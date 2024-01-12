@@ -1,0 +1,222 @@
+import FreeCAD, Draft, Part
+from PySide import QtCore
+from PySide import QtGui
+import os
+
+# - Get document object
+doc = FreeCAD.activeDocument()
+
+# - Get CNC configuration
+config = doc.getObjectsByLabel('Config')[0]
+
+class Join:
+  def __init__(this, obj):
+    obj.addProperty("App::PropertyString",    "Type",     "", "", 5)
+
+    # - Options
+    obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate" )
+    obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power" )
+
+    # - Start points
+    obj.addProperty("App::PropertyFloat",     "PointXLA",    "", "", 1)
+    obj.addProperty("App::PropertyFloat",     "PointZLA",    "", "", 1)
+    obj.addProperty("App::PropertyFloat",     "PointXLB",    "", "", 1)
+    obj.addProperty("App::PropertyFloat",     "PointZLB",    "", "", 1)
+
+    obj.addProperty("App::PropertyFloat",     "PointXRA",    "", "", 1)
+    obj.addProperty("App::PropertyFloat",     "PointZRA",    "", "", 1)
+    obj.addProperty("App::PropertyFloat",     "PointXRB",    "", "", 1)
+    obj.addProperty("App::PropertyFloat",     "PointZRB",    "", "", 1)
+
+    # - Information
+    obj.addProperty("App::PropertyDistance",    "Length_L",     "Information", "Segment length",   1)
+    obj.addProperty("App::PropertyDistance",    "Length_R",     "Information", "Segment length",   1)
+
+    obj.setEditorMode("Placement", 3)
+    obj.Type        = "Join"
+    obj.PointXLA     = 0
+    obj.PointXLB     = 0
+    obj.PointZLA     = 0
+    obj.PointZLB     = 0
+    obj.PointXRA     = 0
+    obj.PointXRB     = 0
+    obj.PointZRA     = 0
+    obj.PointZRB     = 0
+    obj.FeedRate    = config.FeedRateCut
+    obj.WirePower   = config.WireMinPower
+    obj.Proxy       = this
+
+  def onChanged(this, fp, prop):
+    pass
+
+  def execute(this, obj):
+    try:
+      line_L = Part.makeLine(
+        App.Vector(-config.FieldWidth / 2,  obj.PointXLA, obj.PointZLA),
+        App.Vector(-config.FieldWidth / 2,  obj.PointXLB, obj.PointZLB)
+      )
+      line_R = Part.makeLine(
+        App.Vector(config.FieldWidth / 2,   obj.PointXRA, obj.PointZRA),
+        App.Vector(config.FieldWidth / 2,   obj.PointXRB, obj.PointZRB)
+      )
+      obj.Length_L = line_L.Length
+      obj.Length_R = line_R.Length
+      obj.Shape = Part.makeCompound([line_L, line_R])
+      obj.ViewObject.LineColor = (0.137, 0.0, 0.803)
+    except:
+      pass
+
+  def __getstate__(self):
+      pass
+
+  def __setstate__(self, state):
+      return None
+
+class JoinVP:
+  def __init__(this, obj):
+      obj.Proxy = this
+
+  def attach(this, obj):
+    this.Object = obj.Object
+
+  def getIcon(self):
+      return """
+        /* XPM */
+        static char * join_xpm[] = {
+        "16 16 2 1",
+        " 	c None",
+        ".	c #000000",
+        "              . ",
+        "      ...    ...",
+        "    .....   ... ",
+        "   .....   ...  ",
+        "   ...    ...   ",
+        "  ...  .....    ",
+        "  ... .....  .. ",
+        "  ..  .....  .. ",
+        "  ... .....  .. ",
+        "  ...  ...  ... ",
+        "   ...     ...  ",
+        "   ....   ....  ",
+        "  ...........   ",
+        " ...  .....     ",
+        "...             ",
+        " .              "};
+      """
+
+  def __getstate__(self):
+      pass
+
+  def __setstate__(self, state):
+      return None
+
+def isCommonPoint(first, second):
+  return True if first.distanceToPoint(second) < 0.01 else False
+
+# - Create object
+enter = doc.addObject("Part::FeaturePython", "Join")
+Join(enter)
+JoinVP(enter.ViewObject)
+
+# - Find target endpoint
+object_A  = Gui.Selection.getSelectionEx()[0].Object
+object_B  = Gui.Selection.getSelectionEx()[1].Object
+
+point_A   = App.Vector(
+  Gui.Selection.getSelectionEx()[0].SubObjects[0].X,
+  Gui.Selection.getSelectionEx()[0].SubObjects[0].Y,
+  Gui.Selection.getSelectionEx()[0].SubObjects[0].Z
+)
+point_B   = App.Vector(
+  Gui.Selection.getSelectionEx()[1].SubObjects[0].X,
+  Gui.Selection.getSelectionEx()[1].SubObjects[0].Y,
+  Gui.Selection.getSelectionEx()[1].SubObjects[0].Z
+)
+
+if object_A.Type == "Path":
+  # - Connect
+  if isCommonPoint(object_A.Path_L[0], point_A) or isCommonPoint(object_A.Path_R[0], point_A):
+    # - Forward direction
+    enter.PointXLA = object_A.Path_L[0].y
+    enter.PointZLA = object_A.Path_L[0].z
+    enter.PointXRA = object_A.Path_R[0].y
+    enter.PointZRA = object_A.Path_R[0].z
+
+  elif isCommonPoint(object_A.Path_L[-1], point_A) or isCommonPoint(object_A.Path_R[-1], point_A):
+    # - Forward direction
+    enter.PointXLA = object_A.Path_L[-1].y
+    enter.PointZLA = object_A.Path_L[-1].z
+    enter.PointXRA = object_A.Path_R[-1].y
+    enter.PointZRA = object_A.Path_R[-1].z
+
+elif object_A.Type == "Move":
+
+  point_start_L = App.Vector(-config.FieldWidth / 2,  object_A.PointXL, object_A.PointZL)
+  point_start_R = App.Vector( config.FieldWidth / 2,  object_A.PointXR, object_A.PointZR)
+
+  point_end_L = App.Vector(-config.FieldWidth / 2,  object_A.PointXL + float(object_A.OffsetX), object_A.PointZL + float(object_A.OffsetZ))
+  point_end_R = App.Vector( config.FieldWidth / 2,  object_A.PointXR + float(object_A.OffsetX), object_A.PointZR + float(object_A.OffsetZ))
+
+
+  # - Connect
+  if isCommonPoint(point_start_L, point_A) or isCommonPoint(point_start_R, point_A):
+    # - Forward direction
+    enter.PointXLA = point_start_L.y
+    enter.PointZLA = point_start_L.z
+    enter.PointXRA = point_start_R.y
+    enter.PointZRA = point_start_R.z
+
+  elif isCommonPoint(point_end_L, point_A) or isCommonPoint(point_end_R, point_A):
+    # - Forward direction
+    enter.PointXLA = point_end_L.y
+    enter.PointZLA = point_end_L.z
+    enter.PointXRA = point_end_R.y
+    enter.PointZRA = point_end_R.z
+
+
+
+
+
+
+
+
+
+if object_B.Type == "Path":
+  # - Connect
+  if isCommonPoint(object_B.Path_L[0], point_B) or isCommonPoint(object_B.Path_R[0], point_B):
+    # - Forward direction
+    enter.PointXLB = object_B.Path_L[0].y
+    enter.PointZLB = object_B.Path_L[0].z
+    enter.PointXRB = object_B.Path_R[0].y
+    enter.PointZRB = object_B.Path_R[0].z
+
+  elif isCommonPoint(object_B.Path_L[-1], point_B) or isCommonPoint(object_B.Path_R[-1], point_B):
+    # - Forward direction
+    enter.PointXLB = object_B.Path_L[-1].y
+    enter.PointZLB = object_B.Path_L[-1].z
+    enter.PointXRB = object_B.Path_R[-1].y
+    enter.PointZRB = object_B.Path_R[-1].z
+
+elif object_B.Type == "Move":
+
+  point_start_L = App.Vector(-config.FieldWidth / 2,  object_B.PointXL, object_B.PointZL)
+  point_start_R = App.Vector( config.FieldWidth / 2,  object_B.PointXR, object_B.PointZR)
+
+  point_end_L = App.Vector(-config.FieldWidth / 2,  object_B.PointXL + float(object_B.OffsetX), object_B.PointZL + float(object_B.OffsetZ))
+  point_end_R = App.Vector( config.FieldWidth / 2,  object_B.PointXR + float(object_B.OffsetX), object_B.PointZR + float(object_B.OffsetZ))
+
+
+  # - Connect
+  if isCommonPoint(point_start_L, point_B) or isCommonPoint(point_start_R, point_B):
+    # - Forward direction
+    enter.PointXLB = point_start_L.y
+    enter.PointZLB = point_start_L.z
+    enter.PointXRB = point_start_R.y
+    enter.PointZRB = point_start_R.z
+
+  elif isCommonPoint(point_end_L, point_B) or isCommonPoint(point_end_R, point_B):
+    # - Forward direction
+    enter.PointXLB = point_end_L.y
+    enter.PointZLB = point_end_L.z
+    enter.PointXRB = point_end_R.y
+    enter.PointZRB = point_end_R.z

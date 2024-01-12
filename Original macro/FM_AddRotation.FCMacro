@@ -1,0 +1,92 @@
+import FreeCAD, Draft, Part
+from PySide import QtCore
+from PySide import QtGui
+import os
+
+# - Get document object
+doc = FreeCAD.activeDocument()
+
+# - Get CNC configuration
+config = doc.getObjectsByLabel('Config')[0]
+
+class Rotation:
+  def __init__(this, obj):
+    obj.addProperty("App::PropertyString",    "Type",   "", "", 5 )
+    obj.addProperty("App::PropertyLink",      "Source", "", "", 5 )
+    obj.addProperty("App::PropertyAngle",     "Angle",      "Task", "Rotate object by angle")
+    obj.Type        = "Rotation"
+    obj.Angle       = 0
+    obj.Source      = None
+    obj.Proxy       = this
+
+  def onChanged(this, fp, prop):
+    pass
+
+  def execute(this, obj):
+    if obj.Source is None:
+      return
+
+    # - Copy and rotate object
+    shape = obj.Source.Shape.copy()
+    shape.rotate(App.Vector(0,0,0), App.Vector(0,0,1), obj.Angle)
+
+    # - Assign new shape
+    obj.Shape     = shape
+    obj.Placement = shape.Placement
+
+  def __getstate__(self):
+      pass #return {"name": self.Object.Name}
+
+  def __setstate__(self, state):
+      pass #self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+      return None
+
+class RotationVP:
+  def __init__(this, obj):
+      obj.Proxy = this
+
+  def attach(this, obj):
+    this.Object = obj.Object
+
+  def getIcon(self):
+      return """
+        /* XPM */
+        static char * rotate_xpm[] = {
+        "16 16 2 1",
+        " 	c None",
+        ".	c #000000",
+        ".    ......     ",
+        ".. ..........   ",
+        "......    ....  ",
+        "....        ... ",
+        ".....        .. ",
+        "......       ...",
+        "              ..",
+        "                ",
+        "                ",
+        "..              ",
+        "...       ......",
+        " ..        .....",
+        " ...        ....",
+        "  ....    ......",
+        "   .......... ..",
+        "     ......    ."};
+      """
+
+  def __getstate__(self):
+      pass #return {"name": self.Object.Name}
+
+  def __setstate__(self, state):
+      pass #self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+      return None
+
+
+# - Create rotation object
+rt = doc.addObject("Part::FeaturePython", "Rotation")
+Rotation(rt)
+RotationVP(rt.ViewObject)
+
+# - Attach source object
+rt.Source = Gui.Selection.getSelectionEx()[0].Object
+
+

@@ -1,0 +1,343 @@
+import FreeCAD, Draft, Part
+import PySide
+from PySide import QtCore
+from PySide import QtGui
+import os
+
+# - Get document object
+doc = FreeCAD.activeDocument()
+
+# - Check is common point for two lines
+def isCommonPoint(first, second):
+  return True if first.distanceToPoint(second) < 0.01 else False
+
+'''
+  Generate position string for travel
+'''
+def generateTravelPosition(config, X1, Z1, X2, Z2):
+  return "%s%.2f %s%.2f %s%.2f %s%.2f" % (
+    config.X1AxisName, float(X1),
+    config.Z1AxisName, float(Z1),
+    config.X2AxisName, float(X2),
+    config.Z2AxisName, float(Z2)
+  )
+
+'''
+  Generate rotation position
+'''
+def generateRotationPosition(config, angle):
+  return "%s%.2f" % (
+    config.R1AxisName, float(angle)
+  )
+
+'''
+  Generate travel
+'''
+def generateTravel(config, command, feed_rate, X1, Z1, X2, Z2):
+  # - Create position
+  position = generateTravelPosition(config, X1, Z1, X2, Z2)
+
+  # - Create GCODE
+  return command.replace("{Position}", str(position)).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
+
+'''
+  Generate rotation
+'''
+def generateRotation(config, command, angle, feed_rate):
+  # - Create position
+  position = generateRotationPosition(config, angle)
+
+  # - Create GCODE
+  return command.replace("{Position}", str(position)).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
+
+'''
+  Generate wire enable command
+'''
+def generateWireEnable(config, power):
+  return config.WireOnCommand.replace("{WirePower}", "%.2f" % float(power)) + "\r\n"
+
+'''
+  Generate wire disable command
+'''
+def generateWireDisable(config):
+  return config.WireOffCommand + "\r\n"
+
+'''
+  Generate command for compensated power
+'''
+def generateWireCompensatedPower(config, wire_length):
+  min_power   = float(config.WireMinPower)
+  max_power   = float(config.WireMaxPower)
+  min_length  = float(config.FieldWidth)
+
+  # - Calculate power
+  power = (min_power * wire_length) / min_length
+
+  # - Clip power
+  if power > max_power:
+    power = max_power
+
+  # - Generate command
+  return generateWireEnable(config, power)
+
+'''
+  Make GCODE from path element
+'''
+def makeGCODEFromPath(path, reversed, config):
+  GCODE     = ["; - Path [%s]\r\n" % path.Label]
+  out_start = None
+  out_end   = None
+
+  # - Step over each point
+  for i in range(path.PointsCount):
+    # - Get point index
+    index = path.PointsCount - i - 1 if reversed else i
+
+    # - Calculate wire length
+    wire_length = path.Path_L[index].distanceToPoint(path.Path_R[index]);
+
+    # - Insert compensated wire power
+    #GCODE.append(generateWireCompensatedPower(config, wire_length))
+
+    # - Generate CUT travel command
+    GCODE.append(generateTravel(config, config.CutCommand, config.FeedRateCut,
+      path.Path_L[index].y, path.Path_L[index].z,
+      path.Path_R[index].y, path.Path_R[index].z,
+    ))
+
+    # - Store start point
+    if out_start is None: out_start = (path.Path_L[index], path.Path_R[index])
+
+    # - Update end point
+    out_end = (path.Path_L[index], path.Path_R[index])
+
+  return (out_start, out_end, GCODE)
+
+
+def generateStartBlock(config, start_point):
+  GCODE = "; *** START BLOCK ***\r\n"
+
+  # - Homing
+  GCODE += config.HomingCommand + "\r\n"
+
+  # - Initizlie position
+  GCODE += config.InitPositionCommand.replace("{Position}",
+    generateTravelPosition(config,
+      config.HomingX1, config.HomingZ1, config.HomingX2, config.HomingZ2
+    ) + " " +
+    generateRotationPosition(config,
+    config.HomingR1
+    )
+  ) + "\r\n"
+
+  # - Park
+  GCODE += generateTravel(config, config.MoveCommand, config.FeedRateMove,
+    config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
+  )
+  GCODE += generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+
+  # - Go to start point on parking Z
+  if start_point is not None:
+    start_L, start_R = start_point
+    GCODE += generateTravel(config, config.MoveCommand, config.FeedRateMove,
+      start_L.y, config.ParkZ, start_R.y, config.ParkZ
+    )
+
+  # - Enable wire
+  GCODE += generateWireEnable(config, config.WireMinPower)
+
+  return GCODE
+
+
+def generateEndBlock(config, end_point):
+  GCODE = "; *** END BLOCK ***\r\n"
+
+  # - Up wire at current position to park height
+  #up_posistion  = "%s%.2f %s%.2f" % (config.Z1AxisName, config.ParkZ, config.Z2AxisName, config.ParkZ)
+  #feed_rate     = config.FeedRateMove
+  #GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
+
+  # - Disable wire
+  GCODE += generateWireDisable(config)
+
+  # - Park XZ
+  GCODE += generateTravel(config, config.MoveCommand, config.FeedRateMove,
+    config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
+  )
+
+  # - Part R1
+  GCODE += generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+  return GCODE
+
+'''
+  Make GCODE from rotation element
+'''
+def makeGCODEFromRotation(rt, config):
+  GCODE = ["; - Rotation [%s] -\r\n" % rt.Label]
+
+  # - Generate rotation command
+  GCODE.append(generateRotation(config, config.MoveCommand, rt.Angle, config.FeedRateRotate))
+  return GCODE
+
+
+def makeGCODEFromEnter(enter, config):
+  GCODE = ["; - Enter: [%s]\r\n" % enter.Label]
+
+  # - Move to entry point
+  GCODE += generateTravel(config, config.MoveCommand, config.FeedRateMove,
+    enter.PointXL, enter.SafeHeight, enter.PointXR, enter.SafeHeight
+  )
+
+  # - Generate enter
+  GCODE += generateTravel(config, config.CutCommand, config.FeedRateCut,
+    enter.PointXL, enter.PointZL, enter.PointXR, enter.PointZR
+  )
+
+  return GCODE
+
+def makeGCODEFromExit(exit, config):
+  GCODE = ["; - Exit [%s]\r\n" % exit.Label]
+
+  # - Generate exit
+  GCODE += generateTravel(config, config.CutCommand, config.FeedRateCut,
+    exit.PointXL, exit.SafeHeight, exit.PointXR, exit.SafeHeight
+  )
+
+  return GCODE
+
+def makeGCODEFromMove(move, reversed, config):
+  GCODE = ["; - Move [%s] :: %s\r\n" % (move.Label, "S < E" if reversed else "S > E")]
+
+  # - Detect directed offset
+  if reversed:
+    # - Move from end to start
+    GCODE += generateTravel(config, config.CutCommand, move.FeedRate,
+      move.PointXL, move.PointZL, move.PointXR, move.PointZR
+    )
+  else:
+    # - Move from start to end
+    GCODE += generateTravel(config, config.CutCommand, move.FeedRate,
+      move.PointXL + float(move.OffsetX), move.PointZL + float(move.OffsetZ), move.PointXR + float(move.OffsetX), move.PointZR + float(move.OffsetZ)
+    )
+
+  return GCODE
+
+
+
+def makeGCODEFromJoin(move, reversed, config):
+  GCODE = ["; - Join [%s] :: %s\r\n" % (move.Label, "S < E" if reversed else "S > E")]
+
+  # - Detect directed offset
+  if reversed:
+    # - Move from end to start
+    GCODE += generateTravel(config, config.CutCommand, move.FeedRate,
+      move.PointXLA, move.PointZLA, move.PointXRA, move.PointZRA
+    )
+  else:
+    # - Move from start to end
+    GCODE += generateTravel(config, config.CutCommand, move.FeedRate,
+      move.PointXLB, move.PointZLB, move.PointXRB, move.PointZRB
+    )
+
+  return GCODE
+
+'''
+  Generate GCODE from route
+'''
+def makeGCODE(route_list, config):
+  # - Check routes type
+  for route in route_list:
+    if not hasattr(route, "Type") or (route.Type != "Route"):
+      print ("ERROR: Not supported input")
+      return
+
+  start_point = None
+  end_point   = None
+
+  # - Task GCODE buffer
+  TASK = [";\r\n", "; *** TASK BLOCK ***\r\n"]
+
+  # - Wal all routes
+  for route in route_list:
+
+    TASK += [";\r\n", "; --- Route begin [%s] ---\r\n" % route.Label]
+
+    # - Walk throug all route elemets
+    prev_path = False
+    for i in range(len(route.Data)):
+      # - Access item
+      item = route.Data[i]
+
+      # - This is a Path
+      if item.Object.Type == "Path":
+        # - Remove last point from task as it must be same point as new path start
+        if prev_path:
+          del TASK[-1]
+
+        # - Make GCODE from path
+        (start, end, text) = makeGCODEFromPath(item.Object, item.Reversed, config)
+        TASK += text
+
+        # - Store first point as start point
+        if start_point is None: start_point = start
+
+        # - Update end point
+        end_point = end
+
+        # - Update prev element type
+        prev_path = True
+
+      elif item.Object.Type == "Move":
+        # - Make GCODE from move
+        TASK += makeGCODEFromMove(item.Object, item.Reversed, config)
+
+      # - This is a Rotation
+      elif item.Object.Type == "Rotation":
+        # - Make GCODE from rotation
+        TASK += makeGCODEFromRotation(item.Object, config)
+        prev_path = False
+
+      elif item.Object.Type == "Enter":
+        TASK += makeGCODEFromEnter(item.Object, config)
+
+      elif item.Object.Type == "Exit":
+        TASK += makeGCODEFromExit(item.Object, config)
+
+      elif item.Object.Type == "Join":
+        TASK += makeGCODEFromJoin(item.Object, item.Reversed, config)
+
+    TASK += ["; --- Route end [%s] ---\r\n" % route.Label, ";\r\n"]
+
+  # ---- Generate startup block
+  START = generateStartBlock(config, start_point)
+  END   = generateEndBlock(config, end_point)
+
+  program = START + ''.join(TASK) + END
+
+  print ("GCODE generated")
+
+  #print (program)
+  # - Open save file dialog
+  try:
+    save_path = QFileDialog.getSaveFileName(None, QString.fromLocal8Bit("Save GCODE"), "", "*.gcode") # PyQt4
+  except Exception:
+    save_path, save_filter = PySide.QtGui.QFileDialog.getSaveFileName(None, "Save GCODE", "", "*.gcode") # PySide
+
+  # - Check path
+  if save_path == "":
+    print ("GCODE saving aborted (no output file path specified)")
+  else:
+    try:
+      with open(save_path, "w") as f:
+        f.write(program)
+      print ("GCODE saved into [%s]" % save_path)
+    except Exception:
+      App.Console.PrintError("Unable to save GCODE in [" + save_path + "]\n")
+
+# - Get CNC configuration
+config = doc.getObjectsByLabel('Config')[0]
+
+# - Get selected route
+route = [item.Object for item in Gui.Selection.getSelectionEx()]
+
+makeGCODE(route, config)

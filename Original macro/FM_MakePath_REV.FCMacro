@@ -1,0 +1,297 @@
+import FreeCAD, Draft, Part
+from PySide import QtCore
+from PySide import QtGui
+import os
+
+# - Get document object
+doc = FreeCAD.activeDocument()
+
+# - Get configuration
+config = doc.getObjectsByLabel('Config')[0]
+
+# - Get working planes
+wp = [
+  doc.getObjectsByLabel('WPL')[0],
+  doc.getObjectsByLabel('WPR')[0]
+]
+
+'''
+  Get all selected objects
+'''
+def getAllSelectedObjects():
+  objects = []
+  for item in  Gui.Selection.getSelectionEx():
+    objects += item.SubObjects
+  return objects
+
+'''
+  Find point of intersection of line and plane
+  @param v0 - Fist point
+  @param v1 - Second point
+  @return Point of intersection
+'''
+def intersectLineAndPlane(v0, v1, plane):
+  # - Check is same points and move one of them along X axis to make able to make a line
+  if (v0.isEqual(v1, 0.01)):
+    v1.x += 1
+
+  # - Make line
+  edge  = Part.makeLine(v0, v1);
+
+  # - Find point of intersection
+  point = plane.Shape.Surface.intersect(edge.Curve)[0][0]
+  del edge
+  return point
+
+'''
+  Make path on working planes by two sets of points
+  @param first - First points set
+  @param second - Second points set
+  @param planes - Array of planes
+  @return Array of points of intersection for each plane
+'''
+def makePathByPointSets(first, second, planes):
+  # - Point sets must contain same number of point
+  if len(first) != len(second):
+    return None
+
+  # - Check working planes count
+  if len(planes) == 0:
+    return None
+
+  # - Initialize result
+  result = []
+
+  # - Intersect line by each point pair and each plane
+  for plane_index in range(len(planes)):
+    plane_points = []
+    for point_index in range(len(first)):
+      plane_points.append(
+        intersectLineAndPlane(first[point_index], second[point_index], planes[plane_index])
+      )
+    result.append(plane_points)
+
+
+  # - Done
+  return result
+
+'''
+  Synchronize direction of two edges using their end vertexes
+  @return (vertex00, vertex01, vertex10, vertex11)
+'''
+def getSynchronizedVertices(first, second):
+  dist, vectors, info = first.distToShape(second)
+  if len(vectors) > 1:
+    v1, v2 = vectors[1]
+    return (
+      first.firstVertex()   if first.firstVertex().Point == v1  else first.lastVertex(),
+      first.lastVertex()    if first.firstVertex().Point == v1  else first.firstVertex(),
+      second.firstVertex()  if second.firstVertex().Point == v2 else second.lastVertex(),
+      second.lastVertex()   if second.firstVertex().Point == v2 else second.firstVertex(),
+    )
+  else:
+    v1, v2 = vectors[0]
+    return (
+      first.lastVertex()    if first.firstVertex().Point == v1  else first.firstVertex(),
+      first.firstVertex()   if first.firstVertex().Point == v1  else first.lastVertex(),
+      second.firstVertex()  if second.firstVertex().Point == v2 else second.lastVertex(),
+      second.lastVertex()   if second.firstVertex().Point == v2 else second.firstVertex(),
+    )
+
+'''
+  Make path on working planes by two edges, vertices, or their combination
+  @param first - First edge / vertex
+  @param second - Second edge / vertex
+  @param step - Distance between points in edge discretization
+'''
+def makePathPointsByEdgesPair(first, second, planes, step = 0.1):
+  # --- Use only end vertices of coplanar edges or lines because path will be a straight line
+  if first.isCoplanar(second) or (first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine" and  second.ShapeType == "Edge" and second.Curve.TypeId == "Part::GeomLine"):
+    # - Synchronize edges direction
+    v00, v01, v10, v11 = getSynchronizedVertices(first, second)
+
+    # - Make path
+    return makePathByPointSets([v00.Point, v01.Point], [v10.Point, v11.Point], planes)
+
+  # --- This not coplanar edges
+  else:
+    # - Detect vertex and vertex
+    if first.ShapeType == "Vertex" and second.ShapeType == "Vertex":
+      return makePathByPointSets([first.Point], [second.Point], planes)
+
+    # - Detect line with combination of vertex or another line
+    if                                                                                                                                                    \
+      (first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine" and second.ShapeType == "Vertex")                                             \
+      or                                                                                                                                                  \
+      (first.ShapeType == "Vertex" and second.ShapeType == "Edge" and second.Curve.TypeId == "Part::GeomLine")                                            \
+    :
+      # - Simplify path to straight line
+      points_count = 2
+    else:
+      # - Find longest edge
+      maxlen = first.Length if first.Length >= second.Length else second.Length
+
+      # - Calculate number of discretization points
+      points_count = int(float(maxlen) / float(step))
+
+
+    print("Point count = %d" % points_count)
+
+    first_set   = []
+    second_set  = []
+
+    # - Discretize first edge
+    if first.ShapeType == "Vertex":
+      for i in range(points_count): first_set.append(first.Point)
+    else:
+      first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
+
+    # - Discretize second edge
+    if second.ShapeType == "Vertex":
+      for i in range(points_count): second_set.append(second.Point)
+    else:
+      second_set = second.discretize(Number=points_count) if points_count > 2 else [second.firstVertex().Point, second.lastVertex().Point]
+
+    # - Find orientation
+    v00, v01, v10, v11 = getSynchronizedVertices(first, second)
+
+
+    #def isCommonPoint(first, second):
+    #  return True if first.distanceToPoint(second) < 0.05 else False
+
+    #first_rev   = False
+    #second_rev  = False
+
+    #if isCommonPoint(v00.Point, first_set[-1]) and isCommonPoint(v01.Point, first_set[0]):
+    #  first_rev = True
+
+    #if isCommonPoint(v10.Point, second_set[-1]) and isCommonPoint(v11.Point, second_set[0]):
+    #  second_rev = True
+
+    #if first_rev == second_rev:
+    #  print("REVERSING")
+    first_set.reverse()
+
+
+    # - Make path
+    return makePathByPointSets(first_set, second_set, planes)
+
+
+class PathSection:
+  def __init__(this, obj):
+    obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
+    obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
+    obj.addProperty("App::PropertyString",      "Type",       "", "", 5)
+
+    obj.addProperty("App::PropertyPythonObject","Object_L",   "", "", 5)
+    obj.addProperty("App::PropertyPythonObject","Object_R",   "", "", 5)
+
+    obj.addProperty("App::PropertyInteger",     "PointsCount",  "Information", "Number of points", 1)
+    obj.addProperty("App::PropertyDistance",    "Length_L",     "Information", "Segment length",   1)
+    obj.addProperty("App::PropertyDistance",    "Length_R",     "Information", "Segment length",   1)
+
+    obj.Type  = "Path"
+    obj.Proxy = this
+
+  def onChanged(this, fp, prop):
+    #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+    pass
+
+  def execute(this, obj):
+    # - Create path for L
+    path_L = Part.BSplineCurve()
+    path_L.approximate(Points = obj.Path_L, Continuity="C0")
+
+    # - Create path for R
+    path_R = Part.BSplineCurve()
+    path_R.approximate(Points = obj.Path_R, Continuity="C0")
+
+    # - Update shape and information
+    obj.Shape = Part.makeCompound([path_L.toShape(), path_R.toShape(), obj.Object_L, obj.Object_R])
+    obj.Length_L = float(path_L.length())
+    obj.Length_R = float(path_R.length())
+
+
+  def __getstate__(self):
+      pass #return {"name": self.Object.Name}
+
+  def __setstate__(self, state):
+      pass #self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+      return None
+
+class PathSectionVP:
+  def __init__(this, obj):
+      obj.Proxy = this
+
+  def attach(this, obj):
+    this.Object = obj.Object
+
+  def getIcon(self):
+      '''Return the icon in XPM format which will appear in the tree view. This method is\
+              optional and if not defined a default icon is shown.'''
+      return """
+        /* XPM */
+        static char * route_svgrepo_com_xpm[] = {
+        "16 16 2 1",
+        " 	c None",
+        ".	c #000000",
+        "           ...  ",
+        "          .. .  ",
+        "  .........   . ",
+        " ..       .  .  ",
+        " .         . .  ",
+        "..         ..   ",
+        " .              ",
+        " ............   ",
+        "   ............ ",
+        "              . ",
+        "  ...         ..",
+        " .   .        . ",
+        " .   .       .. ",
+        "  . ..........  ",
+        "  ...           ",
+        "   .            "};
+      """
+
+  def __getstate__(self):
+      pass #return {"name": self.Object.Name}
+
+  def __setstate__(self, state):
+      pass #self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+      return None
+
+'''
+  Make path object from two selected objects
+'''
+def makePath():
+  # - Get selected objects
+  objects = getAllSelectedObjects()
+
+  # - Number of object should be two
+  if len(objects) != 2:
+    print("ERROR: Need exactly two objects")
+    return
+
+  # - Check object types
+  for obj in objects:
+    if obj.ShapeType != "Vertex" and obj.ShapeType != "Edge":
+      print("ERROR: Selected objects shoul be vertex or edge")
+      return
+
+  # - Make path between objects on working planes
+  path_points = makePathPointsByEdgesPair(objects[0], objects[1], wp)
+
+  # - Create path object
+  path = doc.addObject("Part::FeaturePython", "Path")
+  PathSection(path)
+  PathSectionVP(path.ViewObject)
+
+  # - Set data
+  path.Path_L       = [App.Vector(item.X, item.Y, item.Z) for item in path_points[0]]
+  path.Path_R       = [App.Vector(item.X, item.Y, item.Z) for item in path_points[1]]
+  path.Object_L     = objects[0]
+  path.Object_R     = objects[1]
+  path.PointsCount  = int(len(path_points[0]))
+  #
+
+makePath()
