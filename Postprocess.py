@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __title__ = "Generate Gcode"
-__author__ = "Andrew Shkolik & Andrei Bezborodov LGPL"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Generate Gcode."
 __usage__ = """Select route(s) and activate tool."""

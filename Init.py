@@ -1,2 +1,5 @@
-# FreeCAD init script of the Foamcut module
-# (c) 2024 Andrew Shkolik, Andrei Bezborodov LGPL
+# -*- coding: utf-8 -*-
+
+__title__= "FreeCAD Foamcut Workbench - Init file"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
+__url__ = ["http://www.freecadweb.org"]

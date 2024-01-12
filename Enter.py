@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __title__ = "Create Enter path"
-__author__ = "Andrew Shkolik & Andrei Bezborodov LGPL"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Create Enter path to selected point."
 __usage__ = """Select point on left or right working plane and activate tool."""

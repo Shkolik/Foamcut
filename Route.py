@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __title__ = "Create Route"
-__author__ = "Andrew Shkolik & Andrei Bezborodov LGPL"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Create a route from selected pathes."
 __usage__ = """Select multiple paths in order of cutting and activate tool."""

@@ -1,17 +1,8 @@
-# (c) 2024 Andrew Shkolik, Andrei Bezborodov LGPL
-
-# coding=utf-8
+# -*- coding: utf-8 -*-
 
 __title__= "FreeCAD Foamcut Workbench - Init file"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __url__ = ["http://www.freecadweb.org"]
-
-# -*- coding: utf-8 -*-
-
-__title__ = "Foamcut workbench utilities"
-__author__ = "Andrew Shkolik & Andrei Bezborodov LGPL"
-__license__ = "LGPL 2.1"
-__doc__ = "Foamcut workbench provide functionality to prepare job and generate Gcode for 4 or 5 axis cnc hotwire cutter."
 
 import FreeCAD
 App=FreeCAD

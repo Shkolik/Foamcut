@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __title__ = "Make Path"
-__author__ = "Andrew Shkolik & Andrei Bezborodov LGPL"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Make Path from 2 selected opposite edges."
 __usage__ = """Select 2 opposite edges and activate tool."""

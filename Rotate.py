@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __title__ = "Create Rotation"
-__author__ = "Andrew Shkolik & Andrei Bezborodov LGPL"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Rotate selected body."
 __usage__ = """Select target body to rotate and activate tool."""

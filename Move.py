@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __title__ = "Create Move path"
-__author__ = "Andrew Shkolik & Andrei Bezborodov LGPL"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Create Move path from selected point."
 __usage__ = """Select start point on left or right plane and activate tool."""

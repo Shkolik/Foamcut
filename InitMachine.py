@@ -1,6 +1,10 @@
-# (c) 2024 Andrew Shkolik, Andrei Bezborodov LGPL
+# -*- coding: utf-8 -*-
 
-# coding=utf-8
+__title__ = "Create Move path"
+__author__ = "Andrew Shkolik & Andrei Bezborodov"
+__license__ = "LGPL 2.1"
+__doc__ = "Create Move path from selected point."
+__usage__ = """Select start point on left or right plane and activate tool."""
 
 import FreeCAD
 App=FreeCAD
@@ -39,7 +43,7 @@ class InitMachine():
     """Init machine"""
 
     def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("machine.svg"), # the name of a svg file available in the resources
+        return {"Pixmap"  : utilities.getIconPath("foamcut.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Init machine",
                 "ToolTip" : "Create Machine object and define working area and machine properties"}
