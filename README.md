@@ -51,7 +51,7 @@ Creates path from selected vertex
 
 ![Move example](Examples/Move.png)
 
-### ![joinIcon](./Resources/icons/Join.svg) Join
+### ![joinIcon](./Resources/icons/join.svg) Join
 Creates path between 2 selected vertexes
 
 ![Join example](Examples/Join.png)
