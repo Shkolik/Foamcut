@@ -79,40 +79,10 @@ def intersectLineAndPlane(v0, v1, plane):
 
     # - Find point of intersection
     point = plane.Shape.Surface.intersect(edge.Curve)[0][0]
-    del edge
+    # del edge
     return point
 
-'''
-  Make path on working planes by two sets of points
-  @param first - First points set
-  @param second - Second points set
-  @param planes - Array of planes
-  @return Array of points of intersection for each plane
-'''
-def makePathByPointSets(first, second, planes):
-    # - Point sets must contain same number of point
-    if len(first) != len(second):
-        return None
 
-    # - Check working planes count
-    if len(planes) == 0:
-        return None
-
-    # - Initialize result
-    result = []
-
-    # - Intersect line by each point pair and each plane
-    for plane_index in range(len(planes)):
-        plane_points = []
-        for point_index in range(len(first)):
-            plane_points.append(
-            intersectLineAndPlane(first[point_index], second[point_index], planes[plane_index])
-            )
-        result.append(plane_points)
-
-
-    # - Done
-    return result
 
 '''
   Get working planes
@@ -134,73 +104,51 @@ def getWorkingPlanes():
             print("ERROR: Right working plane not found")
         
         return result
-        
-'''
-  Synchronize direction of two edges using their end vertexes
-  @return (vertex00, vertex01, vertex10, vertex11)
-'''
-def getSynchronizedVertices(first, second):
-    dist, vectors, info = first.distToShape(second)
-    v1, v2 = vectors[0]
-    return (
-        first.firstVertex()   if first.firstVertex().Point == v1  else first.lastVertex(),
-        first.lastVertex()    if first.firstVertex().Point == v1  else first.firstVertex(),
-        second.firstVertex()  if second.firstVertex().Point == v2 else second.lastVertex(),
-        second.lastVertex()   if second.firstVertex().Point == v2 else second.firstVertex(),
-    )
-  
-'''
-  Make path on working planes by two edges, vertices, or their combination
-  @param first - First edge / vertex
-  @param second - Second edge / vertex
-  @param step - Distance between points in edge discretization
-'''
-def makePathPointsByEdgesPair(first, second, planes, step = 0.1):
-    # --- Use only end vertices of coplanar edges or lines because path will be a straight line
-    if first.isCoplanar(second) or (first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine" and  second.ShapeType == "Edge" and second.Curve.TypeId == "Part::GeomLine"):
-        # - Synchronize edges direction
-        v00, v01, v10, v11 = getSynchronizedVertices(first, second)
 
-        # - Make path
-        return makePathByPointSets([v00.Point, v01.Point], [v10.Point, v11.Point], planes)
+'''
+  Enumeration for the pick style
+'''
+REGULAR = 0
+BOUNDBOX = 1
+UNPICKABLE = 2
 
-    # --- This not coplanar edges
+'''
+  Get pick style node from view object
+  @param viewprovider - view object
+  @param create - optional. If set to True node will be added if not found
+'''
+def getPickStyleNode(viewprovider, create = True):
+    from pivy import coin
+    sa = coin.SoSearchAction()
+    sa.setType(coin.SoPickStyle.getClassTypeId())
+    sa.traverse(viewprovider.RootNode)
+    if sa.isFound() and sa.getPath().getLength() == 1:
+        return sa.getPath().getTail()
     else:
-        # - Detect vertex and vertex
-        if first.ShapeType == "Vertex" and second.ShapeType == "Vertex":
-            return makePathByPointSets([first.Point], [second.Point], planes)
+        if not create:
+            return None
+        node = coin.SoPickStyle()
+        node.style.setValue(coin.SoPickStyle.SHAPE)
+        viewprovider.RootNode.insertChild(node, 0)
+        return node
 
-        # - Detect line with combination of vertex or another line
-        if                                                                                                                                                  \
-        (first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine" and second.ShapeType == "Vertex")                                             \
-        or                                                                                                                                                  \
-        (first.ShapeType == "Vertex" and second.ShapeType == "Edge" and second.Curve.TypeId == "Part::GeomLine")                                            \
-        :
-            # - Simplify path to straight line
-            points_count = 2
-        else:
-            # - Find longest edge
-            maxlen = first.Length if first.Length >= second.Length else second.Length
-
-            # - Calculate number of discretization points
-            points_count = int(float(maxlen) / float(step))
-
-    print("Point count = %d" % points_count)
-
-    first_set   = []
-    second_set  = []
-
-    # - Discretize first edge
-    if first.ShapeType == "Vertex":
-        for i in range(points_count): first_set.append(first.Point)
+'''
+  Get pick style from view object
+  @param viewprovider - view object
+'''
+def getPickStyle(viewprovider):
+    node = getPickStyleNode(viewprovider, create = False)
+    if node is not None:
+        return node.style.getValue()
     else:
-        first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
+        return REGULAR
 
-    # - Discretize second edge
-    if second.ShapeType == "Vertex":
-        for i in range(points_count): second_set.append(second.Point)
-    else:
-        second_set = second.discretize(Number=points_count) if points_count > 2 else [second.firstVertex().Point, second.lastVertex().Point]
-
-    # - Make path
-    return makePathByPointSets(first_set, second_set, planes)
+'''
+  Set pick style
+  @param viewprovider - view object
+  @param style - pick style. Acceptable values: REGULAR, BOUNDBOX, UNPICKABLE
+'''
+def setPickStyle(viewprovider, style):
+    node = getPickStyleNode(viewprovider, create = style != 0)
+    if node is not None:
+        return node.style.setValue(style)

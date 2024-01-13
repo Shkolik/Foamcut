@@ -34,14 +34,16 @@ class Rotation:
 
         obj.Source.ViewObject.Visibility = False
 
+        # - Get CNC configuration
+        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
+        
         # - Copy and rotate object
         shape = obj.Source.Shape.copy()
-        shape.rotate(App.Vector(0,0,0), App.Vector(0,0,1), obj.Angle)
-
+        shape.rotate(App.Vector(config.OriginRotationY, config.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
+        
         # - Assign new shape
         obj.Shape     = shape
-        obj.Placement = shape.Placement
-
+        
         Gui.Selection.clearSelection()
 
 class RotationVP:

@@ -3,14 +3,15 @@
 __title__ = "Create Move path"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
-__doc__ = "Create Move path from selected point."
-__usage__ = """Select start point on left or right plane and activate tool."""
+__doc__ = "Create and initialize Job."
+__usage__ = """Create and initialize Job."""
 
 import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import utilities
+import Config
 
 class Machine:
     def __init__(self, obj):
@@ -22,22 +23,32 @@ class Machine:
     def execute(self, obj):
         pass
 
-    def __getstate__(self):
-        pass #return {"name": self.Object.Name}
-
-    def __setstate__(self, state):
-        pass #self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-        return None
-
 class MachineVP:
     def __init__(self, obj):
         obj.Proxy = self
 
     def attach(self, obj):
-        pass
+        self.ViewObject = obj
+        self.Object = obj.Object
 
     def getIcon(self):
         return utilities.getIconPath("machine.svg")
+    
+    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
+        def dumps(self):
+            return {"name": self.Object.Name}
+
+        def loads(self, state):
+            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+            return None
+
+    else:
+        def __getstate__(self):
+            return {"name": self.Object.Name}
+
+        def __setstate__(self, state):
+            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+            return None
   
 class InitMachine():
     """Init machine"""
@@ -49,153 +60,64 @@ class InitMachine():
                 "ToolTip" : "Create Machine object and define working area and machine properties"}
 
     def Activated(self):
-        # - Get document object
-        doc = FreeCAD.activeDocument()
-        # - Create bounding box
-        boundary = doc.addObject("Part::Box", "CNCVolume")
-        boundary.setEditorMode("Placement",     3)
-        boundary.setEditorMode("Label",         3)
-        boundary.setEditorMode("Width",         3)
-        boundary.setEditorMode("Height",        3)
-        boundary.setEditorMode("Length",        3)
-        boundary.setEditorMode("Support",       3)
-        boundary.setEditorMode("MapMode",       3)
-
-        # - Create CNC configuration
-        config = doc.addObject("Part::Feature", "Config")
-        config.setEditorMode("Placement", 3)
-        config.setEditorMode("Label",     3)
-        config.addProperty("App::PropertyLength",     "HorizontalTravel", "Machine Geometry", "Horizontal travel distance")   # - Horizontal travel
-        config.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry", "Vertical travel distance"  )   # - Vertical travel
-        config.addProperty("App::PropertyLength",     "FieldWidth",       "Machine Geometry", "Distance between wire ends")   # - Width
-
-        config.addProperty("App::PropertyString",     "X1AxisName",    "Axis Mapping",     "Name of X1 axis in GCODE"     )
-        config.addProperty("App::PropertyString",     "Z1AxisName",    "Axis Mapping",     "Name of Z1 axis in GCODE"     )
-
-        config.addProperty("App::PropertyString",     "X2AxisName",    "Axis Mapping",     "Name of X2 axis in GCODE"     )
-        config.addProperty("App::PropertyString",     "Z2AxisName",    "Axis Mapping",     "Name of Z2 axis in GCODE"     )
-
-        config.addProperty("App::PropertyString",     "R1AxisName",    "Axis Mapping",     "Name of rotary table axis in GCODE")
-
-
-        config.addProperty("App::PropertyDistance",     "HomingX1",      "Homing", "Initial position for X1 axis")
-        config.addProperty("App::PropertyDistance",     "HomingZ1",      "Homing", "Initial position for Z1 axis")
-        config.addProperty("App::PropertyDistance",     "HomingX2",      "Homing", "Initial position for X2 axis")
-        config.addProperty("App::PropertyDistance",     "HomingZ2",      "Homing", "Initial position for Z2 axis")
-        config.addProperty("App::PropertyDistance",     "HomingR1",      "Homing", "Initial position for R1 axis")
-
-        config.addProperty("App::PropertyDistance",      "ParkX",         "Parking", "Parking position for X")
-        config.addProperty("App::PropertyDistance",      "ParkZ",         "Parking", "Parking position for Z")
-        config.addProperty("App::PropertyDistance",      "ParkR1",        "Parking", "Parking position for rotary table")
-
-        config.addProperty("App::PropertySpeed",      "FeedRateCut",     "FeedRate",   "Feed rate while cutting")
-        config.addProperty("App::PropertySpeed",      "FeedRateMove",    "FeedRate",   "Feed rate while moving")
-        config.addProperty("App::PropertySpeed",      "FeedRateRotate",  "FeedRate",   "Feed rate while rotating")
-
-        config.addProperty("App::PropertyInteger",    "WireMinPower",     "Wire",         "Minimal wire power")
-        config.addProperty("App::PropertyInteger",    "WireMaxPower",     "Wire",         "Maximal wire power")
-
-        config.addProperty("App::PropertyString",     "CutCommand",           "GCODE",        "Command for move while cutting")
-        config.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",        "Command for move")
-        config.addProperty("App::PropertyString",     "WireOnCommand",        "GCODE",        "Command for enable wire")
-        config.addProperty("App::PropertyString",     "WireOffCommand",       "GCODE",        "Command for disable wire")
-        config.addProperty("App::PropertyString",     "HomingCommand",        "GCODE",        "Command for homing procedure")
-        config.addProperty("App::PropertyString",     "InitPositionCommand",  "GCODE",        "Command for initialize position")
-
-        config.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",       "Safe height for travel")
-
-        # - Set boundary
-        config.HorizontalTravel = 490
-        config.VerticalTravel   = 235
-        config.FieldWidth       = 374
-
-        # - Set axis mapping
-        config.X1AxisName  = "X"
-        config.Z1AxisName  = "Y"
-        config.X2AxisName  = "Z"
-        config.Z2AxisName  = "A"
-        config.R1AxisName  = "B"
-
-        # - Set default homing positions
-        config.HomingX1 = 249
-        config.HomingZ1 = 238
-        config.HomingX2 = 245
-        config.HomingZ2 = 236
-        config.HomingR1 = -7.3
-
-        config.FeedRateCut      = 7
-        config.FeedRateMove     = 14
-        config.FeedRateRotate   = 30
-        config.WireMinPower     = 500
-        config.WireMaxPower     = 1000
-
-        config.CutCommand           = "G01 {Position} F{FeedRate}"
-        config.MoveCommand          = "G00 {Position} F{FeedRate}"
-        config.HomingCommand        = "$H"
-        config.WireOnCommand        = "M03 S{WirePower}"
-        config.WireOffCommand       = "M05"
-        config.InitPositionCommand  = "G92 {Position}"
-
-        config.ParkX  = 240
-        config.ParkZ  = 235
-        config.ParkR1 = 0
-        config.SafeHeight = 200
-
-        # - Link boundary
-        boundary.setExpression(".Placement.Base.y", u"-<<Config>>.HorizontalTravel / 2")
-        boundary.setExpression(".Placement.Base.x", u"-<<Config>>.FieldWidth / 2")
-        boundary.setExpression(".Length",           u"<<Config>>.FieldWidth")
-        boundary.setExpression(".Width",            u"<<Config>>.HorizontalTravel")
-        boundary.setExpression(".Height",           u"<<Config>>.VerticalTravel")
-        boundary.ViewObject.Transparency = 90
-        boundary.recompute()
+        
+        
 
         # - Create CNC support
-        cnc = doc.addObject("PartDesign::Body", "CNC")
-        cnc.setEditorMode("Placement",    3)
-        cnc.setEditorMode("Label",        3)
-        cnc.setEditorMode("Tip",          3)
-        cnc.setEditorMode("BaseFeature",  3)
-        cnc.setEditorMode("Group",        3)
+        # cnc = FreeCAD.ActiveDocument.addObject("PartDesign::Body", "CNC")
+        # cnc.setEditorMode("Placement",    3)
+        # cnc.setEditorMode("Label",        3)
+        # cnc.setEditorMode("Tip",          3)
+        # cnc.setEditorMode("BaseFeature",  3)
+        # cnc.setEditorMode("Group",        3)
 
         # - Create working plane #L
-        wp = cnc.newObject("PartDesign::Plane", "WPL")
-        wp.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
-        wp.Support          = None
-        wp.MapMode          = 'Deactivated'
-        wp.MapPathParameter = 0.000000
-        wp.MapReversed      = False
-        wp.ResizeMode       = 'Manual'
-        wp.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),90)).multiply(wp.Placement)
-        wp.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,0,1),-90)).multiply(wp.Placement)
-        wp.setExpression(".Width",   u"<<Config>>.VerticalTravel")
-        wp.setExpression(".Length",    u"<<Config>>.HorizontalTravel")
-        wp.setExpression(".Placement.Base.x", u"-<<Config>>.FieldWidth / 2")
-        wp.setExpression(".Placement.Base.z", u"<<Config>>.VerticalTravel / 2")
-        wp.recompute()
+        # wpl = cnc.newObject("PartDesign::Plane", "WPL")
+        # wpl.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
+        # wpl.Support          = None
+        # wpl.MapMode          = 'Deactivated'
+        # wpl.MapPathParameter = 0.000000
+        # wpl.MapReversed      = False
+        # wpl.ResizeMode       = 'Manual'
+        # wpl.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),90)).multiply(wpl.Placement)
+        # wpl.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,0,1),-90)).multiply(wpl.Placement)
+        
 
         # - Create working plane #R
-        wp = cnc.newObject("PartDesign::Plane", "WPR")
-        wp.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
-        wp.Support          = None
-        wp.MapMode          = 'Deactivated'
-        wp.MapPathParameter = 0.000000
-        wp.MapReversed      = False
-        wp.ResizeMode       = 'Manual'
-        wp.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),90)).multiply(wp.Placement)
-        wp.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,0,1),90)).multiply(wp.Placement)
-        wp.setExpression(".Width",   u"<<Config>>.VerticalTravel")
-        wp.setExpression(".Length",    u"<<Config>>.HorizontalTravel")
-        wp.setExpression(".Placement.Base.x", u"<<Config>>.FieldWidth / 2")
-        wp.setExpression(".Placement.Base.z", u"<<Config>>.VerticalTravel / 2")
-        wp.recompute()
+        # wpr = cnc.newObject("PartDesign::Plane", "WPR")
+        # wpr.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
+        # wpr.Support          = None
+        # wpr.MapMode          = 'Deactivated'
+        # wpr.MapPathParameter = 0.000000
+        # wpr.MapReversed      = False
+        # wpr.ResizeMode       = 'Manual'
+        # wpr.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),90)).multiply(wpr.Placement)
+        # wpr.Placement        = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,0,1),90)).multiply(wpr.Placement)
+        
+
+        # - Create CNC configuration
+        config = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Config")
+        Config.createConfig(config)
+
+        # wpl.setExpression(".Width",   u"<<Config>>.VerticalTravel")
+        # wpl.setExpression(".Length",    u"<<Config>>.HorizontalTravel")
+        # wpl.setExpression(".Placement.Base.x", u"-<<Config>>.FieldWidth / 2")
+        # wpl.setExpression(".Placement.Base.z", u"<<Config>>.VerticalTravel / 2")
+        # wpl.recompute()
+
+        # wpr.setExpression(".Width",   u"<<Config>>.VerticalTravel")
+        # wpr.setExpression(".Length",    u"<<Config>>.HorizontalTravel")
+        # wpr.setExpression(".Placement.Base.x", u"<<Config>>.FieldWidth / 2")
+        # wpr.setExpression(".Placement.Base.z", u"<<Config>>.VerticalTravel / 2")
+        # wpr.recompute()
 
         # - Create group
-        machine = doc.addObject("App::DocumentObjectGroupPython", "Machine")
+        machine = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Machine")
         Machine(machine)
         MachineVP(machine.ViewObject)
+        machine.Group = [config]
 
-        machine.Group = [config, cnc, boundary]
+        FreeCAD.ActiveDocument.ActiveView.setActiveObject('group', machine)
 
         machine.recompute()
         return
