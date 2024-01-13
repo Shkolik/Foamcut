@@ -1,3 +1,4 @@
+
 # FoamCut Workbench
 
 A FreeCAD External Workbench for creating Gcode for 4 and 5 axis CNC foam cutting machine.
@@ -81,13 +82,13 @@ Generates Gcode and save it to the specified file
 
 ## Limitations/TODO
 
- - Machine setup is not parametric. Path and other objects will not be recalculated if you change working area in a middle of the process. But object themself parametric and will be recalculated in case target body parameters got changed.
- - There should be only one machine per file. So far objects strongly depends on that.
+ ~~- Machine setup is not parametric. Path and other objects will not be recalculated if you change working area in a middle of the process. But object themself parametric and will be recalculated in case target body parameters got changed.~~ DONE
+ - ~~There should be only one machine per file. So far objects strongly depends on that.~~ DONE
  - Need to add foam block representation in setup.
- - 5th axis location not configurable for now
- - Machine origin is hardcoded and locates in a working area center
+ - ~~5th axis location not configurable for now~~ DONE
+ - ~~Machine origin is hardcoded and locates in a working area center~~ DONE
  - No kerf settings. User can overcome it by modifying model (create Draft offset and use it as reference for paths )
- - It's highly recommended to export your model as .STEP file, import it in new document and start from there. Since all objects depends on underlying geometry you, in most cases, cannot transform your model or part of it to place inside working area. It's higher priority TODO.
+ - It's highly recommended to export your model as .STEP file, import it in new document and start from there. Since all objects depends on underlying geometry you, in most cases, cannot transform your model or part of it to place inside working area. It's higher priority TODO. 
  - Cannot create path by selecting faces. In many cases it could be very useful to just select 2 faces and create path/route based on their edges (somewhat like loft) instead of selecting edges one by one.
  - many more I forgot for sure ;) 
 
