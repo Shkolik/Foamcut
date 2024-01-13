@@ -88,22 +88,25 @@ def intersectLineAndPlane(v0, v1, plane):
   Get working planes
 '''
 def getWorkingPlanes():
-        doc = FreeCAD.activeDocument()
-        # - Initialize result
-        result = []
-        wpl = doc.getObjectsByLabel('WPL')
-        if len(wpl) > 0:
-            result.append(wpl[0])
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":
+            # - Initialize result
+            result = []
+            wpl = FreeCAD.ActiveDocument.getObject(group.WPLName)
+            if wpl is not None:
+                result.append(wpl)
+            else:
+                print("ERROR: Left working plane not found")
+                return None
+            wpr = FreeCAD.ActiveDocument.getObject(group.WPRName)
+            if wpr is not None:
+                result.append(wpr)
+            else:
+                print("ERROR: Right working plane not found")
+            
+            return result
         else:
-            print("ERROR: Left working plane not found")
-            return None
-        wpr = doc.getObjectsByLabel('WPR')
-        if len(wpr) > 0:
-            result.append(wpr[0])
-        else:
-            print("ERROR: Right working plane not found")
-        
-        return result
+            print("ERROR: Active Job not found.")
 
 '''
   Enumeration for the pick style

@@ -1,0 +1,14 @@
+- foam block in machine config
+- origin arrows
+- kerf settings
+- unpicable helper geometry in one group
+- configuration setup panel
+- paths produced by selecting face
+- G93 mode
+- mirroring gcode tool
+- path by vertex and edge
+- projection to the working plane
+- toggle projection lines
+- package.xml
+- video tutorial
+- examples

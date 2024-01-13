@@ -13,7 +13,7 @@ Gui=FreeCADGui
 import utilities
 import Config
 
-def initChildren(config):
+def initChildren(config, machine):
     CNCVolume = FreeCAD.ActiveDocument.addObject("Part::Box", "CNCVolume")
     CNCVolume.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
     CNCVolume.setEditorMode("Placement",     3)
@@ -63,6 +63,8 @@ def initChildren(config):
     WPL.setExpression(".Placement.Base.x", u"-<<{}>>.FieldWidth / 2".format(config.Name))
     WPL.Placement.Base.z = 0
     WPL.ViewObject.Transparency = 80
+
+    machine.WPLName = WPL.Name
     
     WPR = FreeCAD.ActiveDocument.addObject("Part::Plane", "WPR")
     WPR.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
@@ -83,12 +85,16 @@ def initChildren(config):
     WPR.Placement.Base.z = 0
     WPR.ViewObject.Transparency = 80
 
-    return [config, CNCVolume, RotationAxis, WPL, WPR]
+    machine.WPRName = WPR.Name
+
+    machine.Group = [config, CNCVolume, RotationAxis, WPL, WPR]
     
 class Machine:
     def __init__(self, obj):
         obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Job"
         obj.addProperty("App::PropertyString",      "ConfigName", "", "", 5)
+        obj.addProperty("App::PropertyString",      "WPLName", "", "", 5)
+        obj.addProperty("App::PropertyString",      "WPRName", "", "", 5)
         obj.Proxy = self
 
     def onChanged(self, fp, prop):
@@ -105,7 +111,7 @@ class MachineVP:
         self.ViewObject = obj
         self.Object = obj.Object
         for child in self.Object.Group:
-            if hasattr(child, 'Type') and child.Type == "Helper":
+            if hasattr(child, 'Type') and child.Type == "Helper" and child.Name not in [self.Object.WPLName, self.Object.WPRName]:
                 utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
 
     def doubleClicked(self, obj):
@@ -151,7 +157,7 @@ class InitMachine():
         MachineVP(machine.ViewObject)
 
         machine.ConfigName = config.Name
-        machine.Group = initChildren(config)
+        initChildren(config, machine)
 
         Gui.ActiveDocument.ActiveView.setActiveObject('group', machine)
 
