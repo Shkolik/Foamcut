@@ -14,15 +14,14 @@ import Part
 import utilities
 
 class Join:
-    def __init__(self, obj, start, end):        
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
+    def __init__(self, obj, start, end, config):  
 
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Join"
+        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
 
         # - Options
-        obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate" ).FeedRate = config.FeedRateCut
-        obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power").WirePower = config.WireMinPower
+        obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate" )
+        obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power")
 
         obj.addProperty("App::PropertyFloat",     "PointXLA",   "", "", 1)
         obj.addProperty("App::PropertyFloat",     "PointZLA",   "", "", 1)
@@ -40,6 +39,9 @@ class Join:
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
         obj.addProperty("App::PropertyLinkSub",      "EndPoint",      "Task",   "Start Point").EndPoint = end
 
+        obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
+        obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
+        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
         obj.setEditorMode("Placement", 3)        
         obj.Proxy = self
 
@@ -50,9 +52,6 @@ class Join:
         pass
 
     def execute(self, obj):
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-
         parentA = obj.StartPoint[0]
         vertexA = parentA.getSubObject(obj.StartPoint[1][0])
 
@@ -88,11 +87,11 @@ class Join:
                 obj.PointZRA = parentA.Path_R[-1].z
 
         elif parentA.Type == "Move":
-            point_start_L = App.Vector(-config.FieldWidth / 2,  parentA.PointXL, parentA.PointZL)
-            point_start_R = App.Vector( config.FieldWidth / 2,  parentA.PointXR, parentA.PointZR)
+            point_start_L = App.Vector(-obj.FieldWidth / 2,  parentA.PointXL, parentA.PointZL)
+            point_start_R = App.Vector( obj.FieldWidth / 2,  parentA.PointXR, parentA.PointZR)
 
-            point_end_L = App.Vector(-config.FieldWidth / 2,  parentA.PointXL + float(parentA.InXDirection), parentA.PointZL + float(parentA.InZDirection))
-            point_end_R = App.Vector( config.FieldWidth / 2,  parentA.PointXR + float(parentA.InXDirection), parentA.PointZR + float(parentA.InZDirection))
+            point_end_L = App.Vector(-obj.FieldWidth / 2,  parentA.PointXL + float(parentA.InXDirection), parentA.PointZL + float(parentA.InZDirection))
+            point_end_R = App.Vector( obj.FieldWidth / 2,  parentA.PointXR + float(parentA.InXDirection), parentA.PointZR + float(parentA.InZDirection))
 
             # - Connect
             if utilities.isCommonPoint(point_start_L, pointA) or utilities.isCommonPoint(point_start_R, pointA):
@@ -125,11 +124,11 @@ class Join:
                 obj.PointZRB = parentB.Path_R[-1].z
 
         elif parentB.Type == "Move":
-            point_start_L = App.Vector(-config.FieldWidth / 2,  parentB.PointXL, parentB.PointZL)
-            point_start_R = App.Vector( config.FieldWidth / 2,  parentB.PointXR, parentB.PointZR)
+            point_start_L = App.Vector(-obj.FieldWidth / 2,  parentB.PointXL, parentB.PointZL)
+            point_start_R = App.Vector( obj.FieldWidth / 2,  parentB.PointXR, parentB.PointZR)
 
-            point_end_L = App.Vector(-config.FieldWidth / 2,  parentB.PointXL + float(parentB.InXDirection), parentB.PointZL + float(parentB.InZDirection))
-            point_end_R = App.Vector( config.FieldWidth / 2,  parentB.PointXR + float(parentB.InXDirection), parentB.PointZR + float(parentB.InZDirection))
+            point_end_L = App.Vector(-obj.FieldWidth / 2,  parentB.PointXL + float(parentB.InXDirection), parentB.PointZL + float(parentB.InZDirection))
+            point_end_R = App.Vector( obj.FieldWidth / 2,  parentB.PointXR + float(parentB.InXDirection), parentB.PointZR + float(parentB.InZDirection))
 
             # - Connect
             if utilities.isCommonPoint(point_start_L, pointB) or utilities.isCommonPoint(point_start_R, pointB):
@@ -147,12 +146,12 @@ class Join:
                 obj.PointZRB = point_end_R.z
                 
         line_L = Part.makeLine(
-            App.Vector(-config.FieldWidth / 2,  obj.PointXLA, obj.PointZLA),
-            App.Vector(-config.FieldWidth / 2,  obj.PointXLB, obj.PointZLB)
+            App.Vector(-obj.FieldWidth / 2,  obj.PointXLA, obj.PointZLA),
+            App.Vector(-obj.FieldWidth / 2,  obj.PointXLB, obj.PointZLB)
         )
         line_R = Part.makeLine(
-            App.Vector(config.FieldWidth / 2,   obj.PointXRA, obj.PointZRA),
-            App.Vector(config.FieldWidth / 2,   obj.PointXRB, obj.PointZRB)
+            App.Vector(obj.FieldWidth / 2,   obj.PointXRA, obj.PointZRA),
+            App.Vector(obj.FieldWidth / 2,   obj.PointXRB, obj.PointZRB)
         )
         obj.LeftSegmentLength = line_L.Length
         obj.RightSegmentLength = line_R.Length
@@ -208,49 +207,56 @@ class MakeJoin():
                 "ToolTip" : "Join 2 selected coplanar points"}
 
     def Activated(self):         
-        # - Get selecttion
-        objects = utilities.getAllSelectedObjects()
-        
-        # - Create object
-        join = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Join")
-        Join(join, objects[0], objects[1])
-        JoinVP(join.ViewObject)
-        join.ViewObject.PointSize = 4
-   
-        FreeCAD.ActiveDocument.recompute()
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":    
+            # - Get selecttion
+            objects = utilities.getAllSelectedObjects()
+            
+            # - Create object
+            join = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Join")
+            Join(join, objects[0], objects[1], group.ConfigName)
+            JoinVP(join.ViewObject)
+            join.ViewObject.PointSize = 4
+    
+            group.addObject(join)
+
+            FreeCAD.ActiveDocument.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            # - Get selecttion
-            objects = utilities.getAllSelectedObjects()
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":   
+                # - Get selecttion
+                objects = utilities.getAllSelectedObjects()
 
-            # - nothing selected
-            if len(objects) < 2:
-                return False
-            
-            objectA = objects[0]
-            parentA = objectA[0]
-            objectB = objects[1]
-            parentB = objectB[0]
-            # - Check object type
-            if parentA.Type != "Path" and parentA.Type != "Move":                    
-                return False
-            
-            wp = utilities.getWorkingPlanes()
-            if len(wp) != 2:
-                return False
+                # - nothing selected
+                if len(objects) < 2:
+                    return False
                 
-            vertexA = parentA.getSubObject(objectA[1][0])
-            vertexB = parentB.getSubObject(objectB[1][0])
-            # Selected point should be on any working plane
-            if (not wp[0].Shape.isInside(App.Vector(vertexA.X, vertexA.Y, vertexA.Z), 0.01, True) 
-                and not wp[1].Shape.isInside(App.Vector(vertexA.X, vertexA.Y, vertexA.Z), 0.01, True)):
-                return False
-            if (not wp[0].Shape.isInside(App.Vector(vertexB.X, vertexB.Y, vertexB.Z), 0.01, True) 
-                and not wp[1].Shape.isInside(App.Vector(vertexB.X, vertexB.Y, vertexB.Z), 0.01, True)):
-                return False
-            return True
+                objectA = objects[0]
+                parentA = objectA[0]
+                objectB = objects[1]
+                parentB = objectB[0]
+                # - Check object type
+                if parentA.Type != "Path" and parentA.Type != "Move":                    
+                    return False
+                
+                wp = utilities.getWorkingPlanes()
+                if len(wp) != 2:
+                    return False
+                    
+                vertexA = parentA.getSubObject(objectA[1][0])
+                vertexB = parentB.getSubObject(objectB[1][0])
+                # Selected point should be on any working plane
+                if (not wp[0].Shape.isInside(App.Vector(vertexA.X, vertexA.Y, vertexA.Z), 0.01, True) 
+                    and not wp[1].Shape.isInside(App.Vector(vertexA.X, vertexA.Y, vertexA.Z), 0.01, True)):
+                    return False
+                if (not wp[0].Shape.isInside(App.Vector(vertexB.X, vertexB.Y, vertexB.Z), 0.01, True) 
+                    and not wp[1].Shape.isInside(App.Vector(vertexB.X, vertexB.Y, vertexB.Z), 0.01, True)):
+                    return False
+                return True
+            return False
             
 Gui.addCommand("Join", MakeJoin())

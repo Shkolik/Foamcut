@@ -224,15 +224,18 @@ class MakePath():
                 "ToolTip" : "Create path object from 2 selected opposite edges"}
 
     def Activated(self):
-        # - Get selected edges
-        edges = utilities.getAllSelectedEdges()
-    
-        obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython","Path")
-        PathSection(obj, (FreeCAD.ActiveDocument.getObject((edges[0])[0].Name), (edges[0])[1][0]), (FreeCAD.ActiveDocument.getObject((edges[1])[0].Name),(edges[1])[1][0]))
-        PathSectionVP(obj.ViewObject)
-        obj.ViewObject.PointSize = 4
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":
+            # - Get selected edges
+            edges = utilities.getAllSelectedEdges()
+            obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython","Path")
+            
+            PathSection(obj, (FreeCAD.ActiveDocument.getObject((edges[0])[0].Name), (edges[0])[1][0]), (FreeCAD.ActiveDocument.getObject((edges[1])[0].Name),(edges[1])[1][0]))
+            PathSectionVP(obj.ViewObject)
+            obj.ViewObject.PointSize = 4
 
-        FreeCAD.ActiveDocument.recompute()
+            group.addObject(obj)
+            obj.recompute()
     
     def IsActive(self):
         if App.ActiveDocument is None:

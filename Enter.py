@@ -14,12 +14,10 @@ import Part
 import utilities
 
 class Enter:
-    def __init__(self, obj, entry):      
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]  
-
-        obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height during move" ).SafeHeight = config.SafeHeight
+    def __init__(self, obj, entry, config):              
+        obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height" )        
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Enter"
+        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
 
         obj.addProperty("App::PropertyFloat",     "PointXL",   "", "", 1)
         obj.addProperty("App::PropertyFloat",     "PointZL",   "", "", 1)
@@ -31,6 +29,8 @@ class Enter:
 
         obj.addProperty("App::PropertyLinkSub",      "EntryPoint",      "Task",   "Entry Point").EntryPoint = entry
 
+        obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
+        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
@@ -40,10 +40,7 @@ class Enter:
         # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
-    def execute(self, obj):
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-
+    def execute(self, obj):        
         parent = obj.EntryPoint[0]
         vertex = parent.getSubObject(obj.EntryPoint[1][0])
 
@@ -70,11 +67,11 @@ class Enter:
                 obj.PointZR = parent.Path_R[-1].z
 
         elif parent.Type == "Move":
-            point_start_L = App.Vector(-config.FieldWidth / 2,  parent.PointXL, parent.PointZL)
-            point_start_R = App.Vector( config.FieldWidth / 2,  parent.PointXR, parent.PointZR)
+            point_start_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL, parent.PointZL)
+            point_start_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR, parent.PointZR)
 
-            point_end_L = App.Vector(-config.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
-            point_end_R = App.Vector( config.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
+            point_end_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
+            point_end_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
 
             # - Connect
             if utilities.isCommonPoint(point_start_L, point) or utilities.isCommonPoint(point_start_R, point):
@@ -91,12 +88,12 @@ class Enter:
                 obj.PointXR = point_end_R.y
                 obj.PointZR = point_end_R.z
         line_L = Part.makeLine(
-            App.Vector(-config.FieldWidth / 2,  obj.PointXL, obj.SafeHeight),
-            App.Vector(-config.FieldWidth / 2,   obj.PointXL, obj.PointZL)
+            App.Vector(-obj.FieldWidth / 2,  obj.PointXL, obj.SafeHeight),
+            App.Vector(-obj.FieldWidth / 2,   obj.PointXL, obj.PointZL)
         )
         line_R = Part.makeLine(
-            App.Vector(config.FieldWidth / 2,  obj.PointXR, obj.SafeHeight),
-            App.Vector(config.FieldWidth / 2,   obj.PointXR, obj.PointZR)
+            App.Vector(obj.FieldWidth / 2,  obj.PointXR, obj.SafeHeight),
+            App.Vector(obj.FieldWidth / 2,   obj.PointXR, obj.PointZR)
         )
         obj.LeftSegmentLength = line_L.Length
         obj.RightSegmentLength = line_R.Length
@@ -150,44 +147,50 @@ class MakeEnter():
                 "MenuText": "Create enter",
                 "ToolTip" : "Create enter path object to selected entry point"}
 
-    def Activated(self):         
-        # - Get selecttion
-        objects = utilities.getAllSelectedObjects()
-        
-        # - Create object
-        enter = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Enter")
-        Enter(enter, objects[0])
-        EnterVP(enter.ViewObject)
-        enter.ViewObject.PointSize = 4
-   
-        FreeCAD.ActiveDocument.recompute()
+    def Activated(self):     
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":    
+            # - Get selecttion
+            objects = utilities.getAllSelectedObjects()
+            
+            # - Create object
+            enter = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Enter")
+            Enter(enter, objects[0], group.ConfigName)
+            EnterVP(enter.ViewObject)
+            enter.ViewObject.PointSize = 4
+    
+            group.addObject(enter)
+            enter.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            # - Get selecttion
-            objects = utilities.getAllSelectedObjects()
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":
+                # - Get selecttion
+                objects = utilities.getAllSelectedObjects()
 
-            # - nothing selected
-            if len(objects) == 0:
-                return False
-            
-            object = objects[0]
-            parent = object[0]
-            # - Check object type
-            if parent.Type != "Path" and parent.Type != "Move":                    
-                return False
-            
-            wp = utilities.getWorkingPlanes()
-            if len(wp) != 2:
-                return False
+                # - nothing selected
+                if len(objects) == 0:
+                    return False
                 
-            vertex = parent.getSubObject(object[1][0])
-            # Selected point should be on any working plane
-            if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
-                and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
-                return False
-            return True
+                object = objects[0]
+                parent = object[0]
+                # - Check object type
+                if parent.Type != "Path" and parent.Type != "Move":                    
+                    return False
+                
+                wp = utilities.getWorkingPlanes()
+                if len(wp) != 2:
+                    return False
+                    
+                vertex = parent.getSubObject(object[1][0])
+                # Selected point should be on any working plane
+                if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
+                    and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
+                    return False
+                return True
+            return False
             
 Gui.addCommand("MakeEnter", MakeEnter())

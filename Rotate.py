@@ -13,12 +13,13 @@ Gui=FreeCADGui
 import utilities
  
 class Rotation:
-    def __init__(self, obj, source):        
+    def __init__(self, obj, source, config):        
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Rotation"  
 
         obj.addProperty("App::PropertyLink",      "Source",      "Task",   "Source object").Source = source
         obj.addProperty("App::PropertyAngle",     "Angle",      "Task", "Rotate object by angle").Angle = 90
-
+        obj.addProperty("App::PropertyDistance",   "OriginRotationX", "", "", 5)
+        obj.setExpression(".OriginRotationX", u"<<{}>>.OriginRotationX".format(config))
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
@@ -34,16 +35,13 @@ class Rotation:
 
         obj.Source.ViewObject.Visibility = False
 
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-        
         # - Copy and rotate object
         shape = obj.Source.Shape.copy()
-        shape.rotate(App.Vector(config.OriginRotationY, config.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
+        shape.rotate(App.Vector(0.0, obj.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
         
         # - Assign new shape
         obj.Shape     = shape
-        
+        obj.Placement = shape.Placement
         Gui.Selection.clearSelection()
 
 class RotationVP:
@@ -51,6 +49,7 @@ class RotationVP:
         obj.Proxy = self
 
     def attach(self, obj):
+        self.ViewObject = obj
         self.Object = obj.Object
 
     def getIcon(self):
@@ -92,35 +91,44 @@ class AddRotation():
                 "ToolTip" : "Rotate target object by given angle"}
 
     def Activated(self):   
-        source = Gui.Selection.getSelectionEx()[0].Object      
-        # - Create rotation object
-        rt = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Rotation")
-        Rotation(rt, source)
-        RotationVP(rt.ViewObject)
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":
+            source = Gui.Selection.getSelectionEx()[0].Object      
+            # - Create rotation object
+            rt = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Rotation")
+            
+            Rotation(rt, source, group.ConfigName)
+            RotationVP(rt.ViewObject)
 
-        FreeCAD.ActiveDocument.recompute()
+            group.addObject(rt)
+            rt.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            # - Get selecttion
-            selection = Gui.Selection.getSelectionEx()
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":
+                # - Get selecttion
+                selection = Gui.Selection.getSelectionEx()
 
-            # - nothing selected
-            if len(selection) == 0:
-                return False
-            
-            # - Check object type
-            if selection[0] is None or selection[0].Object is None:                    
-                return False      
+                # - nothing selected
+                if len(selection) == 0:
+                    return False
+                
+                # - Check object type
+                if selection[0] is None or selection[0].Object is None:                    
+                    return False      
 
-            obj = selection[0].Object
-            if ((obj.TypeId == "Part::FeaturePython" or obj.TypeId == "App::DocumentObjectGroupPython") and 
-                (obj.Type == "Path" or obj.Type == "Rotation" or obj.Type == "Enter" 
-                 or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route")):
-                return False
-             
-            return True
+                obj = selection[0].Object
+                if not hasattr(obj, "Shape"):
+                    return False
+                if ((obj.TypeId == "Part::FeaturePython" or obj.TypeId == "App::DocumentObjectGroupPython") and 
+                    (obj.Type == "Path" or obj.Type == "Enter"  or obj.Type == "Job" or obj.Type == "Helper"
+                    or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route")):
+                    return False
+                
+                return True
+            return False
             
 Gui.addCommand("Rotate", AddRotation())

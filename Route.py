@@ -25,11 +25,14 @@ class RouteEntry:
         return json.dumps(this, default=lambda o: o.__dict__, sort_keys=True, indent=4)
     
 class Route:
-    def __init__(self, obj, objects):        
+    def __init__(self, obj, objects, config):        
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Route"  
+        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
 
         obj.addProperty("App::PropertyLinkList",      "Objects",      "Task",   "Source data").Objects = objects
         obj.addProperty("App::PropertyPythonObject",  "Data", "Task", "", 5)
+
+        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
 
         obj.setEditorMode("Group", 3)
         obj.Proxy = self
@@ -40,10 +43,7 @@ class Route:
         # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
-    def execute(self, obj):
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-        
+    def execute(self, obj):        
         first       = obj.Objects[0]
         reversed    = None        # - Second segment is reversed
         START       = 0           # - Segment start point index
@@ -127,16 +127,16 @@ class Route:
             if first.Type   == "Path":    
                 first_line  = first.Path_L
             elif first.Type == "Enter":   
-                first_line  = [App.Vector(-config.FieldWidth / 2, first.PointXL, first.PointZL)]
+                first_line  = [App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL)]
             elif first.Type == "Move":    
                 first_line  = [
-                    App.Vector(-config.FieldWidth / 2, first.PointXL, first.PointZL),
-                    App.Vector(-config.FieldWidth / 2, first.PointXL + float(first.InXDirection), first.PointZL + float(first.InZDirection))
+                    App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL),
+                    App.Vector(-obj.FieldWidth / 2, first.PointXL + float(first.InXDirection), first.PointZL + float(first.InZDirection))
                 ]
             elif first.Type == "Join":    
                 first_line  = [
-                    App.Vector(-config.FieldWidth / 2, first.PointXLA, first.PointZLA),
-                    App.Vector(-config.FieldWidth / 2, first.PointXLB, first.PointZLB)
+                    App.Vector(-obj.FieldWidth / 2, first.PointXLA, first.PointZLA),
+                    App.Vector(-obj.FieldWidth / 2, first.PointXLB, first.PointZLB)
                 ]
             else:
                 print("Unsupported first element")
@@ -147,16 +147,16 @@ class Route:
             if second.Type == "Path":   
                 second_line = second.Path_L
             elif second.Type == "Exit": 
-                second_line = [App.Vector(-config.FieldWidth / 2, second.PointXL, second.PointZL)]
+                second_line = [App.Vector(-obj.FieldWidth / 2, second.PointXL, second.PointZL)]
             elif second.Type == "Move": 
                 second_line = [
-                    App.Vector(-config.FieldWidth / 2, second.PointXL, second.PointZL),
-                    App.Vector(-config.FieldWidth / 2, second.PointXL + float(second.InXDirection), second.PointZL + float(second.InZDirection))
+                    App.Vector(-obj.FieldWidth / 2, second.PointXL, second.PointZL),
+                    App.Vector(-obj.FieldWidth / 2, second.PointXL + float(second.InXDirection), second.PointZL + float(second.InZDirection))
                 ]
             elif second.Type == "Join":    
                 second_line  = [
-                    App.Vector(-config.FieldWidth / 2, second.PointXLA, second.PointZLA),
-                    App.Vector(-config.FieldWidth / 2, second.PointXLB, second.PointZLB)
+                    App.Vector(-obj.FieldWidth / 2, second.PointXLA, second.PointZLA),
+                    App.Vector(-obj.FieldWidth / 2, second.PointXLB, second.PointZLB)
                 ]
             else:
                 print("Unsupported second element")
@@ -266,33 +266,39 @@ class MakeRoute():
                 "MenuText": "Create a route",
                 "ToolTip" : "Create a route from selected paths"}
 
-    def Activated(self):         
-        # - Get selecttion
-        objects = [item.Object for item in Gui.Selection.getSelectionEx()]
-        
-        # - Create object
-        route = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Route")
-        Route(route, objects)
-        RouteVP(route.ViewObject)
-   
-        FreeCAD.ActiveDocument.recompute()
+    def Activated(self): 
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":        
+            # - Get selecttion
+            objects = [item.Object for item in Gui.Selection.getSelectionEx()]
+            
+            # - Create object
+            route = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Route")
+            Route(route, objects, group.ConfigName)
+            RouteVP(route.ViewObject)
+
+            group.addObject(route)
+
+            route.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            # - Get selected objects
-            objects = [item.Object for item in Gui.Selection.getSelectionEx()]
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":
+                # - Get selected objects
+                objects = [item.Object for item in Gui.Selection.getSelectionEx()]
 
-            # - nothing selected
-            if len(objects) == 0:
-                return False
-            
-            for obj in objects:
-                if (not hasattr(obj, "Type") or 
-                    (obj.Type != "Path" and obj.Type != "Rotation" and obj.Type != "Enter" and obj.Type != "Exit" and obj.Type != "Move" and obj.Type != "Join")):
+                # - nothing selected
+                if len(objects) == 0:
                     return False
                 
-            return True
+                for obj in objects:
+                    if (not hasattr(obj, "Type") or 
+                        (obj.Type != "Path" and obj.Type != "Rotation" and obj.Type != "Enter" and obj.Type != "Exit" and obj.Type != "Move" and obj.Type != "Join")):
+                        return False                    
+                return True
+            return False
             
 Gui.addCommand("Route", MakeRoute())

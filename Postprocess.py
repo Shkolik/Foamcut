@@ -364,38 +364,43 @@ class Postprocess():
                 "MenuText": "Generate GCODE file",
                 "ToolTip" : "Generate GCODE file from selected route"}
 
-    def Activated(self):     
-        # - Get CNC configuration
-        config = FreeCAD.activeDocument().getObjectsByLabel('Config')[0]
+    def Activated(self):
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":     
+            # - Get CNC configuration
+            config = FreeCAD.ActiveDocument.getObject(group.ConfigName)
 
-         # - Get selecttion
-        routes = [item.Object for item in Gui.Selection.getSelectionEx()]
+            # - Get selecttion
+            routes = [item.Object for item in Gui.Selection.getSelectionEx()]
 
-        for route in routes:
-            print("Initial route Data:")
-            print(route.Data)
-            route.touch()
-            route.recompute()
-            print("Recomputed route Data:")
-            print(route.Data)
+            for route in routes:
+                print("Initial route Data:")
+                print(route.Data)
+                route.touch()
+                route.recompute()
+                print("Recomputed route Data:")
+                print(route.Data)
 
-        self.makeGCODE(routes, config)
+            self.makeGCODE(routes, config)
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            # - Get selecttion
-            routes = [item.Object for item in Gui.Selection.getSelectionEx()]
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":
+                # - Get selecttion
+                routes = [item.Object for item in Gui.Selection.getSelectionEx()]
 
-            # - nothing selected
-            if len(routes) == 0:
-                return False
-            
-            # - Check types
-            for route in routes:
-                if not hasattr(route, "Type") or (route.Type != "Route"):
+                # - nothing selected
+                if len(routes) == 0:
                     return False
-            return True
+                
+                # - Check types
+                for route in routes:
+                    if not hasattr(route, "Type") or (route.Type != "Route"):
+                        return False
+                return True
+            return False
             
 Gui.addCommand("MakeGcode", Postprocess())

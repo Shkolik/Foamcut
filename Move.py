@@ -14,17 +14,15 @@ import Part
 import utilities
 
 class Move:
-    def __init__(self, obj, start):  
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-
+    def __init__(self, obj, start, config):         
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Move"
+        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
 
         # - Options
         obj.addProperty("App::PropertyDistance",  "InXDirection",  "Options",   "Move along X axis" ).InXDirection = 100
         obj.addProperty("App::PropertyDistance",  "InZDirection",  "Options",   "Move along Z axis" ).InZDirection = 100
-        obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate").FeedRate = config.FeedRateCut
-        obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power").WirePower = config.WireMinPower
+        obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate")
+        obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power")
 
         obj.addProperty("App::PropertyFloat",     "PointXL",   "", "", 1)
         obj.addProperty("App::PropertyFloat",     "PointZL",   "", "", 1)
@@ -36,6 +34,9 @@ class Move:
 
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
 
+        obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
+        obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
+        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
@@ -45,10 +46,7 @@ class Move:
         # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
-    def execute(self, obj):
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-
+    def execute(self, obj):        
         parent = obj.StartPoint[0]
         vertex = parent.getSubObject(obj.StartPoint[1][0])
 
@@ -75,11 +73,11 @@ class Move:
                 obj.PointZR = parent.Path_R[-1].z
 
         elif parent.Type == "Move":
-            point_start_L = App.Vector(-config.FieldWidth / 2,  parent.PointXL, parent.PointZL)
-            point_start_R = App.Vector( config.FieldWidth / 2,  parent.PointXR, parent.PointZR)
+            point_start_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL, parent.PointZL)
+            point_start_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR, parent.PointZR)
 
-            point_end_L = App.Vector(-config.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
-            point_end_R = App.Vector( config.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
+            point_end_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
+            point_end_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
 
             # - Connect
             if utilities.isCommonPoint(point_start_L, point) or utilities.isCommonPoint(point_start_R, point):
@@ -97,12 +95,12 @@ class Move:
                 obj.PointZR = point_end_R.z
                 
         line_L = Part.makeLine(
-            App.Vector(-config.FieldWidth / 2,  obj.PointXL, obj.PointZL),
-            App.Vector(-config.FieldWidth / 2,  obj.PointXL + float(obj.InXDirection.getValueAs("mm")), obj.PointZL + obj.InZDirection.getValueAs("mm"))
+            App.Vector(-obj.FieldWidth / 2,  obj.PointXL, obj.PointZL),
+            App.Vector(-obj.FieldWidth / 2,  obj.PointXL + float(obj.InXDirection.getValueAs("mm")), obj.PointZL + obj.InZDirection.getValueAs("mm"))
         )
         line_R = Part.makeLine(
-            App.Vector(config.FieldWidth / 2,   obj.PointXR, obj.PointZR),
-            App.Vector(config.FieldWidth / 2,   obj.PointXR + float(obj.InXDirection.getValueAs("mm")), obj.PointZR + obj.InZDirection.getValueAs("mm"))
+            App.Vector(obj.FieldWidth / 2,   obj.PointXR, obj.PointZR),
+            App.Vector(obj.FieldWidth / 2,   obj.PointXR + float(obj.InXDirection.getValueAs("mm")), obj.PointZR + obj.InZDirection.getValueAs("mm"))
         )
         obj.LeftSegmentLength = line_L.Length
         obj.RightSegmentLength = line_R.Length
@@ -154,44 +152,51 @@ class MakeMove():
                 "MenuText": "Create move path",
                 "ToolTip" : "Create move path object from selected point in specified direction"}
 
-    def Activated(self):         
-        # - Get selecttion
-        objects = utilities.getAllSelectedObjects()
-        
-        # - Create object
-        move = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Move")
-        Move(move, objects[0])
-        MoveVP(move.ViewObject)
-        move.ViewObject.PointSize = 4
-   
-        FreeCAD.ActiveDocument.recompute()
+    def Activated(self):    
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":        
+            # - Get selecttion
+            objects = utilities.getAllSelectedObjects()
+            
+            # - Create object
+            move = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Move")
+            Move(move, objects[0], group.ConfigName)
+            MoveVP(move.ViewObject)
+            move.ViewObject.PointSize = 4
+
+            group.addObject(move)
+
+            move.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            # - Get selecttion
-            objects = utilities.getAllSelectedObjects()
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":    
+                # - Get selecttion
+                objects = utilities.getAllSelectedObjects()
 
-            # - nothing selected
-            if len(objects) == 0:
-                return False
-            
-            object = objects[0]
-            parent = object[0]
-            # - Check object type
-            if parent.Type != "Path" and parent.Type != "Move":                    
-                return False
-            
-            wp = utilities.getWorkingPlanes()
-            if len(wp) != 2:
-                return False
+                # - nothing selected
+                if len(objects) == 0:
+                    return False
                 
-            vertex = parent.getSubObject(object[1][0])
-            # Selected point should be on any working plane
-            if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
-                and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
-                return False
-            return True
+                object = objects[0]
+                parent = object[0]
+                # - Check object type
+                if parent.Type != "Path" and parent.Type != "Move":                    
+                    return False
+                
+                wp = utilities.getWorkingPlanes()
+                if len(wp) != 2:
+                    return False
+                    
+                vertex = parent.getSubObject(object[1][0])
+                # Selected point should be on any working plane
+                if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
+                    and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
+                    return False
+                return True
+            return False
             
 Gui.addCommand("MakeMove", MakeMove())

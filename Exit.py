@@ -14,12 +14,10 @@ import Part
 import utilities
 
 class Exit:
-    def __init__(self, obj, exit):
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-
-        obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height during rotation").SafeHeight = config.SafeHeight
+    def __init__(self, obj, exit, config):
+        obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height")
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Exit"
+        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
 
         obj.addProperty("App::PropertyFloat",     "PointXL",   "", "", 1)
         obj.addProperty("App::PropertyFloat",     "PointZL",   "", "", 1)
@@ -31,6 +29,8 @@ class Exit:
 
         obj.addProperty("App::PropertyLinkSub",      "ExitPoint",      "Task",   "Exit Point").ExitPoint = exit
 
+        obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
+        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
@@ -40,10 +40,7 @@ class Exit:
         #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
-    def execute(this, obj):
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObjectsByLabel('Config')[0]
-
+    def execute(this, obj):        
         parent = obj.ExitPoint[0]
         vertex = parent.getSubObject(obj.ExitPoint[1][0])
 
@@ -70,11 +67,11 @@ class Exit:
                 obj.PointZR = parent.Path_R[-1].z
 
         elif parent.Type == "Move":
-            point_start_L = App.Vector(-config.FieldWidth / 2,  parent.PointXL, parent.PointZL)
-            point_start_R = App.Vector( config.FieldWidth / 2,  parent.PointXR, parent.PointZR)
+            point_start_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL, parent.PointZL)
+            point_start_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR, parent.PointZR)
 
-            point_end_L = App.Vector(-config.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
-            point_end_R = App.Vector( config.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
+            point_end_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
+            point_end_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
 
             # - Connect
             if utilities.isCommonPoint(point_start_L, point) or utilities.isCommonPoint(point_start_R, point):
@@ -92,12 +89,12 @@ class Exit:
                 obj.PointZR = point_end_R.z
 
         line_L = Part.makeLine(
-            App.Vector(-config.FieldWidth / 2,  obj.PointXL,  obj.PointZL),
-            App.Vector(-config.FieldWidth / 2,  obj.PointXL,  obj.SafeHeight)
+            App.Vector(-obj.FieldWidth / 2,  obj.PointXL,  obj.PointZL),
+            App.Vector(-obj.FieldWidth / 2,  obj.PointXL,  obj.SafeHeight)
         )
         line_R = Part.makeLine(
-            App.Vector(config.FieldWidth / 2,   obj.PointXR,  obj.PointZR),
-            App.Vector(config.FieldWidth / 2,   obj.PointXR,  obj.SafeHeight)
+            App.Vector(obj.FieldWidth / 2,   obj.PointXR,  obj.PointZR),
+            App.Vector(obj.FieldWidth / 2,   obj.PointXR,  obj.SafeHeight)
         )
         obj.LeftSegmentLength = line_L.Length
         obj.RightSegmentLength = line_R.Length
@@ -151,44 +148,51 @@ class MakeExit():
                 "MenuText": "Create exit",
                 "ToolTip" : "Create exit path object from selected entry point"}
 
-    def Activated(self):     
-        # - Get selecttion
-        objects = utilities.getAllSelectedObjects()
-        
-        # - Create object
-        exit = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Exit")
-        Exit(exit, objects[0])
-        ExitVP(exit.ViewObject)
-        exit.ViewObject.PointSize = 4
-   
-        FreeCAD.ActiveDocument.recompute()
+    def Activated(self):
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":     
+            # - Get selecttion
+            objects = utilities.getAllSelectedObjects()
+            
+            # - Create object
+            exit = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Exit")
+            Exit(exit, objects[0], group.ConfigName)
+            ExitVP(exit.ViewObject)
+            exit.ViewObject.PointSize = 4
+            
+            group.addObject(exit)
+
+            exit.recompute()
 
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            # - Get selecttion
-            objects = utilities.getAllSelectedObjects()
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":
+                # - Get selecttion
+                objects = utilities.getAllSelectedObjects()
 
-            # - nothing selected
-            if len(objects) == 0:
-                return False
-            
-            object = objects[0]
-            parent = object[0]
-            # - Check object type
-            if parent.Type != "Path" and parent.Type != "Move":                    
-                return False
-            
-            wp = utilities.getWorkingPlanes()
-            if len(wp) != 2:
-                return False
+                # - nothing selected
+                if len(objects) == 0:
+                    return False
                 
-            vertex = parent.getSubObject(object[1][0])
-            # Selected point should be on any working plane
-            if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
-                and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
-                return False
-            return True
-            
+                object = objects[0]
+                parent = object[0]
+                # - Check object type
+                if parent.Type != "Path" and parent.Type != "Move":                    
+                    return False
+                
+                wp = utilities.getWorkingPlanes()
+                if len(wp) != 2:
+                    return False
+                    
+                vertex = parent.getSubObject(object[1][0])
+                # Selected point should be on any working plane
+                if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
+                    and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
+                    return False
+                return True
+            return False
+        
 Gui.addCommand("MakeExit", MakeExit())
