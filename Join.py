@@ -192,12 +192,7 @@ class JoinVP:
             return [self.Object.StartPoint[0], self.Object.EndPoint[0]]
         return None
 
-    def onDelete(self, feature, subelements):
-        try:
-            self.Object.StartPoint[0].ViewObject.Visibility = True
-            self.Object.EndPoint[0].ViewObject.Visibility = True
-        except Exception as err:
-            FreeCAD.Console.PrintError("Error in onDelete: {0} \n".format(err))
+    def doubleClicked(self, obj):
         return True
 
 class MakeJoin():

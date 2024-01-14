@@ -124,7 +124,6 @@ class MoveVP:
         def loads(self, state):
             self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
             return None
-
     else:
         def __getstate__(self):
             return {"name": self.Object.Name}
@@ -136,11 +135,7 @@ class MoveVP:
     def claimChildren(self):
         return [self.Object.StartPoint[0]] if self.Object.StartPoint is not None and len(self.Object.StartPoint) > 0 else None
 
-    def onDelete(self, feature, subelements):
-        try:
-            self.Object.StartPoint[0].ViewObject.Visibility = True
-        except Exception as err:
-            FreeCAD.Console.PrintError("Error in onDelete: {0} \n".format(err))
+    def doubleClicked(self, obj):
         return True
 
 class MakeMove():

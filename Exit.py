@@ -118,7 +118,6 @@ class ExitVP:
         def loads(self, state):
             self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
             return None
-
     else:
         def __getstate__(self):
             return {"name": self.Object.Name}
@@ -130,11 +129,7 @@ class ExitVP:
     def claimChildren(self):
         return [self.Object.ExitPoint[0]] if self.Object.ExitPoint is not None and len(self.Object.ExitPoint) > 0 else None
 
-    def onDelete(self, feature, subelements):
-        try:
-            self.Object.ExitPoint[0].ViewObject.Visibility = True
-        except Exception as err:
-            FreeCAD.Console.PrintError("Error in onDelete: {0} \n".format(err))
+    def doubleClicked(self, obj):
         return True
 
 class MakeExit():

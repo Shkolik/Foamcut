@@ -1,7 +1,7 @@
 - foam block in machine config
-- origin arrows
+- origin arrows - DONE
 - kerf settings
-- unpicable helper geometry in one group
+- unpicable helper geometry in one group - Done
 - configuration setup panel
 - paths produced by selecting face
 - G93 mode

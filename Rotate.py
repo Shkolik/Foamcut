@@ -79,6 +79,9 @@ class RotationVP:
         except Exception as err:
             FreeCAD.Console.PrintError("Error in onDelete: {0} \n".format(err))
         return True
+    
+    def doubleClicked(self, obj):
+        return True
 
 class AddRotation():
     """Add Rotation"""

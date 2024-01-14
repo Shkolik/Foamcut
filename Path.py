@@ -203,7 +203,6 @@ class PathSectionVP:
         def loads(self, state):
             self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
             return None
-
     else:
         def __getstate__(self):
             return {"name": self.Object.Name}
@@ -212,12 +211,14 @@ class PathSectionVP:
             self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
             return None
         
-
     def claimChildren(self):
         if (self.Object.LeftEdge is not None and len(self.Object.LeftEdge) > 0 
             and self.Object.RightEdge is not None and len(self.Object.RightEdge) > 0 ):
             return [self.Object.LeftEdge[0], self.Object.RightEdge[0]]
         return None
+
+    def doubleClicked(self, obj):
+        return True
     
 class MakePath():
     """Make Path"""

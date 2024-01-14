@@ -244,7 +244,6 @@ class RouteVP:
         def loads(self, state):
             self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
             return None
-
     else:
         def __getstate__(self):
             return {"name": self.Object.Name}
@@ -255,6 +254,9 @@ class RouteVP:
     
     def claimChildren(self):
         return self.Object.Objects
+    
+    def doubleClicked(self, obj):
+        return True
 
 class MakeRoute():
     """Make Route"""

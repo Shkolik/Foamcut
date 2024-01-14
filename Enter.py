@@ -111,6 +111,9 @@ class EnterVP:
     def getIcon(self):
         return utilities.getIconPath("enter.svg")
 
+    def doubleClicked(self, obj):
+        return True
+
     if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
         def dumps(self):
             return {"name": self.Object.Name}
@@ -118,7 +121,6 @@ class EnterVP:
         def loads(self, state):
             self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
             return None
-
     else:
         def __getstate__(self):
             return {"name": self.Object.Name}
@@ -130,12 +132,6 @@ class EnterVP:
     def claimChildren(self):
         return [self.Object.EntryPoint[0]] if self.Object.EntryPoint is not None and len(self.Object.EntryPoint) > 0 else None
 
-    def onDelete(self, feature, subelements):
-        try:
-            self.Object.EntryPoint[0].ViewObject.Visibility = True
-        except Exception as err:
-            FreeCAD.Console.PrintError("Error in onDelete: {0} \n".format(err))
-        return True
 
 class MakeEnter():
     """Make Enter"""
