@@ -1,49 +1,83 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
 <svg
-   version="1.0"
-   width="16.000000pt"
-   height="16.000000pt"
-   viewBox="0 0 16.000000 16.000000"
-   preserveAspectRatio="xMidYMid meet"   
+   width="16pt"
+   height="16pt"
+   viewBox="0 0 5.6444443 5.6444444"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   sodipodi:docname="machine.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
-   >
-  <g transform="matrix(1.1272067,0,0,1.0551609,-0.94849805,-0.23914614)">
-    <rect
-       style="fill:#000000;stroke:#000000;stroke-width:0.941184;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
-       id="rect1"
-       width="12.700921"
-       height="1.6078887"
-       x="1.6049929"
-       y="13.005682" />
-    <path
-       style="fill:none;stroke:#000000;stroke-width:2.05726;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
-       d="M 2.2088204,12.788709 2.8396687,5.6233839 13.230105,5.5866404 13.712518,12.788712"
-       id="path1-2"
-       sodipodi:nodetypes="cccc" />
-    <rect
-       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.933193;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
-       id="rect2"
-       width="0.57918656"
-       height="8.177371"
-       x="3.4309692"
-       y="0.95915031" />
-    <rect
-       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.933193;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
-       id="rect2-0"
-       width="0.57918656"
-       height="8.177371"
-       x="12.123293"
-       y="0.95915031" />
-    <path
-       style="fill:#000000;fill-opacity:1;stroke:#cf4a00;stroke-width:0.64627;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
-       d="M 2.9979842,4.317412 13.135091,2.6220629"
-       id="path2-7" />
-    <ellipse
-       style="fill:none;fill-opacity:1;stroke:#040000;stroke-width:0.304853;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
-       id="path3"
-       cx="8.0667229"
-       cy="9.5753117"
-       rx="1.6738428"
-       ry="1.5325429" />
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="31.083176"
+     inkscape:cx="10.79362"
+     inkscape:cy="11.179681"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <g
+       transform="matrix(0.39765347,0,0,0.37223731,-0.32270883,-0.08049361)"
+       id="g2">
+      <rect
+         style="fill:#000000;stroke:#000000;stroke-width:0.941184;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+         id="rect1"
+         width="12.700921"
+         height="1.6078887"
+         x="1.6049929"
+         y="13.005682" />
+      <path
+         style="fill:none;stroke:#000000;stroke-width:2.05726;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+         d="M 2.2088204,12.788709 2.8396687,5.6233839 13.230105,5.5866404 13.712518,12.788712"
+         id="path1-2"
+         sodipodi:nodetypes="cccc" />
+      <rect
+         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.933193;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+         id="rect2"
+         width="0.57918656"
+         height="8.177371"
+         x="3.4309692"
+         y="0.95915031" />
+      <rect
+         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.933193;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+         id="rect2-0"
+         width="0.57918656"
+         height="8.177371"
+         x="12.123293"
+         y="0.95915031" />
+      <path
+         style="fill:#000000;fill-opacity:1;stroke:#cf4a00;stroke-width:0.64627;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         d="M 2.9979842,4.317412 13.135091,2.6220629"
+         id="path2-7" />
+      <ellipse
+         style="fill:none;fill-opacity:1;stroke:#040000;stroke-width:0.304853;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+         id="path3"
+         cx="8.0667229"
+         cy="9.5753117"
+         rx="1.6738428"
+         ry="1.5325429" />
+    </g>
   </g>
 </svg>

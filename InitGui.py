@@ -2,6 +2,7 @@
 
 __title__= "FreeCAD Foamcut Workbench - Init file"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
+__license__ = "LGPLv2.1"
 __url__ = ["http://www.freecadweb.org"]
 
 import FreeCAD
@@ -15,7 +16,7 @@ class FoamcutWB (Workbench):
         import utilities
         self.__class__.MenuText = "FoamCut"
         self.__class__.ToolTip = "Foamcut workbench provide functionality to prepare job and generate Gcode for 4 or 5 axis cnc hotwire cutter."
-        self.__class__.Icon = utilities.getIconPath("machine.svg")
+        self.__class__.Icon = utilities.getIconPath("foamcut.svg")
 
     def Initialize(self):
         "This function is executed when FreeCAD starts"
