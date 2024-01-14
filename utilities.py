@@ -20,8 +20,11 @@ import os
 def get_module_path():    
     return os.path.dirname(__file__)
 
+def getResourcesPath():
+    return os.path.join(get_module_path(), "Resources")
+
 def getIconPath(icon):
-    return os.path.join(get_module_path(), "Resources", "icons", icon)
+    return os.path.join(getResourcesPath(), "icons", icon)
 
 def isNewStateHandling():
     return (FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]+FreeCAD.Version()[2]) >= '0.212' and (FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]) < '2000'

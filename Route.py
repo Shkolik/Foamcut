@@ -255,7 +255,7 @@ class RouteVP:
             return None
     
     def claimChildren(self):
-        return [object for object in self.Object.Objects]
+        return self.Object.Objects
 
 class MakeRoute():
     """Make Route"""

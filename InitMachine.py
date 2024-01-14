@@ -12,8 +12,12 @@ import FreeCADGui
 Gui=FreeCADGui
 import utilities
 import Config
+import Origin
 
 def initChildren(config, machine):
+    origin = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Origin")
+    Origin.CreateOrigin(origin, config.Name)
+
     CNCVolume = FreeCAD.ActiveDocument.addObject("Part::Box", "CNCVolume")
     CNCVolume.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
     CNCVolume.setEditorMode("Placement",     3)
@@ -87,7 +91,7 @@ def initChildren(config, machine):
 
     machine.WPRName = WPR.Name
 
-    machine.Group = [config, CNCVolume, RotationAxis, WPL, WPR]
+    machine.Group = [config, origin, RotationAxis, CNCVolume, WPL, WPR]
     
 class Machine:
     def __init__(self, obj):
@@ -115,7 +119,10 @@ class MachineVP:
                 utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
 
     def doubleClicked(self, obj):
-        Gui.ActiveDocument.ActiveView.setActiveObject("group", obj.Object)
+        if Gui.ActiveDocument.ActiveView.getActiveObject("group") == obj.Object:
+            Gui.ActiveDocument.ActiveView.setActiveObject("group", None)
+        else:
+            Gui.ActiveDocument.ActiveView.setActiveObject("group", obj.Object)
         return True
     
     def getIcon(self):
