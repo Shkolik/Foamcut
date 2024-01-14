@@ -37,10 +37,15 @@ class Exit:
         self.execute(obj)
 
     def onChanged(this, fp, prop):
-        #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+        FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
-    def execute(this, obj):        
+    def execute(this, obj): 
+        if obj.FieldWidth is None or obj.FieldWidth == 0:
+            return
+        if obj.SafeHeight is None or obj.SafeHeight == 0:
+            return
+
         parent = obj.ExitPoint[0]
         vertex = parent.getSubObject(obj.ExitPoint[1][0])
 
@@ -49,7 +54,7 @@ class Exit:
             vertex.Y,
             vertex.Z
         )
-
+        
         if parent.Type == "Path":
             # - Connect
             if utilities.isCommonPoint(parent.Path_L[0], point) or utilities.isCommonPoint(parent.Path_R[0], point):
