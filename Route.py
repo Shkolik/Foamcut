@@ -226,7 +226,6 @@ class Route:
 
         obj.Data = route_data
 
-        Gui.Selection.clearSelection()
 
 class RouteVP:
     def __init__(self, obj):
@@ -280,6 +279,7 @@ class MakeRoute():
             group.addObject(route)
 
             route.recompute()
+            Gui.Selection.clearSelection()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

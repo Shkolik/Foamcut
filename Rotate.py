@@ -42,7 +42,6 @@ class Rotation:
         # - Assign new shape
         obj.Shape     = shape
         obj.Placement = shape.Placement
-        Gui.Selection.clearSelection()
 
 class RotationVP:
     def __init__(self, obj):
@@ -102,6 +101,7 @@ class AddRotation():
 
             group.addObject(rt)
             rt.recompute()
+            Gui.Selection.clearSelection()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

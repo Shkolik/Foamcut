@@ -11,6 +11,9 @@ Gui=FreeCADGui
 import Part
 import os
 
+LEFT = -1
+RIGHT = 1
+
 '''
     Returns the current module path.
     Determines where this file is running from, so works regardless of whether
@@ -90,8 +93,7 @@ def intersectLineAndPlane(v0, v1, plane):
 '''
   Get working planes
 '''
-def getWorkingPlanes():
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+def getWorkingPlanes(group):
         if group is not None and group.Type == "Job":
             # - Initialize result
             result = []
@@ -99,17 +101,17 @@ def getWorkingPlanes():
             if wpl is not None:
                 result.append(wpl)
             else:
-                print("ERROR: Left working plane not found")
+                FreeCAD.Console.PrintError("ERROR:\n Left working plane not found.\n")
                 return None
             wpr = FreeCAD.ActiveDocument.getObject(group.WPRName)
             if wpr is not None:
                 result.append(wpr)
             else:
-                print("ERROR: Right working plane not found")
+                FreeCAD.Console.PrintError("ERROR:\n Right working plane not found.\n")
             
             return result
         else:
-            print("ERROR: Active Job not found.")
+            FreeCAD.Console.PrintError("ERROR:\n Parent Job not found.\n")
 
 '''
   Enumeration for the pick style

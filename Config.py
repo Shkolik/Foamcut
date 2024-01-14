@@ -49,11 +49,10 @@ class Config:
 
         obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = 200
         obj.addProperty("App::PropertyDistance",   "OriginX",              "Travel",        "Origin along X axis").OriginX = 0
-        obj.addProperty("App::PropertyDistance",   "OriginY",              "Travel",        "Origin along Y axis").OriginY = obj.FieldWidth / 2
 
         obj.addProperty("App::PropertyDistance",   "OriginRotationX",      "Travel",        "Origin of rotation along X axis").OriginRotationX = obj.HorizontalTravel / 2
 
-        obj.setEditorMode("Label",     3)
+        obj.setEditorMode("Group",     3)
         obj.Proxy = self
         self.execute(obj)
 

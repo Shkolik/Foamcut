@@ -13,9 +13,6 @@ import Draft
 import utilities
 import os
 
-LEFT = -1
-RIGHT = 1
-
 class Origin:
     def __init__(self, obj, config):
         obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
@@ -74,9 +71,9 @@ class Origin:
     def createLabel(self, x, x_expr, position):
         pl = FreeCAD.Placement()
         pl.Base = FreeCAD.Vector(0.0, 100.0, 8.0) if x else FreeCAD.Vector(0.0, 16.0, 90.0)
-        pl.Rotation.Q = (0.5, -0.5, -0.5, 0.5) if position == LEFT else (0.5, 0.5, 0.5, 0.5)
+        pl.Rotation.Q = (0.5, -0.5, -0.5, 0.5) if position == utilities.LEFT else (0.5, 0.5, 0.5, 0.5)
 
-        str = ("X" if x else "Y") + ("L" if position == LEFT else "R")
+        str = ("X" if x else "Y") + ("L" if position == utilities.LEFT else "R")
         font = os.path.join(utilities.getResourcesPath(), "calibri.ttf")
         ss = Draft.make_shapestring(String=str, FontFile=font, Size=10.0, Tracking=0.0)
         ss.Placement = pl
@@ -102,8 +99,8 @@ class Origin:
         x_expr_l = u"-<<{}>>.FieldWidth / 2".format(config) 
         x_expr_r = u"<<{}>>.FieldWidth / 2".format(config)  
         return [
-            self.createArrow(True, x_expr_l), self.createArrow(False, x_expr_l), self.createLabel(True, x_expr_l, LEFT), self.createLabel(False, x_expr_l, LEFT),
-            self.createArrow(True, x_expr_r), self.createArrow(False, x_expr_r), self.createLabel(True, x_expr_r, RIGHT), self.createLabel(False, x_expr_r, RIGHT)
+            self.createArrow(True, x_expr_l), self.createArrow(False, x_expr_l), self.createLabel(True, x_expr_l, utilities.LEFT), self.createLabel(False, x_expr_l, utilities.LEFT),
+            self.createArrow(True, x_expr_r), self.createArrow(False, x_expr_r), self.createLabel(True, x_expr_r, utilities.RIGHT), self.createLabel(False, x_expr_r, utilities.RIGHT)
             ]
 
 
@@ -149,3 +146,4 @@ class OriginVP:
 def CreateOrigin(obj, config):
     Origin(obj, config)
     OriginVP(obj.ViewObject)
+    Gui.Selection.clearSelection()

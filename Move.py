@@ -134,7 +134,7 @@ class MoveVP:
             return None
     
     def claimChildren(self):
-        return [self.Object.StartPoint[0]]
+        return [self.Object.StartPoint[0]] if self.Object.StartPoint is not None and len(self.Object.StartPoint) > 0 else None
 
     def onDelete(self, feature, subelements):
         try:
@@ -187,8 +187,8 @@ class MakeMove():
                 if parent.Type != "Path" and parent.Type != "Move":                    
                     return False
                 
-                wp = utilities.getWorkingPlanes()
-                if len(wp) != 2:
+                wp = utilities.getWorkingPlanes(group)
+                if wp is None or len(wp) != 2:
                     return False
                     
                 vertex = parent.getSubObject(object[1][0])

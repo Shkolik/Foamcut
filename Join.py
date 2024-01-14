@@ -187,7 +187,10 @@ class JoinVP:
             return None
     
     def claimChildren(self):
-        return [self.Object.StartPoint[0], self.Object.EndPoint[0]]
+        if (self.Object.StartPoint is not None and len(self.Object.StartPoint) > 0 
+            and self.Object.EndPoint is not None and len(self.Object.EndPoint) > 0 ):
+            return [self.Object.StartPoint[0], self.Object.EndPoint[0]]
+        return None
 
     def onDelete(self, feature, subelements):
         try:
@@ -243,8 +246,8 @@ class MakeJoin():
                 if parentA.Type != "Path" and parentA.Type != "Move":                    
                     return False
                 
-                wp = utilities.getWorkingPlanes()
-                if len(wp) != 2:
+                wp = utilities.getWorkingPlanes(group)
+                if wp is None or len(wp) != 2:
                     return False
                     
                 vertexA = parentA.getSubObject(objectA[1][0])

@@ -100,8 +100,6 @@ class Exit:
         obj.RightSegmentLength = line_R.Length
         obj.Shape = Part.makeCompound([line_L, line_R])
         obj.ViewObject.LineColor = (1.0, 0.0, 0.0)
-
-        Gui.Selection.clearSelection()
         
 class ExitVP:
     def __init__(this, obj):
@@ -130,7 +128,7 @@ class ExitVP:
             return None
     
     def claimChildren(self):
-        return [self.Object.ExitPoint[0]]
+        return [self.Object.ExitPoint[0]] if self.Object.ExitPoint is not None and len(self.Object.ExitPoint) > 0 else None
 
     def onDelete(self, feature, subelements):
         try:
@@ -163,6 +161,7 @@ class MakeExit():
             group.addObject(exit)
 
             exit.recompute()
+            Gui.Selection.clearSelection()
 
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
@@ -183,8 +182,8 @@ class MakeExit():
                 if parent.Type != "Path" and parent.Type != "Move":                    
                     return False
                 
-                wp = utilities.getWorkingPlanes()
-                if len(wp) != 2:
+                wp = utilities.getWorkingPlanes(group)
+                if wp is None or len(wp) != 2:
                     return False
                     
                 vertex = parent.getSubObject(object[1][0])

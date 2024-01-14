@@ -153,9 +153,13 @@ class PathSection:
         pass
 
     def execute(self, obj):
+        job = obj.getParentGroup()
         # - Get working planes
-        wp = utilities.getWorkingPlanes()
+        wp = utilities.getWorkingPlanes(job)
         
+        if wp is None or len(wp) != 2:
+            FreeCAD.Console.PrintError("ERROR:\n Error updating Path - working planes not found in Parent object '{}'\n".format(job.Label if job is not None else "None"))
+
         edge_l = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1])[0]
         edge_r = obj.RightEdge[0].getSubObject(obj.RightEdge[1])[0]
         
@@ -180,8 +184,6 @@ class PathSection:
         obj.Shape = Part.makeCompound([path_L.toShape(), path_R.toShape(), Part.Wire(edge_l), Part.Wire(edge_r)])
         obj.LeftSegmentLength = float(path_L.length())
         obj.RightSegmentLength = float(path_R.length())
-
-        Gui.Selection.clearSelection()
 
 class PathSectionVP:
     def __init__(self, obj):
@@ -212,7 +214,10 @@ class PathSectionVP:
         
 
     def claimChildren(self):
-        return [self.Object.LeftEdge[0], self.Object.RightEdge[0]]
+        if (self.Object.LeftEdge is not None and len(self.Object.LeftEdge) > 0 
+            and self.Object.RightEdge is not None and len(self.Object.RightEdge) > 0 ):
+            return [self.Object.LeftEdge[0], self.Object.RightEdge[0]]
+        return None
     
 class MakePath():
     """Make Path"""
@@ -228,29 +233,32 @@ class MakePath():
         if group is not None and group.Type == "Job":
             # - Get selected edges
             edges = utilities.getAllSelectedEdges()
-            obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython","Path")
+            obj = group.newObject("Part::FeaturePython","Path")
             
             PathSection(obj, (FreeCAD.ActiveDocument.getObject((edges[0])[0].Name), (edges[0])[1][0]), (FreeCAD.ActiveDocument.getObject((edges[1])[0].Name),(edges[1])[1][0]))
             PathSectionVP(obj.ViewObject)
             obj.ViewObject.PointSize = 4
 
-            group.addObject(obj)
             obj.recompute()
+            Gui.Selection.clearSelection()
     
     def IsActive(self):
         if App.ActiveDocument is None:
             return False
         else:
-            # - Get selected edges
-            edges = utilities.getAllSelectedEdges()
+            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            if group is not None and group.Type == "Job":  
+                # - Get selected edges
+                edges = utilities.getAllSelectedEdges()
 
-            # - Number of edges should be two
-            if len(edges) != 2:               
-                return False
-            
-            if len(utilities.getWorkingPlanes()) != 2:
-                return False
+                # - Number of edges should be two
+                if len(edges) != 2:               
+                    return False
                 
-            return True
+                wp = utilities.getWorkingPlanes(group)
+                if wp is None or len(wp) != 2:
+                    return False                    
+                return True
+            return False
             
 Gui.addCommand("MakePath", MakePath())

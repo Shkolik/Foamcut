@@ -13,6 +13,7 @@ Gui=FreeCADGui
 import utilities
 import Config
 import Origin
+import Plane
 
 def initChildren(config, machine):
     origin = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Origin")
@@ -28,7 +29,7 @@ def initChildren(config, machine):
     CNCVolume.setEditorMode("AttachmentSupport",       3)
     CNCVolume.setEditorMode("MapMode",       3)
 
-    CNCVolume.setExpression(".Placement.Base.y", u"<<{}>>.OriginX".format(config.Name))
+    CNCVolume.setExpression(".Placement.Base.y", u"-<<{}>>.OriginX".format(config.Name))
     CNCVolume.setExpression(".Placement.Base.x", u"- <<{}>>.FieldWidth / 2".format(config.Name))
     CNCVolume.setExpression(".Length",   u"<<{}>>.FieldWidth".format(config.Name))
     CNCVolume.setExpression(".Width",   u"<<{}>>.HorizontalTravel".format(config.Name))
@@ -49,49 +50,19 @@ def initChildren(config, machine):
     RotationAxis.ViewObject.Transparency = 70
     RotationAxis.ViewObject.LineColor = (1.0, 0.886, 0.023)
     
-    WPL = FreeCAD.ActiveDocument.addObject("Part::Plane", "WPL")
-    WPL.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
-    WPL.Support          = None
-    WPL.MapMode          = 'Deactivated'
-    WPL.MapPathParameter = 0.000000
-    WPL.MapReversed      = False
-    WPL.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
-    WPL.Placement = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,0,1),90))
-    WPL.Placement = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),90)).multiply(WPL.Placement)
-    WPL.ViewObject.LineColor = (1.0, 0.886, 0.023)
-    WPL.ViewObject.ShapeColor = (1.0, 0.886, 0.023)
-    WPL.ViewObject.PointColor = (1.0, 0.886, 0.023)
-    WPL.ViewObject.LineWidth = 0
-    WPL.setExpression(".Width",   u"<<{}>>.VerticalTravel".format(config.Name))
-    WPL.setExpression(".Length",  u"<<{}>>.HorizontalTravel".format(config.Name))
-    WPL.setExpression(".Placement.Base.x", u"-<<{}>>.FieldWidth / 2".format(config.Name))
-    WPL.Placement.Base.z = 0
-    WPL.ViewObject.Transparency = 80
+    wpl = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPL")
+    Plane.CreateWorkingPlane(wpl, config.Name, utilities.LEFT)
+    wpl.Label = "Working Plane L"
 
-    machine.WPLName = WPL.Name
+    machine.WPLName = wpl.Name
     
-    WPR = FreeCAD.ActiveDocument.addObject("Part::Plane", "WPR")
-    WPR.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
-    WPR.Support          = None
-    WPR.MapMode          = 'Deactivated'
-    WPR.MapPathParameter = 0.000000
-    WPR.MapReversed      = False
-    WPR.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))        
-    WPR.Placement = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,0,1),90))
-    WPR.Placement = App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),90)).multiply(WPR.Placement)
-    WPR.ViewObject.LineColor =  (1.0, 0.886, 0.023)
-    WPR.ViewObject.ShapeColor = (1.0, 0.886, 0.023)
-    WPL.ViewObject.PointColor = (1.0, 0.886, 0.023)
-    WPR.ViewObject.LineWidth = 0
-    WPR.setExpression(".Width",   u"<<{}>>.VerticalTravel".format(config.Name))
-    WPR.setExpression(".Length",  u"<<{}>>.HorizontalTravel".format(config.Name))
-    WPR.setExpression(".Placement.Base.x", u"<<{}>>.FieldWidth / 2".format(config.Name))
-    WPR.Placement.Base.z = 0
-    WPR.ViewObject.Transparency = 80
+    wpr = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPR")
+    Plane.CreateWorkingPlane(wpr, config.Name, utilities.RIGHT)
+    wpr.Label = "Working Plane R"
 
-    machine.WPRName = WPR.Name
+    machine.WPRName = wpr.Name
 
-    machine.Group = [config, origin, RotationAxis, CNCVolume, WPL, WPR]
+    machine.Group = [config, origin, RotationAxis, CNCVolume, wpl, wpr]
     
 class Machine:
     def __init__(self, obj):
@@ -99,6 +70,8 @@ class Machine:
         obj.addProperty("App::PropertyString",      "ConfigName", "", "", 5)
         obj.addProperty("App::PropertyString",      "WPLName", "", "", 5)
         obj.addProperty("App::PropertyString",      "WPRName", "", "", 5)
+
+        obj.setEditorMode("Group",     3)
         obj.Proxy = self
 
     def onChanged(self, fp, prop):
@@ -155,7 +128,7 @@ class InitMachine():
 
     def Activated(self):        
         # - Create CNC configuration
-        config = FreeCAD.ActiveDocument.addObject("App::FeaturePython", "Config")
+        config = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Config")
         Config.createConfig(config)
 
         # - Create group

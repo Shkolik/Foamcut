@@ -100,7 +100,6 @@ class Enter:
         obj.Shape = Part.makeCompound([line_L, line_R])
         obj.ViewObject.LineColor = (0.0, 1.0, 0.0)
 
-        Gui.Selection.clearSelection()
 
 class EnterVP:
     def __init__(self, obj):
@@ -129,7 +128,7 @@ class EnterVP:
             return None
     
     def claimChildren(self):
-        return [self.Object.EntryPoint[0]]
+        return [self.Object.EntryPoint[0]] if self.Object.EntryPoint is not None and len(self.Object.EntryPoint) > 0 else None
 
     def onDelete(self, feature, subelements):
         try:
@@ -161,6 +160,7 @@ class MakeEnter():
     
             group.addObject(enter)
             enter.recompute()
+            Gui.Selection.clearSelection()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
@@ -181,8 +181,8 @@ class MakeEnter():
                 if parent.Type != "Path" and parent.Type != "Move":                    
                     return False
                 
-                wp = utilities.getWorkingPlanes()
-                if len(wp) != 2:
+                wp = utilities.getWorkingPlanes(group)
+                if wp is None or len(wp) != 2:
                     return False
                     
                 vertex = parent.getSubObject(object[1][0])
