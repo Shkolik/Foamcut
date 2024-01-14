@@ -144,6 +144,7 @@ class PathSection:
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information", "Left Segment length",   1)
         obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information", "Right Segment length",   1)
 
+        obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
         self.execute(obj)
