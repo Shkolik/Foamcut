@@ -88,10 +88,20 @@ Generates Gcode and save it to the specified file
  - ~~5th axis location not configurable for now~~ DONE
  - ~~Machine origin is hardcoded and locates in a working area center~~ DONE
  - No kerf settings. User can overcome it by modifying model (create Draft offset and use it as reference for paths )
- - It's highly recommended to export your model as .STEP file, import it in new document and start from there. Since all objects depends on underlying geometry you, in most cases, cannot transform your model or part of it to place inside working area. It's higher priority TODO. 
+ - ~~It's highly recommended to export your model as .STEP file, import it in new document and start from there, or . Since all objects depends on underlying geometry you, in most cases, cannot transform your model or part of it to place inside working area. It's higher priority TODO.~~ DONE with some limitation
  - Cannot create path by selecting faces. In many cases it could be very useful to just select 2 faces and create path/route based on their edges (somewhat like loft) instead of selecting edges one by one.
+ - Configuration setup panel widget
+ - ~~Make helper geometry unpicable~~ Done
+ - G93 mode
+ - mirroring gcode tool
+ - ~~Create path by vertex and edge~~ Done
+ - Edge projection normal to the working plane
+ - Toggle projection lines
+ - ~~Add package.xml~~ DONE
+ - Add video tutorial
+ - Add examples
  - many more I forgot for sure ;) 
-
+ 
 ## Discussion
 Please offer feedback or connect with the developer via the [dedicated FreeCAD forum thread].
 Will be added soon
