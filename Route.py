@@ -34,7 +34,7 @@ class Route:
 
         obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
 
-        obj.setEditorMode("Group", 3)
+        # obj.setEditorMode("Group", 3)
         obj.Proxy = self
 
         self.execute(obj)
@@ -274,13 +274,11 @@ class MakeRoute():
             objects = [item.Object for item in Gui.Selection.getSelectionEx()]
             
             # - Create object
-            route = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Route")
+            route = group.newObject("App::FeaturePython", "Route")
             Route(route, objects, group.ConfigName)
             RouteVP(route.ViewObject)
 
-            group.addObject(route)
-
-            route.recompute()
+            group.recompute()
             Gui.Selection.clearSelection()
     
     def IsActive(self):
