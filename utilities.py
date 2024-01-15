@@ -31,7 +31,15 @@ def getIconPath(icon):
 
 def isNewStateHandling():
     return (FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]+FreeCAD.Version()[2]) >= '0.212' and (FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]) < '2000'
-    
+
+'''
+    Converts Part.Vertex to FreeCAD.Vector
+    @param v - vertex to convert
+    @returns FreeCAD.Vector
+'''
+def vertexToVector(v):
+    return FreeCAD.Vector(v.X, v.Y, v.Z)
+      
 '''
   Get all selected Edges and Vertexes
 '''
@@ -81,14 +89,12 @@ def intersectLineAndPlane(v0, v1, plane):
         v1.x += 1
 
     # - Make line
-    edge  = Part.makeLine(v0, v1);
+    edge  = Part.makeLine(v0, v1)
 
     # - Find point of intersection
     point = plane.Shape.Surface.intersect(edge.Curve)[0][0]
     # del edge
     return point
-
-
 
 '''
   Get working planes

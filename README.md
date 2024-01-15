@@ -96,7 +96,7 @@ Generates Gcode and save it to the specified file
  - ~~mirroring gcode tool~~ DONE
  - ~~Create path by vertex and edge~~ Done
  - Edge projection normal to the working plane
- - Toggle projection lines
+ - ~~Toggle projection lines~~ DONE
  - ~~Add package.xml~~ DONE
  - Add video tutorial
  - Add examples

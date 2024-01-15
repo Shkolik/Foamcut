@@ -174,6 +174,7 @@ class PathSection:
         obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information", "Number of points", 1)
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information", "Left Segment length",   1)
         obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information", "Right Segment length",   1)
+        obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Information", "Show projection lines between planes").ShowProjectionLines = False
 
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
@@ -199,8 +200,8 @@ class PathSection:
         path_points = makePathPointsByEdgesPair(left, right, wp)
 
         # - Set data
-        obj.Path_L       = [App.Vector(item.X, item.Y, item.Z) for item in path_points[0]]
-        obj.Path_R       = [App.Vector(item.X, item.Y, item.Z) for item in path_points[1]]        
+        obj.Path_L       = [utilities.vertexToVector(item) for item in path_points[0]]
+        obj.Path_R       = [utilities.vertexToVector(item) for item in path_points[1]]        
         obj.PointsCount  = int(len(path_points[0]))
         #
 
@@ -212,8 +213,14 @@ class PathSection:
         path_R = Part.BSplineCurve()
         path_R.approximate(Points = obj.Path_R, Continuity="C0")
 
+        shapes = [path_L.toShape(), path_R.toShape(), left, right]
+
+        if obj.ShowProjectionLines:
+            shapes.append(Part.makeLine(obj.Path_L[0] , obj.Path_R[0]))
+            shapes.append(Part.makeLine(obj.Path_L[len(obj.Path_L) - 1] , obj.Path_R[len(obj.Path_R) - 1] ))
+        
         # - Update shape and information
-        obj.Shape = Part.makeCompound([path_L.toShape(), path_R.toShape(), left, right])
+        obj.Shape = Part.makeCompound(shapes)
         obj.LeftSegmentLength = float(path_L.length())
         obj.RightSegmentLength = float(path_R.length())
 
