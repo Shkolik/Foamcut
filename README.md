@@ -93,7 +93,7 @@ Generates Gcode and save it to the specified file
  - Configuration setup panel widget
  - ~~Make helper geometry unpicable~~ Done
  - G93 mode
- - mirroring gcode tool
+ - ~~mirroring gcode tool~~ DONE
  - ~~Create path by vertex and edge~~ Done
  - Edge projection normal to the working plane
  - Toggle projection lines

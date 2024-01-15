@@ -11,6 +11,8 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import PySide
+from PySide import QtCore
+from PySide import QtGui
 import utilities
 
 
@@ -253,16 +255,6 @@ class Postprocess():
                 print ("ERROR: Not supported input")
                 return
 
-        operationsCount = 2 # - taking into account start and end blocks
-        operationsDone = 0
-
-        # - calculate motions count
-        for route in route_list:
-            operationsCount += len(route.Data)
-
-        progress = PySide.QtGui.QProgressDialog("Generating GCode", "Cancel", 0, operationsCount)
-        progress.setWindowModality(PySide.QtGui.Qt.WindowModal)
-
         start_point = None
         end_point   = None
 
@@ -275,13 +267,7 @@ class Postprocess():
 
             # - Walk throug all route elemets
             prev_path = False
-            for i in range(len(route.Data)):
-                if progress.wasCanceled():
-                    msgBox = PySide.QtGui.QMessageBox()
-                    msgBox.setText("Operation was canceled by user.")
-                    msgBox.exec_()
-                    return
-                
+            for i in range(len(route.Data)):                                
                 # - Access item
                 item = route.Data[i]
 
@@ -323,27 +309,20 @@ class Postprocess():
                 elif item.Object.Type == "Join":
                     TASK += self.makeGCODEFromJoin(item.Object, item.Reversed, config)
                 
-                operationsDone += 1
-                progress.setValue(operationsDone)
 
             TASK += ["; --- Route end [%s] ---\r\n" % route.Label, ";\r\n"]
 
         # ---- Generate startup block
-        START = self.generateStartBlock(config, start_point)
-        operationsDone += 1
-        progress.setValue(operationsDone)
+        START = self.generateStartBlock(config, start_point)        
         END   = self.generateEndBlock(config, end_point)
-
-        progress.setValue(operationsCount)
 
         program = START + ''.join(TASK) + END
 
         print ("GCODE generated")
 
-        #print (program)
         # - Open save file dialog
         try:
-            save_path = PySide.QtGui.QFileDialog.getSaveFileName(None, QString.fromLocal8Bit("Save GCODE"), "", "*.gcode") # PyQt4
+            save_path = QFileDialog.getSaveFileName(None, QString.fromLocal8Bit("Save GCODE"), "", "*.gcode") # PyQt4
         except Exception:
             save_path, save_filter = PySide.QtGui.QFileDialog.getSaveFileName(None, "Save GCODE", "", "*.gcode") # PySide
 
@@ -372,16 +351,21 @@ class Postprocess():
 
             # - Get selecttion
             routes = [item.Object for item in Gui.Selection.getSelectionEx()]
-
+            
+            hasError = False
             for route in routes:
-                print("Initial route Data:")
-                print(route.Data)
                 route.touch()
                 route.recompute()
-                print("Recomputed route Data:")
-                print(route.Data)
+                if route.Error is not None and len(route.Error) > 0:
+                    hasError = True
+                    break
 
-            self.makeGCODE(routes, config)
+            if hasError:
+                PySide.QtGui.QMessageBox.critical(None, "Error generating Gcode", "Route data is incorrect. Check Selected routes.")
+            else:
+                self.makeGCODE(routes, config)
+
+            App.ActiveDocument.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
