@@ -58,6 +58,7 @@ class FoamBlockVP:
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
+        utilities.setPickStyle(obj, utilities.UNPICKABLE)
 
     def getIcon(self):
         return utilities.getIconPath("block.svg")
