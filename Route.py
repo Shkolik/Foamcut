@@ -33,8 +33,8 @@ class Route:
         obj.addProperty("App::PropertyPythonObject",  "Data", "Task", "", 5)
 
         obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
+        obj.addProperty("App::PropertyString",    "Error", "", "", 5) 
 
-        # obj.setEditorMode("Group", 3)
         obj.Proxy = self
 
         self.execute(obj)
@@ -169,21 +169,22 @@ class Route:
 
                 # - Detect first pair
                 if utilities.isCommonPoint(first_line[END], second_line[START]):
-                    print ("First connected: FWD - FWD")
+                    # print ("First connected: FWD - FWD")
                     reversed = False
                 elif utilities.isCommonPoint(first_line[END], second_line[END]):
-                    print ("First connected: FWD - REV")
+                    # print ("First connected: FWD - REV")
                     reversed = True
                 elif utilities.isCommonPoint(first_line[START], second_line[START]):
-                    print ("First connected: REV - FWD")
+                    # print ("First connected: REV - FWD")
                     first_reversed  = True
                     reversed        = False
                 elif utilities.isCommonPoint(first_line[START], second_line[END]):
-                    print ("First connected: REV - REV")
+                    # print ("First connected: REV - REV")
                     first_reversed  = True
                     reversed        = True
                 else:
-                    print("ERROR: [%s] not connected with [%s]" % (first.Label, second.Label))
+                    obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
+                    print(obj.Error)
                     return
 
                 # - Store first element
@@ -204,13 +205,14 @@ class Route:
             else:
                 # - Detect next pairs
                 if utilities.isCommonPoint(first_line[START if reversed else END], second_line[START]):
-                    print ("Connected: FWD - FWD")
+                    # print ("Connected: FWD - FWD")
                     reversed = False
                 elif utilities.isCommonPoint(first_line[START if reversed else END], second_line[END]):
-                    print ("Connected: FWD - REV")
+                    # print ("Connected: FWD - REV")
                     reversed = True
                 else:
-                    print("ERROR: [%s] not connected with [%s]" % (first.Label, second.Label))
+                    obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
+                    print(obj.Error)
                     return
 
                 # - Store next element
@@ -223,7 +225,7 @@ class Route:
 
             # - Go to next object
             first = second
-
+        
         obj.Data = route_data
 
 
