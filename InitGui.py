@@ -31,6 +31,7 @@ class FoamcutWB (Workbench):
         import Rotate
         import Route
         import Postprocess
+        import MirrorGcode
         
         self.examples = [] # A list of command names to create example project
         self.list = [
@@ -42,7 +43,8 @@ class FoamcutWB (Workbench):
             "Join", 
             "Rotate", 
             "Route", 
-            "MakeGcode"] # A list of command names created in the line above
+            "MakeGcode",
+            "MirrorGcode"] # A list of command names created in the line above
         
         self.appendToolbar("FoamCut",self.list) # creates a new toolbar with your commands
         self.appendMenu("FoamCut",self.list) # creates a new menu
