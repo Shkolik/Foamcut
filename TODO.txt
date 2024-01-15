@@ -1,4 +1,4 @@
-- foam block in machine config
+- foam block in machine config - DONE
 - origin arrows - DONE
 - kerf settings
 - unpicable helper geometry in one group - Done
@@ -9,6 +9,6 @@
 - path by vertex and edge
 - projection to the working plane
 - toggle projection lines
-- package.xml
+- package.xml - DONE
 - video tutorial
 - examples

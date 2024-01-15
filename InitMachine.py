@@ -14,6 +14,7 @@ import utilities
 import Config
 import Origin
 import Plane
+import FoamBlock
 
 def initChildren(config, machine):
     origin = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Origin")
@@ -62,7 +63,11 @@ def initChildren(config, machine):
 
     machine.WPRName = wpr.Name
 
-    machine.Group = [config, origin, RotationAxis, CNCVolume, wpl, wpr]
+    block = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Block")
+    FoamBlock.CreateFoamBlock(block, config.Name)
+    block.Label = "Foam Block"
+
+    machine.Group = [config, origin, RotationAxis, CNCVolume, wpl, wpr, block]
     
 class Machine:
     def __init__(self, obj):
