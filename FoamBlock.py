@@ -19,8 +19,6 @@ class FoamBlock:
         obj.addProperty("App::PropertyLength",     "Width", "", "", 5).Width = 100  
         obj.addProperty("App::PropertyLength",     "Height", "", "", 5).Height = 100      
         
-        # obj.addProperty("App::PropertyPosition",   "Position", "", "", 5).Position = App.Vector(0.0, 0.0, 0.0)  # Position from origin
-        
         obj.setExpression(".Width",   u"<<{}>>.BlockWidth".format(config))
         obj.setExpression(".Length",  u"<<{}>>.BlockLength".format(config))
         obj.setExpression(".Height",  u"<<{}>>.BlockHeight".format(config))

@@ -97,6 +97,24 @@ def intersectLineAndPlane(v0, v1, plane):
     return point
 
 '''
+    Get Config object by it's name
+    @param config - Config object name
+    @retuns Config
+'''
+def getConfigByName(config):
+    if config is None or len(config) == 0:
+        FreeCAD.Console.PrintError("Error: Config name is empty.\n")
+        return
+                
+    configObj = FreeCAD.ActiveDocument.getObject(config)
+
+    if configObj is None:
+        FreeCAD.Console.PrintError("Error: Config not found.\n")
+        return
+    
+    return configObj
+
+'''
   Get working planes
 '''
 def getWorkingPlanes(group):
