@@ -13,7 +13,7 @@ Gui=FreeCADGui
 import Part
 import utilities
 
-class Move:
+class WireMove:
     def __init__(self, obj, start, config):         
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Move"
         obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
@@ -107,7 +107,7 @@ class Move:
         obj.Shape = Part.makeCompound([line_L, line_R])
         obj.ViewObject.LineColor = (0.137, 0.662, 0.803)
 
-class MoveVP:
+class WireMoveVP:
     def __init__(self, obj):
         obj.Proxy = self
 
@@ -155,8 +155,8 @@ class MakeMove():
             
             # - Create object
             move = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Move")
-            Move(move, objects[0], group.ConfigName)
-            MoveVP(move.ViewObject)
+            WireMove(move, objects[0], group.ConfigName)
+            WireMoveVP(move.ViewObject)
             move.ViewObject.PointSize = 4
 
             group.addObject(move)

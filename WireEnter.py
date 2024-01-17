@@ -13,7 +13,7 @@ Gui=FreeCADGui
 import Part
 import utilities
 
-class Enter:
+class WireEnter:
     def __init__(self, obj, entry, config):              
         obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height" )        
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Enter"
@@ -101,7 +101,7 @@ class Enter:
         obj.ViewObject.LineColor = (0.0, 1.0, 0.0)
 
 
-class EnterVP:
+class WireEnterVP:
     def __init__(self, obj):
         obj.Proxy = self
 
@@ -150,12 +150,12 @@ class MakeEnter():
             
             # - Create object
             enter = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Enter")
-            Enter(enter, objects[0], group.ConfigName)
-            EnterVP(enter.ViewObject)
+            WireEnter(enter, objects[0], group.ConfigName)
+            WireEnterVP(enter.ViewObject)
             enter.ViewObject.PointSize = 4
     
             group.addObject(enter)
-            enter.recompute()
+            App.ActiveDocument.recompute()
             Gui.Selection.clearSelection()
     
     def IsActive(self):

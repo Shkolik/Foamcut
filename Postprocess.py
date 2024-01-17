@@ -24,9 +24,9 @@ class Postprocess():
     '''
     def generateTravelPosition(self, config, X1, Z1, X2, Z2):
         return "%s%.2f %s%.2f %s%.2f %s%.2f" % (
-            config.X1AxisName, float(X1),
+            config.X1AxisName, float(X1 - config.OriginX),
             config.Z1AxisName, float(Z1),
-            config.X2AxisName, float(X2),
+            config.X2AxisName, float(X2 - config.OriginX),
             config.Z2AxisName, float(Z2)
             )
 
@@ -271,14 +271,17 @@ class Postprocess():
                 # - Access item
                 item = route.Data[i]
 
+                object = route.Objects[item]
+                reversed = route.DataDirection[i]
+
                 # - This is a Path
-                if item.Object.Type == "Path":
+                if object.Type == "Path":
                     # - Remove last point from task as it must be same point as new path start
                     if prev_path:
                         del TASK[-1]
 
                     # - Make GCODE from path
-                    (start, end, text) = self.makeGCODEFromPath(item.Object, item.Reversed, config)
+                    (start, end, text) = self.makeGCODEFromPath(object, reversed, config)
                     TASK += text
 
                     # - Store first point as start point
@@ -290,24 +293,24 @@ class Postprocess():
                     # - Update prev element type
                     prev_path = True
 
-                elif item.Object.Type == "Move":
+                elif object.Type == "Move":
                     # - Make GCODE from move
-                    TASK += self.makeGCODEFromMove(item.Object, item.Reversed, config)
+                    TASK += self.makeGCODEFromMove(object, reversed, config)
 
                 # - This is a Rotation
-                elif item.Object.Type == "Rotation":
+                elif object.Type == "Rotation":
                     # - Make GCODE from rotation
-                    TASK += self.makeGCODEFromRotation(item.Object, config)
+                    TASK += self.makeGCODEFromRotation(object, config)
                     prev_path = False
 
-                elif item.Object.Type == "Enter":
-                    TASK += self.makeGCODEFromEnter(item.Object, config)
+                elif object.Type == "Enter":
+                    TASK += self.makeGCODEFromEnter(object, config)
 
-                elif item.Object.Type == "Exit":
-                    TASK += self.makeGCODEFromExit(item.Object, config)
+                elif object.Type == "Exit":
+                    TASK += self.makeGCODEFromExit(object, config)
 
-                elif item.Object.Type == "Join":
-                    TASK += self.makeGCODEFromJoin(item.Object, item.Reversed, config)
+                elif object.Type == "Join":
+                    TASK += self.makeGCODEFromJoin(object, reversed, config)
                 
 
             TASK += ["; --- Route end [%s] ---\r\n" % route.Label, ";\r\n"]
@@ -357,6 +360,7 @@ class Postprocess():
                 route.touch()
                 route.recompute()
                 if route.Error is not None and len(route.Error) > 0:
+                    print(route.Error)
                     hasError = True
                     break
 

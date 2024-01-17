@@ -13,7 +13,7 @@ import Draft
 import utilities
 import os
 
-class Origin:
+class MachineOrigin:
     def __init__(self, obj, config):
         obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
         
@@ -104,7 +104,7 @@ class Origin:
             ]
 
 
-class OriginVP:
+class MachineOriginVP:
     def __init__(self, obj):
         obj.Proxy = self
 
@@ -144,6 +144,6 @@ class OriginVP:
     @param config - config object name
 '''
 def CreateOrigin(obj, config):
-    Origin(obj, config)
-    OriginVP(obj.ViewObject)
+    MachineOrigin(obj, config)
+    MachineOriginVP(obj.ViewObject)
     Gui.Selection.clearSelection()

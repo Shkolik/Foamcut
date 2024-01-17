@@ -13,7 +13,7 @@ Gui=FreeCADGui
 import Part
 import utilities
 
-class Join:
+class WireJoin:
     def __init__(self, obj, start, end, config):  
 
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Join"
@@ -160,7 +160,7 @@ class Join:
 
         Gui.Selection.clearSelection()
 
-class JoinVP:
+class WireJoinVP:
     def __init__(self, obj):
         obj.Proxy = self
 
@@ -212,8 +212,8 @@ class MakeJoin():
             
             # - Create object
             join = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Join")
-            Join(join, objects[0], objects[1], group.ConfigName)
-            JoinVP(join.ViewObject)
+            WireJoin(join, objects[0], objects[1], group.ConfigName)
+            WireJoinVP(join.ViewObject)
             join.ViewObject.PointSize = 4
     
             group.addObject(join)

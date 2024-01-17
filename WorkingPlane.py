@@ -12,7 +12,7 @@ Gui=FreeCADGui
 import utilities
 import Part
  
-class Plane:
+class WorkingPlane:
     def __init__(self, obj, config, side):        
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Helper"  
         obj.addProperty("App::PropertyLength",     "Length", "", "", 5).Length = 100                                         # Machine X axis
@@ -48,7 +48,7 @@ class Plane:
         obj.Shape     = plane
         obj.Placement = plane.Placement
         
-class PlaneVP:
+class WorkingPlaneVP:
     def __init__(self, obj):
         obj.LineColor  =  (255, 225, 5)
         obj.ShapeColor = (255, 225, 5)
@@ -84,5 +84,5 @@ class PlaneVP:
             return None
     
 def CreateWorkingPlane(obj, config, side):
-    Plane(obj, config, side)
-    PlaneVP(obj.ViewObject)
+    WorkingPlane(obj, config, side)
+    WorkingPlaneVP(obj.ViewObject)

@@ -12,25 +12,14 @@ import FreeCADGui
 Gui=FreeCADGui
 import utilities
 
-
-# - Route entry object
-class RouteEntry:
-    def __init__(this):
-        this.Object   = None
-        this.Reversed = False
-        this.LeftSegmentLength = float(0)
-        this.RightSegmentLength = float(0)
-
-    def toJSON(this):
-        return json.dumps(this, default=lambda o: o.__dict__, sort_keys=True, indent=4)
-    
-class Route:
+class WireRoute:
     def __init__(self, obj, objects, config):        
-        obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Route"  
-        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
+        obj.addProperty("App::PropertyString",      "Type", "", "", 5).Type = "Route"  
+        obj.addProperty("App::PropertyLength",      "FieldWidth","","",5)
 
-        obj.addProperty("App::PropertyLinkList",      "Objects",      "Task",   "Source data").Objects = objects
-        obj.addProperty("App::PropertyPythonObject",  "Data", "Task", "", 5)
+        obj.addProperty("App::PropertyLinkList",    "Objects",      "Task",   "Source data").Objects = objects
+        obj.addProperty("App::PropertyIntegerList", "Data",         "Task",   "Data")
+        obj.addProperty("App::PropertyBoolList",    "DataDirection","Task",   "Data Direction")
 
         obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
         obj.addProperty("App::PropertyString",    "Error", "", "", 5) 
@@ -39,25 +28,26 @@ class Route:
 
         self.execute(obj)
 
-    def onChanged(this, fp, prop):
+    def onChanged(self, fp, prop):
         # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
+    
+    def execute(self, obj): 
+        obj.Error = ""
 
-    def execute(self, obj):        
         first       = obj.Objects[0]
         reversed    = None        # - Second segment is reversed
         START       = 0           # - Segment start point index
         END         = -1          # - Segment end point index
         route_data  = []
+        route_data_dir  = []
         item_index  = 0
 
         # - Check is single element
         if len(obj.Objects) == 1:
-            # - Store element
-            entry = RouteEntry()
-            entry.Object    = first
-            entry.Reversed  = False
-            route_data.append(entry)
+            # - Store element            
+            route_data.append(item_index)
+            route_data_dir.append(False)
 
         # - Walk through other objects
         for second in obj.Objects[1:]:
@@ -67,10 +57,8 @@ class Route:
             if first is None:
                 first = second
                 if first.Type == "Enter":
-                    entry = RouteEntry()
-                    entry.Object    = first
-                    entry.Reversed  = False
-                    route_data.append(entry)
+                    route_data.append(item_index)
+                    route_data_dir.append(False)
 
                 print("SKIP: %s" % second.Type)
                 continue
@@ -79,10 +67,8 @@ class Route:
             if first.Type == "Rotation":
                 print("R1")
                 # - Store first element
-                entry = RouteEntry()
-                entry.Object    = first
-                entry.Reversed  = False
-                route_data.append(entry)
+                route_data.append(item_index - 1)
+                route_data_dir.append(False)
 
                 # - Check is rotation is firts element
                 if item_index == 1:
@@ -96,10 +82,8 @@ class Route:
             elif second.Type == "Rotation":
                 print("R1 - 2")
                 # - Store element
-                entry = RouteEntry()
-                entry.Object    = second
-                entry.Reversed  = False
-                route_data.append(entry)
+                route_data.append(item_index)
+                route_data_dir.append(False)
 
                 # - Skip element
                 first = None
@@ -109,16 +93,12 @@ class Route:
                 # - Store first item
                 if len(route_data) == 0:
                     # - Store element
-                    entry = RouteEntry()
-                    entry.Object    = first
-                    entry.Reversed  = False
-                    route_data.append(entry)
+                    route_data.append(item_index - 1)
+                    route_data_dir.append(False)
 
                 # - Store element
-                entry = RouteEntry()
-                entry.Object    = second
-                entry.Reversed  = False
-                route_data.append(entry)
+                route_data.append(item_index)
+                route_data_dir.append(False)
 
                 first = second
                 continue
@@ -139,10 +119,9 @@ class Route:
                     App.Vector(-obj.FieldWidth / 2, first.PointXLB, first.PointZLB)
                 ]
             else:
-                print("Unsupported first element")
-                print(first.Label)
-                print(second.Label)
-                return
+                obj.Error = "ERROR: {} - Unsupported first element. Second = {}".format(first.Label, second.Label)
+                print(obj.Error)                
+                return False
             
             if second.Type == "Path":   
                 second_line = second.Path_L
@@ -160,76 +139,70 @@ class Route:
                 ]
             else:
                 print("Unsupported second element")
-                print(first.Label)
-                print(second.Label)
-                return
+                obj.Error = "ERROR: {} - Unsupported second element. First = {}".format(second.Label, first.Label)
+                print(obj.Error) 
+                return False
             
             if reversed is None:
                 first_reversed = False
 
                 # - Detect first pair
                 if utilities.isCommonPoint(first_line[END], second_line[START]):
-                    # print ("First connected: FWD - FWD")
+                    print ("First connected: FWD - FWD")
                     reversed = False
                 elif utilities.isCommonPoint(first_line[END], second_line[END]):
-                    # print ("First connected: FWD - REV")
+                    print ("First connected: FWD - REV")
                     reversed = True
                 elif utilities.isCommonPoint(first_line[START], second_line[START]):
-                    # print ("First connected: REV - FWD")
+                    print ("First connected: REV - FWD")
                     first_reversed  = True
                     reversed        = False
                 elif utilities.isCommonPoint(first_line[START], second_line[END]):
-                    # print ("First connected: REV - REV")
+                    print ("First connected: REV - REV")
                     first_reversed  = True
                     reversed        = True
                 else:
                     obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
                     print(obj.Error)
-                    return
-
+                    return False
+                
                 # - Store first element
-                entry = RouteEntry()
-                entry.Object    = first
-                entry.Reversed  = first_reversed
-                entry.LeftSegmentLength  = first.LeftSegmentLength
-                entry.RightSegmentLength  = first.RightSegmentLength
-                route_data.append(entry)
+                route_data.append(item_index - 1)
+                route_data_dir.append(first_reversed)
 
                 # - Store second element
-                entry = RouteEntry()
-                entry.Object    = second
-                entry.Reversed  = reversed
-                entry.LeftSegmentLength  = second.LeftSegmentLength
-                entry.RightSegmentLength  = second.RightSegmentLength
-                route_data.append(entry)
+                route_data.append(item_index)
+                route_data_dir.append(reversed)
             else:
                 # - Detect next pairs
                 if utilities.isCommonPoint(first_line[START if reversed else END], second_line[START]):
-                    # print ("Connected: FWD - FWD")
+                    print ("Connected: FWD - FWD")
                     reversed = False
                 elif utilities.isCommonPoint(first_line[START if reversed else END], second_line[END]):
-                    # print ("Connected: FWD - REV")
+                    print ("Connected: FWD - REV")
                     reversed = True
                 else:
                     obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
                     print(obj.Error)
-                    return
+                    return False
 
                 # - Store next element
-                entry = RouteEntry()
-                entry.Object    = second
-                entry.Reversed  = reversed
-                entry.LeftSegmentLength  = second.LeftSegmentLength
-                entry.RightSegmentLength  = second.RightSegmentLength
-                route_data.append(entry)
+                route_data.append(item_index)
+                route_data_dir.append(reversed)
 
             # - Go to next object
             first = second
         
+        if len(route_data) != len(route_data_dir) or len(route_data) == 0:
+            obj.Error("Error: Data calculation error.")
+            print(obj.Error)
+            return False
+        
         obj.Data = route_data
+        obj.DataDirection = route_data_dir
 
 
-class RouteVP:
+class WireRouteVP:
     def __init__(self, obj):
         obj.Proxy = self
 
@@ -255,7 +228,7 @@ class RouteVP:
             return None
     
     def claimChildren(self):
-        return self.Object.Objects
+        return [object for object in self.Object.Objects]
     
     def doubleClicked(self, obj):
         return True
@@ -275,12 +248,17 @@ class MakeRoute():
             # - Get selecttion
             objects = [item.Object for item in Gui.Selection.getSelectionEx()]
             
+            for object in objects:
+                object.touch()
+            
+            group.recompute()
+
             # - Create object
             route = group.newObject("App::FeaturePython", "Route")
-            Route(route, objects, group.ConfigName)
-            RouteVP(route.ViewObject)
+            WireRoute(route, objects, group.ConfigName)
+            WireRouteVP(route.ViewObject)
 
-            group.recompute()
+            App.ActiveDocument.recompute()
             Gui.Selection.clearSelection()
     
     def IsActive(self):

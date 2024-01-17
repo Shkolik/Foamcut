@@ -23,13 +23,13 @@ class FoamcutWB (Workbench):
         # import here all the needed files that create your FreeCAD commands
         import utilities
         import InitMachine 
-        import Path
-        import Enter
+        import WirePath
+        import WireEnter
         import Exit
         import Move
-        import Join
+        import WireJoin
         import Rotate
-        import Route
+        import WireRoute
         import Postprocess
         import MirrorGcode
         

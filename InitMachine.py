@@ -11,14 +11,14 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import utilities
-import Config
-import Origin
-import Plane
+import MachineConfig
+import MachineOrigin
+import WorkingPlane
 import FoamBlock
 
 def initChildren(config, machine):
     origin = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Origin")
-    Origin.CreateOrigin(origin, config.Name)
+    MachineOrigin.CreateOrigin(origin, config.Name)
 
     CNCVolume = FreeCAD.ActiveDocument.addObject("Part::Box", "CNCVolume")
     CNCVolume.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
@@ -52,13 +52,13 @@ def initChildren(config, machine):
     RotationAxis.ViewObject.LineColor = (1.0, 0.886, 0.023)
     
     wpl = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPL")
-    Plane.CreateWorkingPlane(wpl, config.Name, utilities.LEFT)
+    WorkingPlane.CreateWorkingPlane(wpl, config.Name, utilities.LEFT)
     wpl.Label = "Working Plane L"
 
     machine.WPLName = wpl.Name
     
     wpr = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPR")
-    Plane.CreateWorkingPlane(wpr, config.Name, utilities.RIGHT)
+    WorkingPlane.CreateWorkingPlane(wpr, config.Name, utilities.RIGHT)
     wpr.Label = "Working Plane R"
 
     machine.WPRName = wpr.Name
@@ -133,7 +133,7 @@ class InitMachine():
     def Activated(self):        
         # - Create CNC configuration
         config = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Config")
-        Config.createConfig(config)
+        MachineConfig.createConfig(config)
 
         # - Create group
         machine = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Job")

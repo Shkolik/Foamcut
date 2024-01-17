@@ -163,9 +163,10 @@ def makePathPointsByEdgesPair(first, second, planes, step = 0.1):
     return makePathByPointSets(first_set, second_set, planes)
 
 class PathSection:
-    def __init__(self, obj, edge_l, edge_r):
+    def __init__(self, obj, edge_l, edge_r, config):
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
+        obj.addProperty("App::PropertyLength",      "FieldWidth","","",5) # - we need this field only to trigger recompute when this property changed in config
         obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Path"
 
         obj.addProperty("App::PropertyLinkSub",     "LeftEdge",             "Edges",    "Left Edge").LeftEdge = edge_l
@@ -175,6 +176,8 @@ class PathSection:
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information", "Left Segment length",   1)
         obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information", "Right Segment length",   1)
         obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Information", "Show projection lines between planes").ShowProjectionLines = False
+
+        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
 
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
@@ -186,6 +189,9 @@ class PathSection:
         pass
 
     def execute(self, obj):
+        START       = 0           # - start point index
+        END         = -1          # - end point index
+    
         job = obj.getParentGroup()
         # - Get working planes
         wp = utilities.getWorkingPlanes(job)
@@ -200,9 +206,9 @@ class PathSection:
         path_points = makePathPointsByEdgesPair(left, right, wp)
 
         # - Set data
-        obj.Path_L       = [utilities.vertexToVector(item) for item in path_points[0]]
-        obj.Path_R       = [utilities.vertexToVector(item) for item in path_points[1]]        
-        obj.PointsCount  = int(len(path_points[0]))
+        obj.Path_L       = [utilities.vertexToVector(item) for item in path_points[START]]
+        obj.Path_R       = [utilities.vertexToVector(item) for item in path_points[END]]        
+        obj.PointsCount  = int(len(path_points[START]))
         #
 
         # - Create path for L
@@ -216,8 +222,8 @@ class PathSection:
         shapes = [path_L.toShape(), path_R.toShape(), left, right]
 
         if obj.ShowProjectionLines:
-            shapes.append(Part.makeLine(obj.Path_L[0] , obj.Path_R[0]))
-            shapes.append(Part.makeLine(obj.Path_L[len(obj.Path_L) - 1] , obj.Path_R[len(obj.Path_R) - 1] ))
+            shapes.append(Part.makeLine(obj.Path_L[START] , obj.Path_R[START]))
+            shapes.append(Part.makeLine(obj.Path_L[END] , obj.Path_R[END] ))
         
         # - Update shape and information
         obj.Shape = Part.makeCompound(shapes)
@@ -275,11 +281,14 @@ class MakePath():
             objects = utilities.getAllSelectedObjects()
             obj = group.newObject("Part::FeaturePython","Path")
             
-            PathSection(obj, (FreeCAD.ActiveDocument.getObject((objects[0])[0].Name), (objects[0])[1][0]), (FreeCAD.ActiveDocument.getObject((objects[1])[0].Name),(objects[1])[1][0]))
+            PathSection(obj, 
+                        (FreeCAD.ActiveDocument.getObject((objects[0])[0].Name), (objects[0])[1][0]), 
+                        (FreeCAD.ActiveDocument.getObject((objects[1])[0].Name),(objects[1])[1][0]),
+                        group.ConfigName)
             PathSectionVP(obj.ViewObject)
             obj.ViewObject.PointSize = 4
 
-            obj.recompute()
+            App.ActiveDocument.recompute()
             Gui.Selection.clearSelection()
     
     def IsActive(self):

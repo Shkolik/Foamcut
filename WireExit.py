@@ -13,7 +13,7 @@ Gui=FreeCADGui
 import Part
 import utilities
 
-class Exit:
+class WireExit:
     def __init__(self, obj, exit, config):
         obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height")
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Exit"
@@ -106,7 +106,7 @@ class Exit:
         obj.Shape = Part.makeCompound([line_L, line_R])
         obj.ViewObject.LineColor = (1.0, 0.0, 0.0)
         
-class ExitVP:
+class WireExitVP:
     def __init__(this, obj):
         obj.Proxy = this
 
@@ -154,13 +154,13 @@ class MakeExit():
             
             # - Create object
             exit = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Exit")
-            Exit(exit, objects[0], group.ConfigName)
-            ExitVP(exit.ViewObject)
+            WireExit(exit, objects[0], group.ConfigName)
+            WireExitVP(exit.ViewObject)
             exit.ViewObject.PointSize = 4
             
             group.addObject(exit)
 
-            exit.recompute()
+            App.ActiveDocument.recompute()
             Gui.Selection.clearSelection()
 
     def IsActive(self):

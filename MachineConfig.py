@@ -11,7 +11,7 @@ import FreeCADGui
 Gui=FreeCADGui
 import utilities
 
-class Config:
+class MachineConfig:
     def __init__(self, obj):
         obj.addProperty("App::PropertyLength",     "HorizontalTravel", "Machine Geometry",  "Horizontal travel distance").HorizontalTravel = 800
         obj.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry",  "Vertical travel distance"  ).VerticalTravel = 300   # - Vertical travel
@@ -68,7 +68,7 @@ class Config:
         pass 
         
 
-class ConfigVP:
+class MachineConfigVP:
     def __init__(self, obj):
         obj.Proxy = self
 
@@ -99,5 +99,5 @@ class ConfigVP:
             return None
         
 def createConfig(obj):
-    Config(obj)
-    ConfigVP(obj.ViewObject)
+    MachineConfig(obj)
+    MachineConfigVP(obj.ViewObject)
