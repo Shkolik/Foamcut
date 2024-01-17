@@ -13,7 +13,7 @@ Gui=FreeCADGui
 import utilities
 import MachineConfig
 import MachineOrigin
-import WorkingPlane
+import FoamCut_WorkingPlane
 import FoamBlock
 
 def initChildren(config, machine):
@@ -52,13 +52,13 @@ def initChildren(config, machine):
     RotationAxis.ViewObject.LineColor = (1.0, 0.886, 0.023)
     
     wpl = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPL")
-    WorkingPlane.CreateWorkingPlane(wpl, config.Name, utilities.LEFT)
+    FoamCut_WorkingPlane.CreateWorkingPlane(wpl, config.Name, utilities.LEFT)
     wpl.Label = "Working Plane L"
 
     machine.WPLName = wpl.Name
     
     wpr = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPR")
-    WorkingPlane.CreateWorkingPlane(wpr, config.Name, utilities.RIGHT)
+    FoamCut_WorkingPlane.CreateWorkingPlane(wpr, config.Name, utilities.RIGHT)
     wpr.Label = "Working Plane R"
 
     machine.WPRName = wpr.Name
