@@ -25,8 +25,8 @@ class FoamcutWB (Workbench):
         import InitMachine 
         import WirePath
         import WireEnter
-        import Exit
-        import Move
+        import WireExit
+        import WireMove
         import WireJoin
         import Rotate
         import WireRoute
