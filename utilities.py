@@ -18,6 +18,9 @@ END         = -1          # - Segment end point index
 LEFT = -1
 RIGHT = 1
 
+FC_TYPES = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join", "Route", "Job", "Helper"]
+FC_TYPES_TO_ROUTE = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join"]
+
 '''
     Returns the current module path.
     Determines where this file is running from, so works regardless of whether

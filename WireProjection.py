@@ -15,7 +15,6 @@ import utilities
 from utilities import makePathByPointSets, START, END
 
 
-
 '''
   Make projected path on working planes by one edge or vertex
   @param first - First edge / vertex
@@ -53,7 +52,7 @@ class ProjectionSection:
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
         obj.addProperty("App::PropertyLength",      "FieldWidth","","",5) # - we need this field only to trigger recompute when this property changed in config
-        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Path"
+        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Projection"
 
         obj.addProperty("App::PropertyLinkSub",     "Source",               "Data",         "Source object to project").Source = source
         
@@ -94,28 +93,48 @@ class ProjectionSection:
         #
 
         shapes = []
-
+        l_points = obj.Path_L
+        r_points = obj.Path_R
+        
         if obj.PointsCount == 1:
             shapes = [Part.Point(obj.Path_L[START]), Part.Point(obj.Path_R[START]), source]
             obj.LeftSegmentLength = 0.0
-            obj.RightSegmentLength = 0.0
+            obj.RightSegmentLength = 0.0      
         else:
+            sameY = True
+            tempY = obj.Path_L[START].y
+            for point in obj.Path_L:
+                if tempY != point.y:
+                    sameY = False
+                    break
+
+            if sameY:
+                minZ = min(obj.Path_L, key=lambda point: point.z)
+                maxZ = max(obj.Path_L, key=lambda point: point.z)
+                
+                l_points = [minZ, maxZ]
+                
+                minZ = min(obj.Path_R, key=lambda point: point.z)
+                maxZ = max(obj.Path_R, key=lambda point: point.z)
+                
+                r_points = [minZ, maxZ]
+
             # - Create path for L
             path_L = Part.BSplineCurve()
-            path_L.approximate(Points = obj.Path_L, Continuity="C0")
+            path_L.approximate(Points = l_points, Continuity="C0")
 
             # - Create path for R
             path_R = Part.BSplineCurve()
-            path_R.approximate(Points = obj.Path_R, Continuity="C0")
-
+            path_R.approximate(Points = r_points, Continuity="C0")
+            
             obj.LeftSegmentLength = float(path_L.length())
             obj.RightSegmentLength = float(path_R.length())
 
             shapes = [path_L.toShape(), path_R.toShape(), source]
 
         if obj.ShowProjectionLines:
-            shapes.append(Part.makeLine(obj.Path_L[START] , obj.Path_R[START]))
-            shapes.append(Part.makeLine(obj.Path_L[END] , obj.Path_R[END] ))
+            shapes.append(Part.makeLine(l_points[START] , r_points[START]))
+            shapes.append(Part.makeLine(l_points[END] , r_points[END] ))
         
         # - Update shape and information
         obj.Shape = Part.makeCompound(shapes)

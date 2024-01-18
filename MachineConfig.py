@@ -13,6 +13,8 @@ import utilities
 
 class MachineConfig:
     def __init__(self, obj):
+        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
+        
         obj.addProperty("App::PropertyLength",     "HorizontalTravel", "Machine Geometry",  "Horizontal travel distance").HorizontalTravel = 800
         obj.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry",  "Vertical travel distance"  ).VerticalTravel = 300   # - Vertical travel
         obj.addProperty("App::PropertyLength",     "FieldWidth",       "Machine Geometry",  "Distance between wire ends").FieldWidth = 500   # - Width

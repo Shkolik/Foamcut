@@ -62,6 +62,11 @@ class WireRoute:
 
                 print("SKIP: %s" % second.Type)
                 continue
+            
+            if first.Type == "Projection" and first.PointsCount < 2:
+                print("Vertex Projection - skip")
+                first = second
+                continue
 
             # - Skip rotation object
             if first.Type == "Rotation":
@@ -104,7 +109,7 @@ class WireRoute:
                 continue
             
             # - Get lines on left plane
-            if first.Type   == "Path":    
+            if first.Type   == "Path" or first.Type   == "Projection":    
                 first_line  = first.Path_L
             elif first.Type == "Enter":   
                 first_line  = [App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL)]
@@ -123,7 +128,7 @@ class WireRoute:
                 print(obj.Error)                
                 return False
             
-            if second.Type == "Path":   
+            if second.Type == "Path" or second.Type   == "Projection":   
                 second_line = second.Path_L
             elif second.Type == "Exit": 
                 second_line = [App.Vector(-obj.FieldWidth / 2, second.PointXL, second.PointZL)]
@@ -275,8 +280,7 @@ class MakeRoute():
                     return False
                 
                 for obj in objects:
-                    if (not hasattr(obj, "Type") or 
-                        (obj.Type != "Path" and obj.Type != "Rotation" and obj.Type != "Enter" and obj.Type != "Exit" and obj.Type != "Move" and obj.Type != "Join")):
+                    if not hasattr(obj, "Type") or obj.Type not in utilities.FC_TYPES_TO_ROUTE:
                         return False                    
                 return True
             return False
