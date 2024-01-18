@@ -10,6 +10,10 @@ import FreeCADGui
 Gui=FreeCADGui
 import Part
 import os
+from math import sqrt
+
+START       = 0           # - Segment start point index
+END         = -1          # - Segment end point index
 
 LEFT = -1
 RIGHT = 1
@@ -29,8 +33,13 @@ def getResourcesPath():
 def getIconPath(icon):
     return os.path.join(getResourcesPath(), "icons", icon)
 
+'''
+    Checs if we need handle object state in a new fashion
+    It was first introduced in FC v.0.21.2 and was merged into LinkStage3 branch v.2024.113
+'''
 def isNewStateHandling():
-    return (FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]+FreeCAD.Version()[2]) >= '0.212' and (FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]) < '2000'
+    version = FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]+FreeCAD.Version()[2]
+    return (version >= '0.212' and version < '2024.1130') or version >= '2024.1130'
 
 '''
     Converts Part.Vertex to FreeCAD.Vector
@@ -77,6 +86,31 @@ def getAllSelectedEdges():
 def isCommonPoint(first, second):
     return True if first.distanceToPoint(second) < 0.01 else False
   
+'''
+    Calculates distance between 2 vertexes in 3d space
+    @param v1 - Vertex 1
+    @param v2 - Vertex 2
+'''
+def distanceToVertex(v1, v2):
+    return sqrt((v2.X - v1.X)**2 + (v2.Y - v1.Y)**2 + (v2.Z - v1.Z)**2) 
+
+'''
+  Synchronize direction of two edges using their end vertexes
+  Sometimes it can produce wrong result (for example for heavy sweeped wing where tip leading edge past root trailing edge)
+  Take it into account and check if reversing one set of vertexes produce shortest line when projecting to working planes
+  @return (vertex00, vertex01, vertex10, vertex11)
+'''
+def getSynchronizedVertices(first, second):
+    dist, vectors, info = first.distToShape(second)
+    v1, v2 = vectors[0]
+
+    return (
+        first.firstVertex()   if first.firstVertex().Point == v1  else first.lastVertex(),
+        first.lastVertex()    if first.firstVertex().Point == v1  else first.firstVertex(),
+        second.firstVertex()  if second.firstVertex().Point == v2 else second.lastVertex(),
+        second.lastVertex()   if second.firstVertex().Point == v2 else second.firstVertex(),
+    )
+
 '''
   Find point of intersection of line and plane
   @param v0 - Fist point
@@ -136,6 +170,76 @@ def getWorkingPlanes(group):
             return result
         else:
             FreeCAD.Console.PrintError("ERROR:\n Parent Job not found.\n")
+
+'''
+  Make path on working planes by one or two sets of points
+  @param first - First points set
+  @param second - Second points set or None if projection is true
+  @param planes - Array of planes
+  @param projection - optional, if set to True, only first points set will be used and will be projected normal to WPs
+  @return Array of points of intersection for each plane
+'''
+def makePathByPointSets(first, second, planes, projection = False):
+    # - Point sets must contain same number of point
+    if not projection and len(first) != len(second):
+        return None
+
+    # - Check working planes count
+    if len(planes) == 0:
+        return None
+
+    # - Initialize result
+    result = []
+    
+    if projection:
+        for plane in planes:
+            plane_points = []
+            for point in first:
+                plane_points.append(FreeCAD.Vector(plane.Position.x, point.y, point.z))
+            result.append(plane_points)
+    else: 
+        pathsLength = []
+        
+        # try inverted edge only if we are working with edges, not with vertexes
+        examineLength = len(first) > 1 and  len(second) > 1 and not projection
+
+        # - Intersect line by each point pair and each plane
+        for plane_index in range(len(planes)):
+            plane_points = []
+            for point_index in range(len(first)):            
+                plane_points.append(
+                    intersectLineAndPlane(first[point_index], second[point_index], planes[plane_index])
+                )
+            if examineLength:
+                pathsLength.append(distanceToVertex(plane_points[START], plane_points[END]))        
+            result.append([vertexToVector(point) for point in plane_points])
+
+        # check with one edge reversed
+        # if resulted length will be less then use this points order
+        if(examineLength):
+            resultInverted = []
+            pathsLengthInverted = []
+            # - Intersect line by each point pair and each plane
+            for plane_index in range(len(planes)):
+                plane_points = []
+                for point_index in range(len(first)):            
+                    plane_points.append(                
+                        intersectLineAndPlane(first[len(first) - point_index - 1], second[point_index], planes[plane_index])
+                    )
+                pathsLengthInverted.append(distanceToVertex(plane_points[START], plane_points[END]))    
+                resultInverted.append([vertexToVector(point) for point in plane_points])
+
+            invert = True
+
+            # if any edge from normal list shorter than same edge from inverted list - use normal list
+            for pathIndex in range(len(pathsLength)):
+                if pathsLength[pathIndex] < pathsLengthInverted[pathIndex]:
+                    invert = False
+                    break
+            
+            # - Done
+            return resultInverted if invert else result
+    return result
 
 '''
   Enumeration for the pick style

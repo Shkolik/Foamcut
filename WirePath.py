@@ -12,95 +12,9 @@ import FreeCADGui
 Gui=FreeCADGui
 import Part
 import utilities
+from utilities import makePathByPointSets
 import math
 
-'''
-    Calculates distance between 2 vertexes in 3d space
-    @param v1 - Vertex 1
-    @param v2 - Vertex 2
-'''
-def distanceToVertex(v1, v2):
-    return math.sqrt((v2.X - v1.X)**2 + (v2.Y - v1.Y)**2 + (v2.Z - v1.Z)**2) 
-
-'''
-  Synchronize direction of two edges using their end vertexes
-  Sometimes it can produce wrong result (for example for heavy sweeped wing where tip leading edge past root trailing edge)
-  Take it into account and check if reversing one set of vertexes produce shortest line when projecting to working planes
-  @return (vertex00, vertex01, vertex10, vertex11)
-'''
-def getSynchronizedVertices(first, second):
-    dist, vectors, info = first.distToShape(second)
-    v1, v2 = vectors[0]
-
-    return (
-        first.firstVertex()   if first.firstVertex().Point == v1  else first.lastVertex(),
-        first.lastVertex()    if first.firstVertex().Point == v1  else first.firstVertex(),
-        second.firstVertex()  if second.firstVertex().Point == v2 else second.lastVertex(),
-        second.lastVertex()   if second.firstVertex().Point == v2 else second.firstVertex(),
-    )
-
-
-'''
-  Make path on working planes by two sets of points
-  @param first - First points set
-  @param second - Second points set
-  @param planes - Array of planes
-  @return Array of points of intersection for each plane
-'''
-def makePathByPointSets(first, second, planes):
-    # - Point sets must contain same number of point
-    if len(first) != len(second):
-        return None
-
-    # - Check working planes count
-    if len(planes) == 0:
-        return None
-
-    # - Initialize result
-    result = []
-    
-    pathsLength = []
-    
-    # try inverted edge only if we are working with edges, not with vertexes
-    examineLength = len(first) > 1 and  len(second) > 1
-
-    # - Intersect line by each point pair and each plane
-    for plane_index in range(len(planes)):
-        plane_points = []
-        for point_index in range(len(first)):            
-            plane_points.append(
-                utilities.intersectLineAndPlane(first[point_index], second[point_index], planes[plane_index])
-            )
-        if examineLength:
-            pathsLength.append(distanceToVertex(plane_points[0], plane_points[len(plane_points) - 1]))        
-        result.append(plane_points)
-
-    # check with one edge reversed
-    # if resulted length will be less then use this points order
-    if(examineLength):
-        resultInverted = []
-        pathsLengthInverted = []
-        # - Intersect line by each point pair and each plane
-        for plane_index in range(len(planes)):
-            plane_points = []
-            for point_index in range(len(first)):            
-                plane_points.append(                
-                    utilities.intersectLineAndPlane(first[len(first) - point_index - 1], second[point_index], planes[plane_index])
-                )
-            pathsLengthInverted.append(distanceToVertex(plane_points[0], plane_points[len(plane_points) - 1]))    
-            resultInverted.append(plane_points)
-
-        invert = True
-
-        # if any edge from normal list shorter than same edge from inverted list - use normal list
-        for pathIndex in range(len(pathsLength)):
-            if pathsLength[pathIndex] < pathsLengthInverted[pathIndex]:
-                invert = False
-                break
-        
-        # - Done
-        return resultInverted if invert else result
-    return result
 
 
 '''
@@ -116,7 +30,7 @@ def makePathPointsByEdgesPair(first, second, planes, step = 0.1):
         # - Synchronize edges direction
         # sometime it produces incorrect result, so one points set needs to be flipped. 
         # it's known issue, and method makePathByPointSets() accounts for it
-        v00, v01, v10, v11 = getSynchronizedVertices(first, second)
+        v00, v01, v10, v11 = utilities.getSynchronizedVertices(first, second)
         
         # - Make path
         return makePathByPointSets([v00.Point, v01.Point], [v10.Point, v11.Point], planes)
@@ -206,8 +120,8 @@ class PathSection:
         path_points = makePathPointsByEdgesPair(left, right, wp)
 
         # - Set data
-        obj.Path_L       = [utilities.vertexToVector(item) for item in path_points[START]]
-        obj.Path_R       = [utilities.vertexToVector(item) for item in path_points[END]]        
+        obj.Path_L       = [item for item in path_points[START]]
+        obj.Path_R       = [item for item in path_points[END]]        
         obj.PointsCount  = int(len(path_points[START]))
         #
 
@@ -259,7 +173,7 @@ class PathSectionVP:
     def claimChildren(self):
         if (self.Object.LeftEdge is not None and len(self.Object.LeftEdge) > 0 
             and self.Object.RightEdge is not None and len(self.Object.RightEdge) > 0 ):
-            return [self.Object.LeftEdge[0], self.Object.RightEdge[0]]
+            return [self.Object.LeftEdge[0], self.Object.RightEdge[0]] if self.Object.LeftEdge[0] != self.Object.RightEdge[0] else [self.Object.LeftEdge[0]]
         return None
 
     def doubleClicked(self, obj):

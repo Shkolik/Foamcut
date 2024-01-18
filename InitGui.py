@@ -32,11 +32,13 @@ class FoamcutWB (Workbench):
         import WireRoute
         import Postprocess
         import MirrorGcode
+        import WireProjection
         
         self.examples = [] # A list of command names to create example project
         self.list = [
             "InitMachine", 
-            "MakePath", 
+            "MakePath",
+            "MakeProjection", 
             "MakeEnter", 
             "MakeExit", 
             "MakeMove", 
