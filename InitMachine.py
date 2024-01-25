@@ -27,7 +27,6 @@ def initChildren(config, machine):
     CNCVolume.setEditorMode("Width",         3)
     CNCVolume.setEditorMode("Height",        3)
     CNCVolume.setEditorMode("Length",        3)
-    CNCVolume.setEditorMode("AttachmentSupport",       3)
     CNCVolume.setEditorMode("MapMode",       3)
 
     CNCVolume.setExpression(".Placement.Base.y", u"-<<{}>>.OriginX".format(config.Name))
@@ -45,7 +44,7 @@ def initChildren(config, machine):
     RotationAxis.Z1 = 0
     RotationAxis.X2 = 0
     RotationAxis.setExpression(".Y2", u"<<{}>>.OriginRotationX".format(config.Name))
-    RotationAxis.setExpression(".Z2", u"<<{}>>.VerticalTravel + 50".format(config.Name))
+    RotationAxis.setExpression(".Z2", u"<<{}>>.VerticalTravel + 50mm".format(config.Name))
     RotationAxis.Placement = App.Placement(App.Vector(0.00,0.00,0.00),App.Rotation(App.Vector(0.00,0.00,1.00),0.00))
     RotationAxis.ViewObject.PointSize = 0
     RotationAxis.ViewObject.Transparency = 70

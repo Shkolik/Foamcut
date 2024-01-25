@@ -29,8 +29,6 @@ class FoamCutWorkingPlane:
         else:
             obj.setExpression(".Position.x", u"<<{}>>.FieldWidth / 2".format(config))
 
-        obj.setEditorMode("ValidateShape", 3)
-        obj.setEditorMode("FixShape", 3)
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 

@@ -57,7 +57,7 @@ class MachineConfig:
         obj.addProperty("App::PropertyLength",     "BlockWidth",            "Foam Block",   "Foam block size along wire").BlockWidth = 400
         obj.addProperty("App::PropertyLength",     "BlockLength",           "Foam Block",   "Foam block size along machine X axis").BlockLength = 300
         obj.addProperty("App::PropertyLength",     "BlockHeight",           "Foam Block",   "Foam block size along machine Y axis").BlockHeight = 50
-        obj.addProperty("App::PropertyPosition",   "BlockPosition",         "Foam Block",   "Foam block position in machine coordinates (x,y,z) where x - coordinate along wire, y - coordinate along machine X axis, z - coordinate along machine Y axis").BlockPosition = App.Vector(-200.0, obj.HorizontalTravel / 2 - 150.0, 50.0 )
+        obj.addProperty("App::PropertyPosition",   "BlockPosition",         "Foam Block",   "Foam block position in machine coordinates (x,y,z) where x - coordinate along wire, y - coordinate along machine X axis, z - coordinate along machine Y axis").BlockPosition = App.Vector(-200.0, float(obj.HorizontalTravel / 2.0) - 150.0, 50.0 )
 
         obj.setEditorMode("Group",     3)
         obj.Proxy = self

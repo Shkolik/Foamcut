@@ -27,8 +27,6 @@ class FoamBlock:
         obj.setExpression(".Placement.Base.y", u"<<{}>>.BlockPosition.y".format(config))
         obj.setExpression(".Placement.Base.z", u"<<{}>>.BlockPosition.z".format(config))
         
-        obj.setEditorMode("ValidateShape", 3)
-        obj.setEditorMode("FixShape", 3)
         obj.setEditorMode("Placement", 3)
 
         obj.Proxy = self
