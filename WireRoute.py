@@ -109,7 +109,7 @@ class WireRoute:
                 continue
             
             # - Get lines on left plane
-            if first.Type   == "Path" or first.Type   == "Projection":    
+            if first.Type   == "Path" or first.Type == "Projection":    
                 first_line  = first.Path_L
             elif first.Type == "Enter":   
                 first_line  = [App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL)]
@@ -128,7 +128,7 @@ class WireRoute:
                 print(obj.Error)                
                 return False
             
-            if second.Type == "Path" or second.Type   == "Projection":   
+            if second.Type == "Path" or second.Type == "Projection":   
                 second_line = second.Path_L
             elif second.Type == "Exit": 
                 second_line = [App.Vector(-obj.FieldWidth / 2, second.PointXL, second.PointZL)]

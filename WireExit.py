@@ -37,7 +37,7 @@ class WireExit:
         self.execute(obj)
 
     def onChanged(this, fp, prop):
-        FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+        #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
     def execute(this, obj): 

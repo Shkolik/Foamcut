@@ -23,7 +23,7 @@ import math
   @param second - Second edge / vertex
   @param step - Distance between points in edge discretization
 '''
-def makePathPointsByEdgesPair(first, second, planes, step = 0.1):
+def makePathPointsByEdgesPair(first, second, planes, step = 0.5):
     # --- Use only end vertices of coplanar edges or lines because path will be a straight line
     if first.isCoplanar(second) or (first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine" and  second.ShapeType == "Edge" and second.Curve.TypeId == "Part::GeomLine"):
         
@@ -79,19 +79,19 @@ def makePathPointsByEdgesPair(first, second, planes, step = 0.1):
 class PathSection:
     def __init__(self, obj, edge_l, edge_r, config):
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
-        obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
-        obj.addProperty("App::PropertyLength",      "FieldWidth","","",5) # - we need this field only to trigger recompute when this property changed in config
+        obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)        
         obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Path"
 
         obj.addProperty("App::PropertyLinkSub",     "LeftEdge",             "Edges",    "Left Edge").LeftEdge = edge_l
         obj.addProperty("App::PropertyLinkSub",     "RightEdge",            "Edges",    "Right Edge").RightEdge = edge_r
         
+        obj.addProperty("App::PropertyLength",      "DiscretizationStep",   "Information", "Discretization step") 
         obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information", "Number of points", 1)
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information", "Left Segment length",   1)
         obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information", "Right Segment length",   1)
         obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Information", "Show projection lines between planes").ShowProjectionLines = False
 
-        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
+        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
 
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
@@ -117,7 +117,7 @@ class PathSection:
         right = obj.RightEdge[0].getSubObject(obj.RightEdge[1])[0]
         
         # - Make path between objects on working planes
-        path_points = makePathPointsByEdgesPair(left, right, wp)
+        path_points = makePathPointsByEdgesPair(left, right, wp, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
 
         # - Set data
         obj.Path_L       = [item for item in path_points[START]]

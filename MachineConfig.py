@@ -25,6 +25,7 @@ class MachineConfig:
         obj.addProperty("App::PropertyString",     "Z2AxisName",        "Axis Mapping",     "Name of Z2 axis in GCODE").Z2AxisName = getParameterString("Z2AxisName", "A")
         obj.addProperty("App::PropertyString",     "R1AxisName",        "Axis Mapping",     "Name of rotary table axis in GCODE").R1AxisName = getParameterString("R1AxisName", "B")
 
+        obj.addProperty("App::PropertyBool",        "EnableHoming",     "Homing",           "Enable homing before cycle start").EnableHoming = getParameterBool("EnableHoming", False)
         obj.addProperty("App::PropertyDistance",    "HomingX1",         "Homing",           "Initial position for X1 axis").HomingX1 = getParameterFloat("HomingX1", 10)
         obj.addProperty("App::PropertyDistance",    "HomingZ1",         "Homing",           "Initial position for Z1 axis").HomingZ1 = getParameterFloat("HomingZ1", 290)
         obj.addProperty("App::PropertyDistance",    "HomingX2",         "Homing",           "Initial position for X2 axis").HomingX2 = getParameterFloat("HomingX2", 10)
@@ -39,10 +40,14 @@ class MachineConfig:
         obj.addProperty("App::PropertySpeed",      "FeedRateMove",      "FeedRate",         "Feed rate while moving").FeedRateMove = getParameterFloat("FeedRateMove", 30)
         obj.addProperty("App::PropertySpeed",      "FeedRateRotate",    "FeedRate",         "Feed rate while rotating").FeedRateRotate = getParameterFloat("FeedRateRotate", 30)
 
-        obj.addProperty("App::PropertyInteger",    "WireMinPower",      "Wire",             "Minimal wire power").WireMinPower = getParameterFloat("WireMinPower", 200)
-        obj.addProperty("App::PropertyInteger",    "WireMaxPower",      "Wire",             "Maximal wire power").WireMaxPower = getParameterFloat("WireMaxPower", 1000)
+        obj.addProperty("App::PropertyInteger",    "WireMinPower",      "Wire",             "Minimal wire power").WireMinPower = getParameterInt("WireMinPower", 700)
+        obj.addProperty("App::PropertyInteger",    "WireMaxPower",      "Wire",             "Maximal wire power").WireMaxPower = getParameterInt("WireMaxPower", 1000)
+        obj.addProperty("App::PropertyBool",       "DynamicWirePower",  "Wire",             "Dynamic wire power. " + 
+                        "Power will vary depending on wire length. When enabling be sure that your controller set to Laser mode, " + 
+                        "otherwise machine will halt for a brif moment after each move.").DynamicWirePower = getParameterBool("DynamicWirePower", False)
 
-        obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = "G01 {Position} F{FeedRate}"
+        obj.addProperty("App::PropertyLength",     "DiscretizationStep",   "GCODE",         "Discretization step").DiscretizationStep = 0.5
+        obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = "G01 {Position} F{FeedRate} {WirePower}"
         obj.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",         "Command for move with cold wire").MoveCommand = "G00 {Position} F{FeedRate}"
         obj.addProperty("App::PropertyString",     "WireOnCommand",        "GCODE",         "Command for enable wire").WireOnCommand = "M03 S{WirePower}"
         obj.addProperty("App::PropertyString",     "WireOffCommand",       "GCODE",         "Command for disable wire").WireOffCommand = "M05"
@@ -103,27 +108,35 @@ class MachineConfigVP:
         
 def getParameterFloat(name, default):
     parameters = App.ParamGet("User parameter:BaseApp/Workbench/FoamcutWB/DefaultMachineConfig")
-    val = parameters.GetFloat(name)
-    if val == 0.0 and val != default:
-        val = default
-        parameters.SetFloat(name, val)
-    return val
+    floats = parameters.GetFloats()
+    if name not in floats:
+        parameters.SetFloat(name, default)
+    
+    return parameters.GetFloat(name)
 
 def getParameterInt(name, default):
     parameters = App.ParamGet("User parameter:BaseApp/Workbench/FoamcutWB/DefaultMachineConfig")
-    val = parameters.GetInt(name)
-    if val == 0 and val != default:
-        val = default
-        parameters.SetInt(name, val)
-    return val
+    ints = parameters.GetInts()
+    if name not in ints:
+        parameters.SetInt(name, default)
+    
+    return parameters.GetInt(name)
+
+def getParameterBool(name, default):
+    parameters = App.ParamGet("User parameter:BaseApp/Workbench/FoamcutWB/DefaultMachineConfig")
+    bools = parameters.GetBools()
+    if name not in bools:
+        parameters.SetBool(name, default)
+    
+    return parameters.GetBool(name)
 
 def getParameterString(name, default):
     parameters = App.ParamGet("User parameter:BaseApp/Workbench/FoamcutWB/DefaultMachineConfig")
-    val = parameters.GetString(name)
-    if val == '' and val != default:
-        val = default
-        parameters.GetString(name, val)
-    return val
+    strings = parameters.GetStrings()
+    if name not in strings:
+        parameters.SetString(name, default)
+    
+    return parameters.GetString(name)
 
 def createConfig(obj):
     MachineConfig(obj)

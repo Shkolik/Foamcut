@@ -41,12 +41,12 @@ class Postprocess():
     '''
     Generate travel
     '''
-    def generateTravel(self, config, command, feed_rate, X1, Z1, X2, Z2):
+    def generateTravel(self, config, command, feed_rate, wire_power, X1, Z1, X2, Z2):
         # - Create position
         position = self.generateTravelPosition(config, X1, Z1, X2, Z2)
 
         # - Create GCODE
-        return command.replace("{Position}", str(position)).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
+        return command.replace("{Position}", str(position)).replace("{FeedRate}", str(float(feed_rate) * 60)).replace("{WirePower}", str(wire_power)) + "\r\n"
 
     '''
     Generate rotation
@@ -85,8 +85,7 @@ class Postprocess():
         if power > max_power:
             power = max_power
 
-        # - Generate command
-        return self.generateWireEnable(config, power)
+        return power
     
     '''
     Make GCODE from path element
@@ -101,14 +100,15 @@ class Postprocess():
             # - Get point index
             index = path.PointsCount - i - 1 if reversed else i
 
-            # - Calculate wire length
-            wire_length = path.Path_L[index].distanceToPoint(path.Path_R[index]);
-
-            # - Insert compensated wire power
-            #GCODE.append(generateWireCompensatedPower(config, wire_length))
+            wirePowerCommand = ""
+            # - generate compensated wire power
+            if config.DynamicWirePower:
+                # - Calculate wire length
+                wire_length = path.Path_L[index].distanceToPoint(path.Path_R[index]);
+                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
 
             # - Generate CUT travel command
-            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut,
+            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
             path.Path_L[index].y, path.Path_L[index].z,
             path.Path_R[index].y, path.Path_R[index].z,
             ))
@@ -124,21 +124,22 @@ class Postprocess():
     def generateStartBlock(self, config, start_point):
         GCODE = "; *** START BLOCK ***\r\n"
 
-        # - Homing
-        GCODE += config.HomingCommand + "\r\n"
+        if config.EnableHoming:
+            # - Homing
+            GCODE += config.HomingCommand + "\r\n"
 
-        # - Initizlie position
-        GCODE += config.InitPositionCommand.replace("{Position}",
-            self.generateTravelPosition(config,
-            config.HomingX1, config.HomingZ1, config.HomingX2, config.HomingZ2
-            ) + " " +
-            self.generateRotationPosition(config,
-            config.HomingR1
-            )
-        ) + "\r\n"
+            # - Initizlie position
+            GCODE += config.InitPositionCommand.replace("{Position}",
+                self.generateTravelPosition(config,
+                config.HomingX1, config.HomingZ1, config.HomingX2, config.HomingZ2
+                ) + " " +
+                self.generateRotationPosition(config,
+                config.HomingR1
+                )
+            ) + "\r\n"
 
         # - Park
-        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove,
+        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
             config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
             )
         GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
@@ -146,12 +147,19 @@ class Postprocess():
         # - Go to start point on parking Z
         if start_point is not None:
             start_L, start_R = start_point
-            GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove,
+            GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
             start_L.y, config.ParkZ, start_R.y, config.ParkZ
             )
 
+        wirePower = config.WireMinPower
+        # - generate compensated wire power
+        if config.DynamicWirePower:
+            # - Calculate wire length
+            wire_length = start_L.distanceToPoint(start_R);
+            wirePower = self.generateWireCompensatedPower(config, wire_length)
+
         # - Enable wire
-        GCODE += self.generateWireEnable(config, config.WireMinPower)
+        GCODE += self.generateWireEnable(config, wirePower)
 
         return GCODE
 
@@ -167,7 +175,7 @@ class Postprocess():
         GCODE += self.generateWireDisable(config)
 
         # - Park XZ
-        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove,
+        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
             config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
             )
 
@@ -190,12 +198,12 @@ class Postprocess():
         GCODE = ["; - Enter: [%s]\r\n" % enter.Label]
 
         # - Move to entry point
-        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove,
+        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
             enter.PointXL, enter.SafeHeight, enter.PointXR, enter.SafeHeight
         )
 
         # - Generate enter
-        GCODE += self.generateTravel(config, config.CutCommand, config.FeedRateCut,
+        GCODE += self.generateTravel(config, config.CutCommand, config.FeedRateCut, "",
             enter.PointXL, enter.PointZL, enter.PointXR, enter.PointZR
         )
 
@@ -205,7 +213,7 @@ class Postprocess():
         GCODE = ["; - Exit [%s]\r\n" % exit.Label]
 
         # - Generate exit
-        GCODE += self.generateTravel(config, config.CutCommand, config.FeedRateCut,
+        GCODE += self.generateTravel(config, config.CutCommand, config.FeedRateCut, "",
             exit.PointXL, exit.SafeHeight, exit.PointXR, exit.SafeHeight
         )
 
@@ -217,12 +225,12 @@ class Postprocess():
         # - Detect directed offset
         if reversed:
             # - Move from end to start
-            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate,
+            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate, "",
                 move.PointXL, move.PointZL, move.PointXR, move.PointZR
             )
         else:
             # - Move from start to end
-            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate,
+            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate, "", 
                 move.PointXL + float(move.InXDirection), move.PointZL + float(move.InZDirection), move.PointXR + float(move.InXDirection), move.PointZR + float(move.InZDirection)
             )
 
@@ -234,12 +242,12 @@ class Postprocess():
         # - Detect directed offset
         if reversed:
             # - Move from end to start
-            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate,
+            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate, "",
                 move.PointXLA, move.PointZLA, move.PointXRA, move.PointZRA
             )
         else:
             # - Move from start to end
-            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate,
+            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate, "", 
                 move.PointXLB, move.PointZLB, move.PointXRB, move.PointZRB
             )
 
@@ -275,7 +283,7 @@ class Postprocess():
                 reversed = route.DataDirection[i]
 
                 # - This is a Path
-                if object.Type == "Path":
+                if object.Type == "Path" or object.Type == "Projection":
                     # - Remove last point from task as it must be same point as new path start
                     if prev_path:
                         del TASK[-1]
