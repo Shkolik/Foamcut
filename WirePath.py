@@ -12,69 +12,8 @@ import FreeCADGui
 Gui=FreeCADGui
 import Part
 import utilities
-from utilities import makePathByPointSets
+from utilities import makePathByPointSets, makePathPointsByEdgesPair
 import math
-
-
-
-'''
-  Make path on working planes by two edges, vertices, or their combination
-  @param first - First edge / vertex
-  @param second - Second edge / vertex
-  @param step - Distance between points in edge discretization
-'''
-def makePathPointsByEdgesPair(first, second, planes, step = 0.5):
-    # --- Use only end vertices of coplanar edges or lines because path will be a straight line
-    if first.isCoplanar(second) or (first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine" and  second.ShapeType == "Edge" and second.Curve.TypeId == "Part::GeomLine"):
-        
-        # - Synchronize edges direction
-        # sometime it produces incorrect result, so one points set needs to be flipped. 
-        # it's known issue, and method makePathByPointSets() accounts for it
-        v00, v01, v10, v11 = utilities.getSynchronizedVertices(first, second)
-        
-        # - Make path
-        return makePathByPointSets([v00.Point, v01.Point], [v10.Point, v11.Point], planes)
-
-    # --- This not coplanar edges
-    else:
-        # - Detect vertex and vertex
-        if first.ShapeType == "Vertex" and second.ShapeType == "Vertex":
-            return makePathByPointSets([first.Point], [second.Point], planes)
-
-        # - Detect line with combination of vertex or another line
-        if                                                                                                                                                  \
-        (first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine" and second.ShapeType == "Vertex")                                             \
-        or                                                                                                                                                  \
-        (first.ShapeType == "Vertex" and second.ShapeType == "Edge" and second.Curve.TypeId == "Part::GeomLine")                                            \
-        :
-            # - Simplify path to straight line
-            points_count = 2
-        else:
-            # - Find longest edge
-            maxlen = first.Length if first.Length >= second.Length else second.Length
-
-            # - Calculate number of discretization points
-            points_count = int(float(maxlen) / float(step))
-
-    print("Point count = %d" % points_count)
-
-    first_set   = []
-    second_set  = []
-
-    # - Discretize first edge
-    if first.ShapeType == "Vertex":
-        for i in range(points_count): first_set.append(first.Point)
-    else:
-        first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
-
-    # - Discretize second edge
-    if second.ShapeType == "Vertex":
-        for i in range(points_count): second_set.append(second.Point)
-    else:
-        second_set = second.discretize(Number=points_count) if points_count > 2 else [second.firstVertex().Point, second.lastVertex().Point]
-
-    # - Make path
-    return makePathByPointSets(first_set, second_set, planes)
 
 class PathSection:
     def __init__(self, obj, edge_l, edge_r, config):
@@ -106,7 +45,10 @@ class PathSection:
         START       = 0           # - start point index
         END         = -1          # - end point index
     
-        job = obj.getParentGroup()
+        job = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if job is None or job.Type != "Job":
+            FreeCAD.Console.PrintError("ERROR:\n Error updating Path - active Job not found\n")
+            
         # - Get working planes
         wp = utilities.getWorkingPlanes(job)
         

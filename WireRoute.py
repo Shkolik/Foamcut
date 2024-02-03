@@ -237,6 +237,13 @@ class WireRouteVP:
     
     def doubleClicked(self, obj):
         return True
+    
+    def onDelete(self, feature, subelements):
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is not None and group.Type == "Job":
+            for obj in self.Object.Objects:
+                group.addObject(obj)
+        return True
 
 class MakeRoute():
     """Make Route"""
@@ -262,6 +269,9 @@ class MakeRoute():
             route = group.newObject("App::FeaturePython", "Route")
             WireRoute(route, objects, group.ConfigName)
             WireRouteVP(route.ViewObject)
+
+            for obj in objects:
+                group.removeObject(obj)
 
             App.ActiveDocument.recompute()
             Gui.Selection.clearSelection()
