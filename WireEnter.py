@@ -25,20 +25,30 @@ class WireEnter:
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
 
-        obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",     "Information", "Left Segment length",   1)
-        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",     "Information", "Right Segment length",   1)
+        obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information", "Left Segment length",   1)
+        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information", "Right Segment length",   1)
         obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information", "Number of points", 1)
 
-        obj.addProperty("App::PropertyLinkSub",      "EntryPoint",      "Task",   "Entry Point").EntryPoint = entry
+        obj.addProperty("App::PropertyLinkSub",     "EntryPoint",           "Task",   "Entry Point").EntryPoint = entry
+        obj.addProperty("App::PropertyBool",        "AddPause",             "Task",   "Add pause at the end of move").AddPause = False
+        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
 
         obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
         obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
+        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
+
+        obj.setEditorMode("PauseDuration", 3)
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
         self.execute(obj)
 
-    def onChanged(this, fp, prop):
+    def onChanged(this, obj, prop):
+        if prop == "AddPause":
+            if obj.AddPause:
+                obj.setEditorMode("PauseDuration", 0)
+            else:
+                obj.setEditorMode("PauseDuration", 3)
         # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 

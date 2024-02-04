@@ -29,16 +29,26 @@ class PathSection:
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information", "Left Segment length",   1)
         obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information", "Right Segment length",   1)
         obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Information", "Show projection lines between planes").ShowProjectionLines = False
+        
+        obj.addProperty("App::PropertyBool",        "AddPause",             "Task",   "Add pause at the end of move").AddPause = False
+        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task",   "Pause duration seconds")
 
         obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
+        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
 
         obj.setEditorMode("Placement", 3)
+        obj.setEditorMode("PauseDuration", 3)
         obj.Proxy = self
 
         self.execute(obj)
 
-    def onChanged(this, fp, prop):
-        # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+    def onChanged(this, obj, prop):
+        if prop == "AddPause":
+            if obj.AddPause:
+                obj.setEditorMode("PauseDuration", 0)
+            else:
+                obj.setEditorMode("PauseDuration", 3)
+        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
     def execute(self, obj):
@@ -48,7 +58,7 @@ class PathSection:
         job = Gui.ActiveDocument.ActiveView.getActiveObject("group")
         if job is None or job.Type != "Job":
             FreeCAD.Console.PrintError("ERROR:\n Error updating Path - active Job not found\n")
-            
+
         # - Get working planes
         wp = utilities.getWorkingPlanes(job)
         

@@ -34,21 +34,35 @@ class WireJoin:
         obj.addProperty("App::PropertyFloat",     "PointZRB",   "", "", 1)
 
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",     "Information", "Left Segment length",   1)
-        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",     "Information", "Right Segment length",   1)
+        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",    "Information", "Right Segment length",   1)
+        obj.addProperty("App::PropertyLength",      "DiscretizationStep",    "Information",  "Discretization step")
 
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
-        obj.addProperty("App::PropertyLinkSub",      "EndPoint",      "Task",   "Start Point").EndPoint = end
+        obj.addProperty("App::PropertyLinkSub",      "EndPoint",        "Task",   "Start Point").EndPoint = end
+
+        obj.addProperty("App::PropertyBool",        "AddPause",         "Task",   "Add pause at the end of move").AddPause = False
+        obj.addProperty("App::PropertyTime",        "PauseDuration",    "Task",   "Pause duration seconds")
+
+        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
+        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
+
 
         obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
         obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
         obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
-        obj.setEditorMode("Placement", 3)        
+        obj.setEditorMode("Placement", 3)       
+        obj.setEditorMode("PauseDuration", 3) 
         obj.Proxy = self
 
         self.execute(obj)
 
-    def onChanged(this, fp, prop):
-        # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+    def onChanged(this, obj, prop):
+        if prop == "AddPause":
+            if obj.AddPause:
+                obj.setEditorMode("PauseDuration", 0)
+            else:
+                obj.setEditorMode("PauseDuration", 3)
+        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
     def execute(self, obj):

@@ -49,6 +49,7 @@ class MachineConfig:
         obj.addProperty("App::PropertyLength",     "DiscretizationStep",   "GCODE",         "Discretization step").DiscretizationStep = 0.5
         obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = "G01 {Position} F{FeedRate} {WirePower}"
         obj.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",         "Command for move with cold wire").MoveCommand = "G00 {Position} F{FeedRate}"
+        obj.addProperty("App::PropertyString",     "PauseCommand",         "GCODE",         "Command for pause movements").PauseCommand = "G04 P{Duration}"
         obj.addProperty("App::PropertyString",     "WireOnCommand",        "GCODE",         "Command for enable wire").WireOnCommand = "M03 S{WirePower}"
         obj.addProperty("App::PropertyString",     "WireOffCommand",       "GCODE",         "Command for disable wire").WireOffCommand = "M05"
         obj.addProperty("App::PropertyString",     "HomingCommand",        "GCODE",         "Command for homing procedure").HomingCommand = "$H"
@@ -56,6 +57,7 @@ class MachineConfig:
 
         obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = getParameterFloat("SafeHeight", 200)
         obj.addProperty("App::PropertyDistance",   "OriginX",              "Travel",        "Origin along X axis").OriginX = getParameterFloat("OriginX", 0)
+        obj.addProperty("App::PropertyTime",       "PauseDuration",        "Travel",        "Pause duration seconds").PauseDuration = getParameterFloat("PauseDuration", 1.0)
 
         obj.addProperty("App::PropertyDistance",   "OriginRotationX",      "Travel",        "Origin of rotation along X axis").OriginRotationX = obj.HorizontalTravel / 2
 
@@ -69,7 +71,7 @@ class MachineConfig:
         obj.Proxy = self
         self.execute(obj)
 
-    def onChanged(self, fp, prop):
+    def onChanged(self, obj, prop):
         pass
 
     def execute(self, obj):

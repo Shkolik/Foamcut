@@ -29,7 +29,7 @@ class WireRoute:
 
         self.execute(obj)
 
-    def onChanged(self, fp, prop):
+    def onChanged(self, obj, prop):
         # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
     
@@ -213,6 +213,7 @@ class WireRouteVP:
         obj.Proxy = self
 
     def attach(self, obj):
+        self.ViewObject = obj
         self.Object = obj.Object
 
     def getIcon(self):
@@ -239,12 +240,18 @@ class WireRouteVP:
     def doubleClicked(self, obj):
         return True
     
-    def onDelete(self, feature, subelements):
+    def onDelete(self, obj, subelements):
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
         if group is not None and group.Type == "Job":
-            for obj in self.Object.Objects:
-                group.addObject(obj)
+            for object in self.Object.Objects:
+                group.addObject(object)
         return True
+    
+    def onChanged(self, obj, prop):
+        if prop == "Visibility":            
+            for object in self.Object.Objects:
+                object.ViewObject.Visibility = self.ViewObject.Visibility
+        pass
 
 class MakeRoute():
     """Make Route"""

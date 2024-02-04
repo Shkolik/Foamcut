@@ -49,6 +49,12 @@ class Postprocess():
         return command.replace("{Position}", str(position)).replace("{FeedRate}", str(float(feed_rate) * 60)).replace("{WirePower}", str(wire_power)) + "\r\n"
 
     '''
+    Generate pause
+    '''
+    def generatePause(self, command, duration):
+        return command.replace("{Duration}", float(duration)) + "\r\n"
+
+    '''
     Generate rotation
     '''
     def generateRotation(self, config, command, angle, feed_rate):
@@ -197,18 +203,8 @@ class Postprocess():
     def makeGCODEFromEnter(self, enter, reversed, config):
         GCODE = ["; - Enter: [%s]\r\n" % enter.Label]
 
-        # # - Move to entry point
-        # GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-        #     enter.PointXL, enter.SafeHeight, enter.PointXR, enter.SafeHeight
-        # )
-
-        # # - Generate enter
-        # GCODE += self.generateTravel(config, config.CutCommand, config.FeedRateCut, "",
-        #     enter.PointXL, enter.PointZL, enter.PointXR, enter.PointZR
-        # )
-
-        out_start = None
-        out_end   = None
+        # out_start = None
+        # out_end   = None
 
         # - Step over each point
         for i in range(enter.PointsCount):
@@ -233,11 +229,14 @@ class Postprocess():
             enter.Path_R[index].y, enter.Path_R[index].z,
             ))
 
-            # - Store start point
-            if out_start is None: out_start = (enter.Path_L[index], enter.Path_R[index])
+            if enter.AddPause:
+                GCODE.append(self.generatePause(config.PauseComand, enter.PauseDuration))
 
-            # - Update end point
-            out_end = (enter.Path_L[index], enter.Path_R[index])
+            # # - Store start point
+            # if out_start is None: out_start = (enter.Path_L[index], enter.Path_R[index])
+
+            # # - Update end point
+            # out_end = (enter.Path_L[index], enter.Path_R[index])
 
         return GCODE
 
