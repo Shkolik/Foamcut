@@ -22,46 +22,63 @@ from utilities import makePathByPointSets, START, END
   @param step - Distance between points in edge discretization
 '''
 def makePathPointsByEdge(first, planes, step = 0.1):
-    # --- Use only end vertices of coplanar edges or lines because path will be a straight line
-    if first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine":
+    # # --- Use only end vertices of coplanar edges or lines because path will be a straight line
+    # if first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine":
         
-        # - Make path
-        return makePathByPointSets([utilities.vertexToVector(first.firstVertex()), utilities.vertexToVector(first.lastVertex())], None, planes)
+    #     # - Make path
+    #     return makePathByPointSets([utilities.vertexToVector(first.firstVertex()), utilities.vertexToVector(first.lastVertex())], None, planes)
 
-    # --- This not coplanar edges
-    else:
-        # - Detect vertex and vertex
-        if first.ShapeType == "Vertex":
-            return makePathByPointSets([first.Point], None, planes, True)
+    # # --- This not coplanar edges
+    # else:
+    #     # - Detect vertex and vertex
+    #     if first.ShapeType == "Vertex":
+    #         return makePathByPointSets([first.Point], None, planes, True)
 
-        # - Calculate number of discretization points
-        points_count = int(float(first.Length) / float(step))
+    #     # - Calculate number of discretization points
+    #     points_count = int(float(first.Length) / float(step))
            
-        print("Point count = %d" % points_count)
+    #     print("Point count = %d" % points_count)
 
-        first_set   = []
+    #     first_set   = []
 
-        # - Discretize first edge
-        first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
+    #     # - Discretize first edge
+    #     first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
 
-        # - Make path
-        return makePathByPointSets(first_set, None,  planes, True)
+    #     # - Make path
+    #     return makePathByPointSets(first_set, None,  planes, True)
+    
+    # - Detect vertex and vertex
+    if first.ShapeType == "Vertex":
+        return makePathByPointSets([first.Point], None, planes, True)
+
+    # - Calculate number of discretization points
+    points_count = int(float(first.Length) / float(step))
+        
+    print("Point count = %d" % points_count)
+
+    first_set   = []
+
+    # - Discretize first edge
+    first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
+
+    # - Make path
+    return makePathByPointSets(first_set, None,  planes, True)
 
 class ProjectionSection:
     def __init__(self, obj, source, config):
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
-        obj.addProperty("App::PropertyLength",      "FieldWidth","","",5) # - we need this field only to trigger recompute when this property changed in config
         obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Projection"
 
         obj.addProperty("App::PropertyLinkSub",     "Source",               "Data",         "Source object to project").Source = source
         
+        obj.addProperty("App::PropertyLength",      "DiscretizationStep",   "Information",  "Discretization step") 
         obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information",  "Number of points", 1)
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information",  "Left Segment length",   1)
         obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information",  "Right Segment length",   1)
         obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Information",  "Show projection lines between planes").ShowProjectionLines = False
 
-        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
+        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
 
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
@@ -74,7 +91,10 @@ class ProjectionSection:
 
     def execute(self, obj):
        
-        job = obj.getParentGroup()
+        job = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if job is None or job.Type != "Job":
+            FreeCAD.Console.PrintError("ERROR:\n Error updating Projection - active Job not found\n")
+
         # - Get working planes
         wp = utilities.getWorkingPlanes(job)
         
@@ -84,7 +104,7 @@ class ProjectionSection:
         source = obj.Source[0].getSubObject(obj.Source[1])[0]
         
         # - Make path between objects on working planes
-        path_points = makePathPointsByEdge(source, wp)
+        path_points = makePathPointsByEdge(source, wp, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
 
         # - Set data
         obj.Path_L       = [item for item in path_points[START]]

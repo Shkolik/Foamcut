@@ -12,92 +12,123 @@ import FreeCADGui
 Gui=FreeCADGui
 import Part
 import utilities
+from utilities import getWorkingPlanes, vertexToVector, isCommonPoint, makePathPointsByEdgesPair
+from utilities import getAllSelectedObjects, START, END
 
 class WireEnter:
     def __init__(self, obj, entry, config):              
         obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height" )        
         obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Enter"
-        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
+        
+        obj.addProperty("App::PropertyLength",      "DiscretizationStep",   "Information", "Discretization step") 
 
-        obj.addProperty("App::PropertyFloat",     "PointXL",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZL",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointXR",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZR",   "", "", 1)
+        obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
+        obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
 
         obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",     "Information", "Left Segment length",   1)
         obj.addProperty("App::PropertyDistance",    "RightSegmentLength",     "Information", "Right Segment length",   1)
+        obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information", "Number of points", 1)
 
         obj.addProperty("App::PropertyLinkSub",      "EntryPoint",      "Task",   "Entry Point").EntryPoint = entry
 
         obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
-        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
+        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
         obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
         self.execute(obj)
 
     def onChanged(this, fp, prop):
-        # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
     def execute(self, obj):        
         parent = obj.EntryPoint[0]
         vertex = parent.getSubObject(obj.EntryPoint[1][0])
+        oppositeVertex = None
 
-        point = App.Vector(
-            vertex.X,
-            vertex.Y,
-            vertex.Z
-        )
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is None or group.Type != "Job":
+            App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
 
-        if parent.Type == "Path":
-            # - Connect
-            if utilities.isCommonPoint(parent.Path_L[0], point) or utilities.isCommonPoint(parent.Path_R[0], point):
-                # - Forward direction
-                obj.PointXL = parent.Path_L[0].y
-                obj.PointZL = parent.Path_L[0].z
-                obj.PointXR = parent.Path_R[0].y
-                obj.PointZR = parent.Path_R[0].z
+        wp = getWorkingPlanes(group)
 
-            elif utilities.isCommonPoint(parent.Path_L[-1], point) or utilities.isCommonPoint(parent.Path_R[-1], point):
-                # - Backward direction
-                obj.PointXL = parent.Path_L[-1].y
-                obj.PointZL = parent.Path_L[-1].z
-                obj.PointXR = parent.Path_R[-1].y
-                obj.PointZR = parent.Path_R[-1].z
+        onPlane = wp[0].Shape.isInside(vertexToVector(vertex), 0.01, True) or wp[1].Shape.isInside(vertexToVector(vertex), 0.01, True)
 
-        elif parent.Type == "Move":
-            point_start_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL, parent.PointZL)
-            point_start_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR, parent.PointZR)
+        isLeft = False
 
-            point_end_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
-            point_end_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
+        if onPlane:
+            print("Selected vertex is on plane. Searching for correcponding vertex.")
+            if parent.Type == "Path" or parent.Type == "Move" or parent.Type == "Projection":
+                point = vertexToVector(vertex)
+                # - Connect
+                if isCommonPoint(parent.Path_L[START], point):
+                    vertex = parent.LeftEdge[0].getSubObject(parent.LeftEdge[1][0]).firstVertex()
+                    oppositeVertex = parent.RightEdge[0].getSubObject(parent.RightEdge[1][0]).firstVertex()
+                elif isCommonPoint(parent.Path_R[START], point):                
+                    vertex = parent.RightEdge[0].getSubObject(parent.RightEdge[1][0]).firstVertex()
+                    oppositeVertex = parent.LeftEdge[0].getSubObject(parent.LeftEdge[1][0]).firstVertex()
 
-            # - Connect
-            if utilities.isCommonPoint(point_start_L, point) or utilities.isCommonPoint(point_start_R, point):
-                # - Forward direction
-                obj.PointXL = point_start_L.y
-                obj.PointZL = point_start_L.z
-                obj.PointXR = point_start_R.y
-                obj.PointZR = point_start_R.z
+                elif isCommonPoint(parent.Path_L[END], point):
+                    vertex = parent.LeftEdge[0].getSubObject(parent.LeftEdge[1][0]).lastVertex()
+                    oppositeVertex = parent.RightEdge[0].getSubObject(parent.RightEdge[1][0]).lastVertex()
+                elif isCommonPoint(parent.Path_R[END], point):
+                    vertex = parent.RightEdge[0].getSubObject(parent.RightEdge[1][0]).lastVertex()
+                    oppositeVertex = parent.LeftEdge[0].getSubObject(parent.LeftEdge[1][0]).lastVertex()
+            else:
+                App.Console.PrintError("ERROR:\n Not supported parent object type. Only Path, Move and Projection supported.\n")
+        else:
+            print("Selected vertex is NOT on plane. Searching for correcponding vertex. Building path.")
+            
+            for object in group.Group:
+                if hasattr(object, "Type") and (object.Type == "Path" or object.Type == "Move" or object.Type == "Projection"):
+                    if object.LeftEdge[0] == parent:
+                        left = parent.getSubObject(object.LeftEdge[1][0])
+                        if isCommonPoint(left.firstVertex(), vertex):
+                            isLeft = True
+                            oppositeVertex = object.RightEdge[0].getSubObject(object.RightEdge[1][0]).firstVertex()
+                            break
+                        elif isCommonPoint(left.lastVertex(), vertex):
+                            isLeft = True
+                            oppositeVertex = object.RightEdge[0].getSubObject(object.RightEdge[1][0]).lastVertex()
+                            break
 
-            elif utilities.isCommonPoint(point_end_L, point) or utilities.isCommonPoint(point_end_R, point):
-                # - Backward direction
-                obj.PointXL = point_end_L.y
-                obj.PointZL = point_end_L.z
-                obj.PointXR = point_end_R.y
-                obj.PointZR = point_end_R.z
-        line_L = Part.makeLine(
-            App.Vector(-obj.FieldWidth / 2,  obj.PointXL, obj.SafeHeight),
-            App.Vector(-obj.FieldWidth / 2,   obj.PointXL, obj.PointZL)
-        )
-        line_R = Part.makeLine(
-            App.Vector(obj.FieldWidth / 2,  obj.PointXR, obj.SafeHeight),
-            App.Vector(obj.FieldWidth / 2,   obj.PointXR, obj.PointZR)
-        )
-        obj.LeftSegmentLength = line_L.Length
-        obj.RightSegmentLength = line_R.Length
-        obj.Shape = Part.makeCompound([line_L, line_R])
+                    if object.RightEdge[0] == parent:
+                        right = parent.getSubObject(object.RightEdge[1][0])
+                        if isCommonPoint(right.firstVertex(), vertex):
+                            oppositeVertex = object.LeftEdge[0].getSubObject(object.LeftEdge[1][0]).firstVertex()
+                            break
+                        elif isCommonPoint(right.lastVertex(), vertex):
+                            oppositeVertex = object.LeftEdge[0].getSubObject(object.LeftEdge[1][0]).lastVertex()
+                            break
+            if oppositeVertex is None:
+                App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
+
+        leftEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex))
+        rightEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex))
+        
+        # - Make path between objects on working planes
+        path_points = makePathPointsByEdgesPair(leftEdge, rightEdge, wp, 0.5)
+
+        # - Set data
+        obj.Path_L       = [item for item in path_points[START]]
+        obj.Path_R       = [item for item in path_points[END]]        
+        obj.PointsCount = int(len(path_points[START]))
+        #
+
+        # - Create path for L
+        path_L = Part.BSplineCurve()
+        path_L.approximate(Points = obj.Path_L, Continuity="C0")
+
+        # - Create path for R
+        path_R = Part.BSplineCurve()
+        path_R.approximate(Points = obj.Path_R, Continuity="C0")
+
+        shapes = [path_L.toShape(), path_R.toShape(), leftEdge, rightEdge]
+        
+        obj.LeftSegmentLength = float(path_L.length())
+        obj.RightSegmentLength = float(path_R.length())
+        obj.Shape = Part.makeCompound(shapes)
         obj.ViewObject.LineColor = (0.0, 1.0, 0.0)
 
 
@@ -146,7 +177,7 @@ class MakeEnter():
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
         if group is not None and group.Type == "Job":    
             # - Get selecttion
-            objects = utilities.getAllSelectedObjects()
+            objects = getAllSelectedObjects()
             
             # - Create object
             enter = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Enter")
@@ -165,7 +196,7 @@ class MakeEnter():
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
             if group is not None and group.Type == "Job":
                 # - Get selecttion
-                objects = utilities.getAllSelectedObjects()
+                objects = getAllSelectedObjects()
 
                 # - nothing selected
                 if len(objects) == 0:
@@ -173,19 +204,15 @@ class MakeEnter():
                 
                 object = objects[0]
                 parent = object[0]
+                vertex = parent.getSubObject(object[1][0])
                 # - Check object type
-                if parent.Type != "Path" and parent.Type != "Move":                    
+                if not issubclass(type(vertex), Part.Vertex):
                     return False
                 
-                wp = utilities.getWorkingPlanes(group)
+                wp = getWorkingPlanes(group)
                 if wp is None or len(wp) != 2:
                     return False
-                    
-                vertex = parent.getSubObject(object[1][0])
-                # Selected point should be on any working plane
-                if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
-                    and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
-                    return False
+                
                 return True
             return False
             

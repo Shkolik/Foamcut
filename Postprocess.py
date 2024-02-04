@@ -194,18 +194,50 @@ class Postprocess():
         return GCODE
 
 
-    def makeGCODEFromEnter(self, enter, config):
+    def makeGCODEFromEnter(self, enter, reversed, config):
         GCODE = ["; - Enter: [%s]\r\n" % enter.Label]
 
-        # - Move to entry point
-        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-            enter.PointXL, enter.SafeHeight, enter.PointXR, enter.SafeHeight
-        )
+        # # - Move to entry point
+        # GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+        #     enter.PointXL, enter.SafeHeight, enter.PointXR, enter.SafeHeight
+        # )
 
-        # - Generate enter
-        GCODE += self.generateTravel(config, config.CutCommand, config.FeedRateCut, "",
-            enter.PointXL, enter.PointZL, enter.PointXR, enter.PointZR
-        )
+        # # - Generate enter
+        # GCODE += self.generateTravel(config, config.CutCommand, config.FeedRateCut, "",
+        #     enter.PointXL, enter.PointZL, enter.PointXR, enter.PointZR
+        # )
+
+        out_start = None
+        out_end   = None
+
+        # - Step over each point
+        for i in range(enter.PointsCount):
+            # - Get point index
+            index = enter.PointsCount - i - 1 if reversed else i
+
+            # - Move to entry point
+            if i == 0:
+                GCODE.append(self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+                    enter.Path_L[index].y, enter.SafeHeight, enter.Path_R[index].y, enter.SafeHeight))
+                
+            wirePowerCommand = ""
+            # - generate compensated wire power
+            if config.DynamicWirePower:
+                # - Calculate wire length
+                wire_length = enter.Path_L[index].distanceToPoint(enter.Path_R[index]);
+                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
+
+            # - Generate CUT travel command
+            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
+            enter.Path_L[index].y, enter.Path_L[index].z,
+            enter.Path_R[index].y, enter.Path_R[index].z,
+            ))
+
+            # - Store start point
+            if out_start is None: out_start = (enter.Path_L[index], enter.Path_R[index])
+
+            # - Update end point
+            out_end = (enter.Path_L[index], enter.Path_R[index])
 
         return GCODE
 
@@ -312,7 +344,7 @@ class Postprocess():
                     prev_path = False
 
                 elif object.Type == "Enter":
-                    TASK += self.makeGCODEFromEnter(object, config)
+                    TASK += self.makeGCODEFromEnter(object, reversed, config)
 
                 elif object.Type == "Exit":
                     TASK += self.makeGCODEFromExit(object, config)

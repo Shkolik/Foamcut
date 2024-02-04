@@ -11,6 +11,7 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import utilities
+from utilities import isCommonPoint
 
 class WireRoute:
     def __init__(self, obj, objects, config):        
@@ -58,7 +59,7 @@ class WireRoute:
                 first = second
                 if first.Type == "Enter":
                     route_data.append(item_index)
-                    route_data_dir.append(False)
+                    route_data_dir.append(True) #enter is always reversed
 
                 print("SKIP: %s" % second.Type)
                 continue
@@ -103,7 +104,7 @@ class WireRoute:
 
                 # - Store element
                 route_data.append(item_index)
-                route_data_dir.append(False)
+                route_data_dir.append(True) #enter is always reversed
 
                 first = second
                 continue
@@ -112,7 +113,7 @@ class WireRoute:
             if first.Type   == "Path" or first.Type == "Projection":    
                 first_line  = first.Path_L
             elif first.Type == "Enter":   
-                first_line  = [App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL)]
+                first_line  = first.Path_L#[App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL)]
             elif first.Type == "Move":    
                 first_line  = [
                     App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL),
@@ -260,10 +261,10 @@ class MakeRoute():
             # - Get selecttion
             objects = [item.Object for item in Gui.Selection.getSelectionEx()]
             
-            for object in objects:
-                object.touch()
+            # for object in objects:
+            #     object.touch()
             
-            group.recompute()
+            # group.recompute()
 
             # - Create object
             route = group.newObject("App::FeaturePython", "Route")
