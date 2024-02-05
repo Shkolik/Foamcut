@@ -68,8 +68,7 @@ class WireEnter:
         isLeft = False
 
         if onPlane:
-            print("Selected vertex is on plane. Searching for correcponding vertex.")
-            if parent.Type == "Path" or parent.Type == "Move" or parent.Type == "Projection":
+            if hasattr(parent, "Type") and (parent.Type == "Path" or parent.Type == "Move" or parent.Type == "Projection"):
                 point = vertexToVector(vertex)
                 # - Connect
                 if isCommonPoint(parent.Path_L[START], point):
@@ -88,29 +87,42 @@ class WireEnter:
             else:
                 App.Console.PrintError("ERROR:\n Not supported parent object type. Only Path, Move and Projection supported.\n")
         else:
-            print("Selected vertex is NOT on plane. Searching for correcponding vertex. Building path.")
-            
-            for object in group.Group:
-                if hasattr(object, "Type") and (object.Type == "Path" or object.Type == "Move" or object.Type == "Projection"):
-                    if object.LeftEdge[0] == parent:
-                        left = parent.getSubObject(object.LeftEdge[1][0])
-                        if isCommonPoint(left.firstVertex(), vertex):
-                            isLeft = True
-                            oppositeVertex = object.RightEdge[0].getSubObject(object.RightEdge[1][0]).firstVertex()
-                            break
-                        elif isCommonPoint(left.lastVertex(), vertex):
-                            isLeft = True
-                            oppositeVertex = object.RightEdge[0].getSubObject(object.RightEdge[1][0]).lastVertex()
-                            break
+            if hasattr(parent, "Type") and (parent.Type == "Path" or parent.Type == "Move" or parent.Type == "Projection"):                
+                left = parent.LeftEdge[0].getSubObject(parent.LeftEdge[1])[0]
+                right = parent.RightEdge[0].getSubObject(parent.RightEdge[1])[0]
 
-                    if object.RightEdge[0] == parent:
-                        right = parent.getSubObject(object.RightEdge[1][0])
-                        if isCommonPoint(right.firstVertex(), vertex):
-                            oppositeVertex = object.LeftEdge[0].getSubObject(object.LeftEdge[1][0]).firstVertex()
-                            break
-                        elif isCommonPoint(right.lastVertex(), vertex):
-                            oppositeVertex = object.LeftEdge[0].getSubObject(object.LeftEdge[1][0]).lastVertex()
-                            break
+                if isCommonPoint(left.firstVertex(), vertex):
+                    isLeft = True
+                    oppositeVertex = right.firstVertex()
+                elif isCommonPoint(left.lastVertex(), vertex):
+                    isLeft = True
+                    oppositeVertex = right.lastVertex()
+                elif isCommonPoint(right.firstVertex(), vertex):
+                    oppositeVertex = left.firstVertex()
+                elif isCommonPoint(right.lastVertex(), vertex):
+                    oppositeVertex = left.lastVertex()
+            else:
+                for object in group.Group:
+                    if hasattr(object, "Type") and (object.Type == "Path" or object.Type == "Move" or object.Type == "Projection"):
+                        if object.LeftEdge[0] == parent:
+                            left = parent.getSubObject(object.LeftEdge[1][0])
+                            if isCommonPoint(left.firstVertex(), vertex):
+                                isLeft = True
+                                oppositeVertex = object.RightEdge[0].getSubObject(object.RightEdge[1][0]).firstVertex()
+                                break
+                            elif isCommonPoint(left.lastVertex(), vertex):
+                                isLeft = True
+                                oppositeVertex = object.RightEdge[0].getSubObject(object.RightEdge[1][0]).lastVertex()
+                                break
+
+                        if object.RightEdge[0] == parent:
+                            right = parent.getSubObject(object.RightEdge[1][0])
+                            if isCommonPoint(right.firstVertex(), vertex):
+                                oppositeVertex = object.LeftEdge[0].getSubObject(object.LeftEdge[1][0]).firstVertex()
+                                break
+                            elif isCommonPoint(right.lastVertex(), vertex):
+                                oppositeVertex = object.LeftEdge[0].getSubObject(object.LeftEdge[1][0]).lastVertex()
+                                break
             if oppositeVertex is None:
                 App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
 

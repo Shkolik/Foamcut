@@ -132,7 +132,7 @@ class WireRoute:
             if second.Type == "Path" or second.Type == "Projection":   
                 second_line = second.Path_L
             elif second.Type == "Exit": 
-                second_line = [App.Vector(-obj.FieldWidth / 2, second.PointXL, second.PointZL)]
+                second_line = second.Path_L
             elif second.Type == "Move": 
                 second_line = [
                     App.Vector(-obj.FieldWidth / 2, second.PointXL, second.PointZL),
