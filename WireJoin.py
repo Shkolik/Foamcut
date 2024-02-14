@@ -26,19 +26,6 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate" )
         obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power")
 
-        obj.addProperty("App::PropertyString",    "LeftEdgeName", "", "", 5)
-        obj.addProperty("App::PropertyString",    "RightEdgeName", "", "", 5)
-        
-        obj.addProperty("App::PropertyFloat",     "PointXLA",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZLA",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointXRA",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZRA",   "", "", 1)
-
-        obj.addProperty("App::PropertyFloat",     "PointXLB",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZLB",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointXRB",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZRB",   "", "", 1)
-
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
         obj.addProperty("App::PropertyLinkSub",      "EndPoint",        "Task",   "Start Point").EndPoint = end
 

@@ -14,7 +14,7 @@ import Part
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects
+from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, isCommonPoint
 
 
 class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
@@ -23,8 +23,6 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height" )        
         obj.Type = "Enter"
 
-        obj.addProperty("App::PropertyString",    "LeftEdgeName", "Task", "")
-        obj.addProperty("App::PropertyString",    "RightEdgeName", "Task", "")
         obj.addProperty("App::PropertyLinkSub",     "EntryPoint",           "Task",   "Entry Point").EntryPoint = entry
         obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
         
@@ -37,12 +35,15 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
         if oppositeVertex is None:
             App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
 
-        leftEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex))
-        rightEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex))
-        
-        self.createShape(obj, [leftEdge, rightEdge], wp, (0, 255, 0))
+        edges = []
 
+        if isCommonPoint(vertex, oppositeVertex):
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)))
+        else:
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
         
+        self.createShape(obj, edges, wp, (0, 255, 0))
 
 
 class WireEnterVP(FoamCutViewProviders.FoamCutBaseViewProvider):

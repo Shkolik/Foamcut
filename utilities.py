@@ -280,6 +280,28 @@ def makePathPointsByEdgesPair(first, second, planes, step = 0.5):
     return makePathByPointSets(first_set, second_set, planes)
 
 '''
+  Make projected path on working planes by one edge or vertex
+  @param first - First edge / vertex
+  @param planes - working planes 
+  @param step - Distance between points in edge discretization
+'''
+def makePathPointsByEdge(first, planes, step = 0.5):    
+    # - Detect vertex and vertex
+    if first.ShapeType == "Vertex":
+        return makePathByPointSets([first.Point], None, planes, True)
+
+    # - Calculate number of discretization points
+    points_count = int(float(first.Length) / float(step))
+        
+    #print("Point count = %d" % points_count)
+
+    # - Discretize first edge
+    first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
+
+    # - Make path
+    return makePathByPointSets(first_set, None,  planes, True)
+
+'''
   Enumeration for the pick style
 '''
 REGULAR = 0

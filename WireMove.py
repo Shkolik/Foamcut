@@ -14,7 +14,7 @@ import Part
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects
+from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, isCommonPoint
 
 class WireMove(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, config):     
@@ -28,9 +28,6 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyInteger",     "WirePower",    "Task",     "Wire power")
         obj.addProperty("App::PropertyLinkSub",     "StartPoint",   "Task",     "Start Point").StartPoint = start
 
-        obj.addProperty("App::PropertyString",    "LeftEdgeName", "", "", 5)
-        obj.addProperty("App::PropertyString",    "RightEdgeName", "", "", 5)
-        
         obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
         obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
 
@@ -43,12 +40,17 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         if oppositeVertex is None:
             App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
             
-        leftEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if isLeft                      \
-            else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex))
-        rightEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if not isLeft                 \
-            else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex))
+        edges = []
+
+        if isCommonPoint(vertex, oppositeVertex):
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)))
+        else:
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if isLeft                      \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if not isLeft                 \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex)))
         
-        self.createShape(obj, [leftEdge, rightEdge], wp, (35, 169, 205))
+        self.createShape(obj, edges, wp, (35, 169, 205))
 
 class WireMoveVP(FoamCutViewProviders.FoamCutBaseViewProvider):     
     def getIcon(self):

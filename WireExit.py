@@ -14,7 +14,7 @@ import Part
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects
+from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, isCommonPoint
 
 class WireExit(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, exit, config):
@@ -36,10 +36,15 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
         if oppositeVertex is None:
             App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
             
-        leftEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex))
-        rightEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex))
+        edges = []
+
+        if isCommonPoint(vertex, oppositeVertex):
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)))
+        else:
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
         
-        self.createShape(obj, [leftEdge, rightEdge], wp, (255, 0, 0))
+        self.createShape(obj, edges, wp, (255, 0, 0))
         
 class WireExitVP(FoamCutViewProviders.FoamCutBaseViewProvider):    
     def getIcon(self):        
