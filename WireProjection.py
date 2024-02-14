@@ -11,8 +11,10 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import Part
+import FoamCutViewProviders
+import FoamCutBase
 import utilities
-from utilities import makePathByPointSets, START, END
+from utilities import getWorkingPlanes, getAllSelectedObjects, makePathByPointSets, START, END
 
 
 '''
@@ -21,32 +23,7 @@ from utilities import makePathByPointSets, START, END
   @param planes - working planes 
   @param step - Distance between points in edge discretization
 '''
-def makePathPointsByEdge(first, planes, step = 0.1):
-    # # --- Use only end vertices of coplanar edges or lines because path will be a straight line
-    # if first.ShapeType == "Edge" and first.Curve.TypeId == "Part::GeomLine":
-        
-    #     # - Make path
-    #     return makePathByPointSets([utilities.vertexToVector(first.firstVertex()), utilities.vertexToVector(first.lastVertex())], None, planes)
-
-    # # --- This not coplanar edges
-    # else:
-    #     # - Detect vertex and vertex
-    #     if first.ShapeType == "Vertex":
-    #         return makePathByPointSets([first.Point], None, planes, True)
-
-    #     # - Calculate number of discretization points
-    #     points_count = int(float(first.Length) / float(step))
-           
-    #     print("Point count = %d" % points_count)
-
-    #     first_set   = []
-
-    #     # - Discretize first edge
-    #     first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
-
-    #     # - Make path
-    #     return makePathByPointSets(first_set, None,  planes, True)
-    
+def makePathPointsByEdge(first, planes, step = 0.1):    
     # - Detect vertex and vertex
     if first.ShapeType == "Vertex":
         return makePathByPointSets([first.Point], None, planes, True)
@@ -54,9 +31,7 @@ def makePathPointsByEdge(first, planes, step = 0.1):
     # - Calculate number of discretization points
     points_count = int(float(first.Length) / float(step))
         
-    print("Point count = %d" % points_count)
-
-    first_set   = []
+    #print("Point count = %d" % points_count)
 
     # - Discretize first edge
     first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
@@ -64,40 +39,17 @@ def makePathPointsByEdge(first, planes, step = 0.1):
     # - Make path
     return makePathByPointSets(first_set, None,  planes, True)
 
-class ProjectionSection:
+class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, source, config):
-        obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
-        obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
-        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Projection"
-
+        super().__init__(obj, config)
+        obj.Type = "Projection"
         obj.addProperty("App::PropertyLinkSub",     "Source",               "Data",         "Source object to project").Source = source
         
-        obj.addProperty("App::PropertyLength",      "DiscretizationStep",   "Information",  "Discretization step") 
-        obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information",  "Number of points", 1)
-        obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information",  "Left Segment length",   1)
-        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information",  "Right Segment length",   1)
-        obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Information",  "Show projection lines between planes").ShowProjectionLines = False
-
-        obj.addProperty("App::PropertyBool",        "AddPause",             "Task",   "Add pause at the end of move").AddPause = False
-        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
-
-        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
-        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
-
-        obj.setEditorMode("Placement", 3)
-        obj.setEditorMode("PauseDuration", 3)
+        obj.addProperty("App::PropertyString",    "LeftEdgeName", "", "", 5)
+        obj.addProperty("App::PropertyString",    "RightEdgeName", "", "", 5)
+        
         obj.Proxy = self
-
         self.execute(obj)
-
-    def onChanged(this, obj, prop):
-        if prop == "AddPause":
-            if obj.AddPause:
-                obj.setEditorMode("PauseDuration", 0)
-            else:
-                obj.setEditorMode("PauseDuration", 3)
-        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
 
     def execute(self, obj):
        
@@ -106,7 +58,7 @@ class ProjectionSection:
             FreeCAD.Console.PrintError("ERROR:\n Error updating Projection - active Job not found\n")
 
         # - Get working planes
-        wp = utilities.getWorkingPlanes(job)
+        wp = getWorkingPlanes(job)
         
         if wp is None or len(wp) != 2:
             FreeCAD.Console.PrintError("ERROR:\n Error updating Path - working planes not found in Parent object '{}'\n".format(job.Label if job is not None else "None"))
@@ -170,39 +122,14 @@ class ProjectionSection:
         obj.Shape = Part.makeCompound(shapes)
         
 
-class ProjectionSectionVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
-    def attach(self, obj):
-        self.ViewObject = obj
-        self.Object = obj.Object
-
+class ProjectionSectionVP(FoamCutViewProviders.FoamCutBaseViewProvider):     
     def getIcon(self):
         return utilities.getIconPath("projection.svg")
 
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-        
     def claimChildren(self):
         if self.Object.Source is not None and len(self.Object.Source) > 0:
             return [self.Object.Source[0]]
         return None
-
-    def doubleClicked(self, obj):
-        return True
     
 class MakeProjection():
     """Make Projection"""
@@ -217,7 +144,7 @@ class MakeProjection():
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
         if group is not None and group.Type == "Job":
             # - Get selected objects
-            objects = utilities.getAllSelectedObjects()
+            objects = getAllSelectedObjects()
             obj = group.newObject("Part::FeaturePython","Projection")
             
             ProjectionSection(obj, 
@@ -236,13 +163,13 @@ class MakeProjection():
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
             if group is not None and group.Type == "Job":  
                 # - Get selected objects
-                objects = utilities.getAllSelectedObjects()
+                objects = getAllSelectedObjects()
 
                 # - Number of edges should be two
                 if len(objects) < 1:               
                     return False
                 
-                wp = utilities.getWorkingPlanes(group)
+                wp = getWorkingPlanes(group)
                 if wp is None or len(wp) != 2:
                     return False                    
                 return True

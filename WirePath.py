@@ -10,127 +10,44 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
-import Part
+import FoamCutViewProviders
+import FoamCutBase
 import utilities
-from utilities import makePathByPointSets, makePathPointsByEdgesPair
-import math
+from utilities import getWorkingPlanes, getAllSelectedObjects
 
-class PathSection:
+class PathSection(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, edge_l, edge_r, config):
-        obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
-        obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)        
-        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Path"
+        super().__init__(obj, config)      
+        obj.Type = "Path"
 
         obj.addProperty("App::PropertyLinkSub",     "LeftEdge",             "Edges",    "Left Edge").LeftEdge = edge_l
         obj.addProperty("App::PropertyLinkSub",     "RightEdge",            "Edges",    "Right Edge").RightEdge = edge_r
         
-        obj.addProperty("App::PropertyLength",      "DiscretizationStep",   "Information", "Discretization step") 
-        obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information", "Number of points", 1)
-        obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",    "Information", "Left Segment length",   1)
-        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",   "Information", "Right Segment length",   1)
-        obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Information", "Show projection lines between planes").ShowProjectionLines = False
-        
-        obj.addProperty("App::PropertyBool",        "AddPause",             "Task",   "Add pause at the end of move").AddPause = False
-        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task",   "Pause duration seconds")
-
-        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
-        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
-
-        obj.setEditorMode("Placement", 3)
-        obj.setEditorMode("PauseDuration", 3)
         obj.Proxy = self
-
         self.execute(obj)
 
-    def onChanged(this, obj, prop):
-        if prop == "AddPause":
-            if obj.AddPause:
-                obj.setEditorMode("PauseDuration", 0)
-            else:
-                obj.setEditorMode("PauseDuration", 3)
-        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
+    def execute(self, obj):  
+        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        if group is None or group.Type != "Job":
+            App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
 
-    def execute(self, obj):
-        START       = 0           # - start point index
-        END         = -1          # - end point index
-    
-        job = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        if job is None or job.Type != "Job":
-            FreeCAD.Console.PrintError("ERROR:\n Error updating Path - active Job not found\n")
-
-        # - Get working planes
-        wp = utilities.getWorkingPlanes(job)
+        wp = getWorkingPlanes(group)
+      
+        leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1])[0]
+        rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1])[0]
         
-        if wp is None or len(wp) != 2:
-            FreeCAD.Console.PrintError("ERROR:\n Error updating Path - working planes not found in Parent object '{}'\n".format(job.Label if job is not None else "None"))
+        self.createShape(obj, [leftEdge, rightEdge], wp, (0, 0, 0))
 
-        left = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1])[0]
-        right = obj.RightEdge[0].getSubObject(obj.RightEdge[1])[0]
-        
-        # - Make path between objects on working planes
-        path_points = makePathPointsByEdgesPair(left, right, wp, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
-
-        # - Set data
-        obj.Path_L       = [item for item in path_points[START]]
-        obj.Path_R       = [item for item in path_points[END]]        
-        obj.PointsCount  = int(len(path_points[START]))
-        #
-
-        # - Create path for L
-        path_L = Part.BSplineCurve()
-        path_L.approximate(Points = obj.Path_L, Continuity="C0")
-
-        # - Create path for R
-        path_R = Part.BSplineCurve()
-        path_R.approximate(Points = obj.Path_R, Continuity="C0")
-
-        shapes = [path_L.toShape(), path_R.toShape(), left, right]
-
-        if obj.ShowProjectionLines:
-            shapes.append(Part.makeLine(obj.Path_L[START] , obj.Path_R[START]))
-            shapes.append(Part.makeLine(obj.Path_L[END] , obj.Path_R[END] ))
-        
-        # - Update shape and information
-        obj.Shape = Part.makeCompound(shapes)
-        obj.LeftSegmentLength = float(path_L.length())
-        obj.RightSegmentLength = float(path_R.length())
-
-class PathSectionVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
-    def attach(self, obj):
-        self.ViewObject = obj
-        self.Object = obj.Object
-
+class PathSectionVP(FoamCutViewProviders.FoamCutBaseViewProvider): 
     def getIcon(self):
         return utilities.getIconPath("path.svg")
 
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-        
     def claimChildren(self):
         if (self.Object.LeftEdge is not None and len(self.Object.LeftEdge) > 0 
             and self.Object.RightEdge is not None and len(self.Object.RightEdge) > 0 ):
             return [self.Object.LeftEdge[0], self.Object.RightEdge[0]] if self.Object.LeftEdge[0] != self.Object.RightEdge[0] else [self.Object.LeftEdge[0]]
         return None
 
-    def doubleClicked(self, obj):
-        return True
-    
 class MakePath():
     """Make Path"""
 
@@ -164,13 +81,13 @@ class MakePath():
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
             if group is not None and group.Type == "Job":  
                 # - Get selected objects
-                objects = utilities.getAllSelectedObjects()
+                objects = getAllSelectedObjects()
 
                 # - Number of edges should be two
                 if len(objects) != 2:               
                     return False
                 
-                wp = utilities.getWorkingPlanes(group)
+                wp = getWorkingPlanes(group)
                 if wp is None or len(wp) != 2:
                     return False                    
                 return True

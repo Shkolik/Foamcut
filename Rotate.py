@@ -10,24 +10,23 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
+import FoamCutViewProviders
+import FoamCutBase
 import utilities
  
-class Rotation:
-    def __init__(self, obj, source, config):        
-        obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Rotation"  
+class Rotation(FoamCutBase.FoamCutBaseObject):
+    def __init__(self, obj, source, config): 
+        super().__init__(obj, config)       
+        obj.Type = "Rotation"  
 
         obj.addProperty("App::PropertyLink",      "Source",      "Task",   "Source object").Source = source
         obj.addProperty("App::PropertyAngle",     "Angle",      "Task", "Rotate object by angle").Angle = 90
         obj.addProperty("App::PropertyDistance",   "OriginRotationX", "", "", 5)
         obj.setExpression(".OriginRotationX", u"<<{}>>.OriginRotationX".format(config))
-        obj.setEditorMode("Placement", 3)
+        
         obj.Proxy = self
 
         self.execute(obj)
-
-    def onChanged(this, fp, prop):
-        # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
 
     def execute(self, obj):
         if obj.Source is None:
@@ -43,32 +42,9 @@ class Rotation:
         obj.Shape     = shape
         obj.Placement = shape.Placement
 
-class RotationVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
-    def attach(self, obj):
-        self.ViewObject = obj
-        self.Object = obj.Object
-
+class RotationVP(FoamCutViewProviders.FoamCutBaseViewProvider):   
     def getIcon(self):
         return utilities.getIconPath("rotation.svg")
-
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
     
     def claimChildren(self):
         return [self.Object.Source]
@@ -78,10 +54,7 @@ class RotationVP:
             self.Object.Source.ViewObject.Visibility = True
         except Exception as err:
             FreeCAD.Console.PrintError("Error in onDelete: {0} \n".format(err))
-        return True
-    
-    def doubleClicked(self, obj):
-        return True
+        return True    
 
 class AddRotation():
     """Add Rotation"""

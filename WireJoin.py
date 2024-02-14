@@ -11,18 +11,24 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import Part
+import FoamCutViewProviders
+import FoamCutBase
 import utilities
+from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects
 
-class WireJoin:
+class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, end, config):  
-
-        obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Join"
+        super().__init__(obj, config)  
+        obj.Type = "Join"
         obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
 
         # - Options
         obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate" )
         obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power")
 
+        obj.addProperty("App::PropertyString",    "LeftEdgeName", "", "", 5)
+        obj.addProperty("App::PropertyString",    "RightEdgeName", "", "", 5)
+        
         obj.addProperty("App::PropertyFloat",     "PointXLA",   "", "", 1)
         obj.addProperty("App::PropertyFloat",     "PointZLA",   "", "", 1)
         obj.addProperty("App::PropertyFloat",     "PointXRA",   "", "", 1)
@@ -33,37 +39,14 @@ class WireJoin:
         obj.addProperty("App::PropertyFloat",     "PointXRB",   "", "", 1)
         obj.addProperty("App::PropertyFloat",     "PointZRB",   "", "", 1)
 
-        obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",     "Information", "Left Segment length",   1)
-        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",    "Information", "Right Segment length",   1)
-        obj.addProperty("App::PropertyLength",      "DiscretizationStep",    "Information",  "Discretization step")
-
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
         obj.addProperty("App::PropertyLinkSub",      "EndPoint",        "Task",   "Start Point").EndPoint = end
-
-        obj.addProperty("App::PropertyBool",        "AddPause",         "Task",   "Add pause at the end of move").AddPause = False
-        obj.addProperty("App::PropertyTime",        "PauseDuration",    "Task",   "Pause duration seconds")
-
-        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
-        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
-
 
         obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
         obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
         obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
-        obj.setEditorMode("Placement", 3)       
-        obj.setEditorMode("PauseDuration", 3) 
         obj.Proxy = self
-
         self.execute(obj)
-
-    def onChanged(this, obj, prop):
-        if prop == "AddPause":
-            if obj.AddPause:
-                obj.setEditorMode("PauseDuration", 0)
-            else:
-                obj.setEditorMode("PauseDuration", 3)
-        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
 
     def execute(self, obj):
         parentA = obj.StartPoint[0]
@@ -174,40 +157,16 @@ class WireJoin:
 
         Gui.Selection.clearSelection()
 
-class WireJoinVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
-    def attach(self, obj):
-        self.Object = obj.Object
-
+class WireJoinVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def getIcon(self):
         return utilities.getIconPath("join.svg")
 
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    
     def claimChildren(self):
         if (self.Object.StartPoint is not None and len(self.Object.StartPoint) > 0 
             and self.Object.EndPoint is not None and len(self.Object.EndPoint) > 0 ):
             return [self.Object.StartPoint[0], self.Object.EndPoint[0]]
         return None
 
-    def doubleClicked(self, obj):
-        return True
 
 class MakeJoin():
     """Make Join"""

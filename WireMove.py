@@ -11,145 +11,51 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import Part
+import FoamCutViewProviders
+import FoamCutBase
 import utilities
+from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects
 
-class WireMove:
-    def __init__(self, obj, start, config):         
-        obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Move"
-        obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
+class WireMove(FoamCutBase.FoamCutMovementBaseObject):
+    def __init__(self, obj, start, config):     
+        super().__init__(obj, config)     
+        obj.Type = "Move"
 
         # - Options
-        obj.addProperty("App::PropertyDistance",  "InXDirection",  "Options",   "Move along X axis" ).InXDirection = 100
-        obj.addProperty("App::PropertyDistance",  "InZDirection",  "Options",   "Move along Z axis" ).InZDirection = 100
-        obj.addProperty("App::PropertySpeed",     "FeedRate",  "Options",  "Feed rate")
-        obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power")
+        obj.addProperty("App::PropertyDistance",    "MoveX",        "Task",     "Move along X machine axis" ).MoveX = 100
+        obj.addProperty("App::PropertyDistance",    "MoveY",        "Task",     "Move along Y machine axis" ).MoveY = 0
+        obj.addProperty("App::PropertySpeed",       "FeedRate",     "Task",     "Feed rate")
+        obj.addProperty("App::PropertyInteger",     "WirePower",    "Task",     "Wire power")
+        obj.addProperty("App::PropertyLinkSub",     "StartPoint",   "Task",     "Start Point").StartPoint = start
 
-        obj.addProperty("App::PropertyFloat",     "PointXL",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZL",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointXR",   "", "", 1)
-        obj.addProperty("App::PropertyFloat",     "PointZR",   "", "", 1)
-
-        obj.addProperty("App::PropertyDistance",    "LeftSegmentLength",     "Information", "Left Segment length",   1)
-        obj.addProperty("App::PropertyDistance",    "RightSegmentLength",    "Information", "Right Segment length",   1)
-        obj.addProperty("App::PropertyLength",      "DiscretizationStep",    "Information",  "Discretization step")
-
-        obj.addProperty("App::PropertyLinkSub",     "StartPoint",           "Task",   "Start Point").StartPoint = start
-        obj.addProperty("App::PropertyBool",        "AddPause",             "Task",   "Add pause at the end of move").AddPause = False
-        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task",   "Pause duration seconds")
-
-        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
-        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
-
+        obj.addProperty("App::PropertyString",    "LeftEdgeName", "", "", 5)
+        obj.addProperty("App::PropertyString",    "RightEdgeName", "", "", 5)
+        
         obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
         obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
-        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
 
-        obj.setEditorMode("Placement", 3)
-        obj.setEditorMode("PauseDuration", 3)
         obj.Proxy = self
-
         self.execute(obj)
 
-    def onChanged(this, obj, prop):
-        if prop == "AddPause":
-            if obj.AddPause:
-                obj.setEditorMode("PauseDuration", 0)
-            else:
-                obj.setEditorMode("PauseDuration", 3)
-        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
-
     def execute(self, obj):        
-        parent = obj.StartPoint[0]
-        vertex = parent.getSubObject(obj.StartPoint[1][0])
+        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
 
-        point = App.Vector(
-            vertex.X,
-            vertex.Y,
-            vertex.Z
-        )
+        if oppositeVertex is None:
+            App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
+            
+        leftEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if isLeft                      \
+            else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex))
+        rightEdge = Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if not isLeft                 \
+            else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex))
+        
+        self.createShape(obj, [leftEdge, rightEdge], wp, (35, 169, 205))
 
-        if parent.Type == "Path":
-            # - Connect
-            if utilities.isCommonPoint(parent.Path_L[0], point) or utilities.isCommonPoint(parent.Path_R[0], point):
-                # - Forward direction
-                obj.PointXL = parent.Path_L[0].y
-                obj.PointZL = parent.Path_L[0].z
-                obj.PointXR = parent.Path_R[0].y
-                obj.PointZR = parent.Path_R[0].z
-
-            elif utilities.isCommonPoint(parent.Path_L[-1], point) or utilities.isCommonPoint(parent.Path_R[-1], point):
-                # - Backward direction
-                obj.PointXL = parent.Path_L[-1].y
-                obj.PointZL = parent.Path_L[-1].z
-                obj.PointXR = parent.Path_R[-1].y
-                obj.PointZR = parent.Path_R[-1].z
-
-        elif parent.Type == "Move":
-            point_start_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL, parent.PointZL)
-            point_start_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR, parent.PointZR)
-
-            point_end_L = App.Vector(-obj.FieldWidth / 2,  parent.PointXL + float(parent.InXDirection), parent.PointZL + float(parent.InZDirection))
-            point_end_R = App.Vector( obj.FieldWidth / 2,  parent.PointXR + float(parent.InXDirection), parent.PointZR + float(parent.InZDirection))
-
-            # - Connect
-            if utilities.isCommonPoint(point_start_L, point) or utilities.isCommonPoint(point_start_R, point):
-                # - Forward direction
-                obj.PointXL = point_start_L.y
-                obj.PointZL = point_start_L.z
-                obj.PointXR = point_start_R.y
-                obj.PointZR = point_start_R.z
-
-            elif utilities.isCommonPoint(point_end_L, point) or utilities.isCommonPoint(point_end_R, point):
-                # - Backward direction
-                obj.PointXL = point_end_L.y
-                obj.PointZL = point_end_L.z
-                obj.PointXR = point_end_R.y
-                obj.PointZR = point_end_R.z
-                
-        line_L = Part.makeLine(
-            App.Vector(-obj.FieldWidth / 2,  obj.PointXL, obj.PointZL),
-            App.Vector(-obj.FieldWidth / 2,  obj.PointXL + float(obj.InXDirection.getValueAs("mm")), obj.PointZL + obj.InZDirection.getValueAs("mm"))
-        )
-        line_R = Part.makeLine(
-            App.Vector(obj.FieldWidth / 2,   obj.PointXR, obj.PointZR),
-            App.Vector(obj.FieldWidth / 2,   obj.PointXR + float(obj.InXDirection.getValueAs("mm")), obj.PointZR + obj.InZDirection.getValueAs("mm"))
-        )
-        obj.LeftSegmentLength = line_L.Length
-        obj.RightSegmentLength = line_R.Length
-        obj.Shape = Part.makeCompound([line_L, line_R])
-        obj.ViewObject.LineColor = (0.137, 0.662, 0.803)
-
-class WireMoveVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
-    def attach(self, obj):
-        self.Object = obj.Object
-
+class WireMoveVP(FoamCutViewProviders.FoamCutBaseViewProvider):     
     def getIcon(self):
         return utilities.getIconPath("move.svg")
 
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    
     def claimChildren(self):
         return [self.Object.StartPoint[0]] if self.Object.StartPoint is not None and len(self.Object.StartPoint) > 0 else None
-
-    def doubleClicked(self, obj):
-        return True
 
 class MakeMove():
     """Make Move"""
@@ -164,7 +70,7 @@ class MakeMove():
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
         if group is not None and group.Type == "Job":        
             # - Get selecttion
-            objects = utilities.getAllSelectedObjects()
+            objects = getAllSelectedObjects()
             
             # - Create object
             move = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Move")
@@ -183,7 +89,7 @@ class MakeMove():
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
             if group is not None and group.Type == "Job":    
                 # - Get selecttion
-                objects = utilities.getAllSelectedObjects()
+                objects = getAllSelectedObjects()
 
                 # - nothing selected
                 if len(objects) == 0:
@@ -191,19 +97,15 @@ class MakeMove():
                 
                 object = objects[0]
                 parent = object[0]
+                vertex = parent.getSubObject(object[1][0])
                 # - Check object type
-                if parent.Type != "Path" and parent.Type != "Move":                    
+                if not issubclass(type(vertex), Part.Vertex):
                     return False
                 
-                wp = utilities.getWorkingPlanes(group)
+                wp = getWorkingPlanes(group)
                 if wp is None or len(wp) != 2:
                     return False
-                    
-                vertex = parent.getSubObject(object[1][0])
-                # Selected point should be on any working plane
-                if (not wp[0].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True) 
-                    and not wp[1].Shape.isInside(App.Vector(vertex.X, vertex.Y, vertex.Z), 0.01, True)):
-                    return False
+                
                 return True
             return False
             

@@ -115,10 +115,7 @@ class WireRoute:
             elif first.Type == "Enter":   
                 first_line  = first.Path_L#[App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL)]
             elif first.Type == "Move":    
-                first_line  = [
-                    App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL),
-                    App.Vector(-obj.FieldWidth / 2, first.PointXL + float(first.InXDirection), first.PointZL + float(first.InZDirection))
-                ]
+                first_line  = first.Path_L
             elif first.Type == "Join":    
                 first_line  = [
                     App.Vector(-obj.FieldWidth / 2, first.PointXLA, first.PointZLA),
@@ -134,10 +131,7 @@ class WireRoute:
             elif second.Type == "Exit": 
                 second_line = second.Path_L
             elif second.Type == "Move": 
-                second_line = [
-                    App.Vector(-obj.FieldWidth / 2, second.PointXL, second.PointZL),
-                    App.Vector(-obj.FieldWidth / 2, second.PointXL + float(second.InXDirection), second.PointZL + float(second.InZDirection))
-                ]
+                second_line = second.Path_L
             elif second.Type == "Join":    
                 second_line  = [
                     App.Vector(-obj.FieldWidth / 2, second.PointXLA, second.PointZLA),
