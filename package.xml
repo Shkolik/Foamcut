@@ -2,7 +2,7 @@
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
   <name>FoamCut</name>
   <description>Foamcut workbench provide functionality to prepare job and generate Gcode for 4 or 5 axis cnc hotwire cutter.</description>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <date>2024-01-14</date>
   <author>Andrew Shkolik (https://github.com/Shkolik)</author>
   <maintainer email="shkolik@gmail.com">Andrew Shkolik</maintainer>
