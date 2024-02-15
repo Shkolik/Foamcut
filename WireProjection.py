@@ -17,8 +17,8 @@ from utilities import getWorkingPlanes, getAllSelectedObjects
 
 
 class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
-    def __init__(self, obj, source, config):
-        super().__init__(obj, config)
+    def __init__(self, obj, source, jobName):
+        super().__init__(obj, jobName)
         obj.Type = "Projection"
         obj.addProperty("App::PropertyLinkSub",     "Source",               "Data",         "Source object to project").Source = source
                 
@@ -27,7 +27,7 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
 
     def execute(self, obj):
        
-        job = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        job = App.ActiveDocument.getObject(obj.JobName)
         if job is None or job.Type != "Job":
             FreeCAD.Console.PrintError("ERROR:\n Error updating Projection - active Job not found\n")
 
@@ -69,7 +69,7 @@ class MakeProjection():
             
             ProjectionSection(obj, 
                         (FreeCAD.ActiveDocument.getObject((objects[0])[0].Name), (objects[0])[1][0]), 
-                        group.ConfigName)
+                        group.Name)
             ProjectionSectionVP(obj.ViewObject)
             obj.ViewObject.PointSize = 4
 

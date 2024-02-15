@@ -17,8 +17,8 @@ import utilities
 from utilities import vertexToVector, getAllSelectedObjects, isCommonPoint, isMovement
 
 class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
-    def __init__(self, obj, start, end, config):  
-        super().__init__(obj, config)  
+    def __init__(self, obj, start, end, jobName):  
+        super().__init__(obj, jobName)  
         obj.Type = "Join"
         obj.addProperty("App::PropertyLength",    "FieldWidth","","",5)
 
@@ -29,16 +29,18 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
         obj.addProperty("App::PropertyLinkSub",      "EndPoint",        "Task",   "Start Point").EndPoint = end
 
+        config = self.getConfigName(obj)
         obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
         obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
         obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
+        
         obj.Proxy = self
         self.execute(obj)
 
     def execute(self, obj):
         
-        (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
-        (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj.EndPoint[0], obj.EndPoint[0].getSubObject(obj.EndPoint[1][0]))
+        (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
+        (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], obj.EndPoint[0].getSubObject(obj.EndPoint[1][0]))
 
         if oppositeVertexA is None:
             App.Console.PrintError("ERROR:\n Unable to locate opposite vertex for the start point.\n")
@@ -87,7 +89,7 @@ class MakeJoin():
             
             # - Create object
             join = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Join")
-            WireJoin(join, objects[0], objects[1], group.ConfigName)
+            WireJoin(join, objects[0], objects[1], group.Name)
             WireJoinVP(join.ViewObject)
             join.ViewObject.PointSize = 4
     

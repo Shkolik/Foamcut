@@ -16,8 +16,8 @@ import utilities
 from utilities import getWorkingPlanes, getAllSelectedObjects
 
 class PathSection(FoamCutBase.FoamCutMovementBaseObject):
-    def __init__(self, obj, edge_l, edge_r, config):
-        super().__init__(obj, config)      
+    def __init__(self, obj, edge_l, edge_r, jobName):
+        super().__init__(obj, jobName)      
         obj.Type = "Path"
 
         obj.addProperty("App::PropertyLinkSub",     "LeftEdge",             "Edges",    "Left Edge").LeftEdge = edge_l
@@ -27,11 +27,11 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):  
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        if group is None or group.Type != "Job":
+        job = App.ActiveDocument.getObject(obj.JobName)
+        if job is None or job.Type != "Job":
             App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
 
-        wp = getWorkingPlanes(group)
+        wp = getWorkingPlanes(job)
       
         leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1])[0]
         rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1])[0]
@@ -67,7 +67,7 @@ class MakePath():
             PathSection(obj, 
                         (FreeCAD.ActiveDocument.getObject((objects[0])[0].Name), (objects[0])[1][0]), 
                         (FreeCAD.ActiveDocument.getObject((objects[1])[0].Name),(objects[1])[1][0]),
-                        group.ConfigName)
+                        group.Name)
             PathSectionVP(obj.ViewObject)
             obj.ViewObject.PointSize = 4
 

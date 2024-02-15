@@ -18,19 +18,22 @@ from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, i
 
 
 class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
-    def __init__(self, obj, entry, config):       
-        super().__init__(obj, config)      
-        obj.addProperty("App::PropertyDistance",  "SafeHeight", "Task", "Safe height" )        
+    def __init__(self, obj, entry, jobName):       
+        super().__init__(obj, jobName)      
+               
         obj.Type = "Enter"
 
-        obj.addProperty("App::PropertyLinkSub",     "EntryPoint",           "Task",   "Entry Point").EntryPoint = entry
+        obj.addProperty("App::PropertyLinkSub",     "EntryPoint",   "Task",     "Entry Point").EntryPoint = entry
+        obj.addProperty("App::PropertyDistance",    "SafeHeight",   "Task",     "Safe height" ) 
+
+        config = self.getConfigName(obj)
         obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
         
         obj.Proxy = self
         self.execute(obj)
 
     def execute(self, obj):        
-        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj.EntryPoint[0], obj.EntryPoint[0].getSubObject(obj.EntryPoint[1][0]))
+        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.EntryPoint[0], obj.EntryPoint[0].getSubObject(obj.EntryPoint[1][0]))
 
         if oppositeVertex is None:
             App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
@@ -71,7 +74,7 @@ class MakeEnter():
             
             # - Create object
             enter = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Enter")
-            WireEnter(enter, objects[0], group.ConfigName)
+            WireEnter(enter, objects[0], group.Name)
             WireEnterVP(enter.ViewObject)
             enter.ViewObject.PointSize = 4
     

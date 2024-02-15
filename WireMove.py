@@ -17,8 +17,8 @@ import utilities
 from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, isCommonPoint
 
 class WireMove(FoamCutBase.FoamCutMovementBaseObject):
-    def __init__(self, obj, start, config):     
-        super().__init__(obj, config)     
+    def __init__(self, obj, start, jobName):     
+        super().__init__(obj, jobName)     
         obj.Type = "Move"
 
         # - Options
@@ -28,6 +28,7 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyInteger",     "WirePower",    "Task",     "Wire power")
         obj.addProperty("App::PropertyLinkSub",     "StartPoint",   "Task",     "Start Point").StartPoint = start
 
+        config = self.getConfigName(obj)
         obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
         obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
 
@@ -35,7 +36,7 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):        
-        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
+        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
 
         if oppositeVertex is None:
             App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
@@ -76,7 +77,7 @@ class MakeMove():
             
             # - Create object
             move = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Move")
-            WireMove(move, objects[0], group.ConfigName)
+            WireMove(move, objects[0], group.Name)
             WireMoveVP(move.ViewObject)
             move.ViewObject.PointSize = 4
 

@@ -15,20 +15,21 @@ import utilities
 from utilities import isMovement
 
 class WireRoute(FoamCutBase.FoamCutBaseObject):
-    def __init__(self, obj, objects, config):   
-        super().__init__(obj)     
+    def __init__(self, obj, objects, jobName):   
+        super().__init__(obj, jobName)     
         obj.Type = "Route"  
         obj.addProperty("App::PropertyLength",      "FieldWidth","","",5)
+        obj.addProperty("App::PropertyString",    "Error", "", "", 5) 
 
         obj.addProperty("App::PropertyLinkList",    "Objects",      "Task",   "Source data").Objects = objects
         obj.addProperty("App::PropertyIntegerList", "Data",         "Task",   "Data")
         obj.addProperty("App::PropertyBoolList",    "DataDirection","Task",   "Data Direction")
 
+        config = self.getConfigName(obj)
+
         obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
-        obj.addProperty("App::PropertyString",    "Error", "", "", 5) 
 
         obj.Proxy = self
-
         self.execute(obj)
     
     def execute(self, obj): 
@@ -243,7 +244,7 @@ class MakeRoute():
             
             # - Create object
             route = group.newObject("App::FeaturePython", "Route")
-            WireRoute(route, objects, group.ConfigName)
+            WireRoute(route, objects, group.Name)
             WireRouteVP(route.ViewObject)
 
             for obj in objects:

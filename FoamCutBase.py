@@ -12,8 +12,9 @@ import Part
 from utilities import getWorkingPlanes, vertexToVector, isCommonPoint, isMovement, makePathPointsByEdgesPair, makePathPointsByEdge, START, END
 
 class FoamCutBaseObject:
-    def __init__(self, obj):
+    def __init__(self, obj, jobName):
         obj.addProperty("App::PropertyString",    "Type", "", "", 5)
+        obj.addProperty("App::PropertyString",    "JobName", "", "", 5).JobName = jobName
 
         if hasattr(obj, "Placement"):
             obj.setEditorMode("Placement", 3)
@@ -22,9 +23,17 @@ class FoamCutBaseObject:
         # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
+    def getConfigName(self, obj):
+        job = App.ActiveDocument.getObject(obj.JobName)
+
+        if job is None:
+            App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
+                
+        return job.ConfigName
+
 class FoamCutMovementBaseObject(FoamCutBaseObject):
-    def __init__(self, obj, config):
-        super().__init__(obj)  
+    def __init__(self, obj, jobName):
+        super().__init__(obj, jobName)  
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
 
@@ -41,6 +50,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
         obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Task", "Show projection lines between planes").ShowProjectionLines = False
         
+        config = self.getConfigName(obj)
         obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
         obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
 
@@ -59,39 +69,31 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         left = None
         right = None
 
-        print("Get edges from {}:".format(obj.Label))
-
         if hasattr(obj, "LeftEdge") and obj.LeftEdge is not None:
             left = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
-            print("LeftEdge from {}: {}".format(obj.LeftEdge[0].Label, obj.LeftEdge[1][0]))
         elif hasattr(obj, "Source") and obj.Source is not None:
             left = obj.Source[0].getSubObject(obj.Source[1][0])
-            print("Source from {}: {}".format(obj.Source[0].Label, obj.Source[1][0]))
         elif hasattr(obj, "LeftEdgeName") and obj.LeftEdgeName:
             left = obj.getSubObject(obj.LeftEdgeName)
-            print("LeftEdgeName from {}: {}".format(obj.Label, obj.LeftEdgeName))
 
         if hasattr(obj, "RightEdge") and obj.RightEdge is not None:
             right = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
-            print("RightEdge from {}: {}".format(obj.RightEdge[0].Label, obj.RightEdge[1][0]))
         elif hasattr(obj, "Source") and obj.Source is not None:
             right = obj.Source[0].getSubObject(obj.Source[1][0])
-            print("Source from {}: {}".format(obj.Source[0].Label, obj.Source[1][0]))
         elif hasattr(obj, "RightEdgeName") and obj.RightEdgeName:
             right = obj.getSubObject(obj.RightEdgeName)
-            print("RightEdgeName from {}: {}".format(obj.Label, obj.RightEdgeName))
 
         return (left, right if right is not None else left)
 
 
-    def findOppositeVertexes(self, parent, vertex):
+    def findOppositeVertexes(self, obj, parent, vertex):
         oppositeVertex = None
 
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        if group is None or group.Type != "Job":
+        job = App.ActiveDocument.getObject(obj.JobName)
+        if job is None or job.Type != "Job":
             App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
 
-        wp = getWorkingPlanes(group)
+        wp = getWorkingPlanes(job)
 
         onPlane = wp[0].Shape.isInside(vertexToVector(vertex), 0.01, True) or wp[1].Shape.isInside(vertexToVector(vertex), 0.01, True)
 
@@ -132,7 +134,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
                 elif isCommonPoint(right.lastVertex(), vertex):
                     oppositeVertex = left.lastVertex()
             else:
-                for object in group.Group:
+                for object in job.Group:
                     if isMovement(object):
                         (left, right) = self.getEdges(object)
 

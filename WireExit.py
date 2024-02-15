@@ -17,21 +17,22 @@ import utilities
 from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, isCommonPoint
 
 class WireExit(FoamCutBase.FoamCutMovementBaseObject):
-    def __init__(self, obj, exit, config):
-        super().__init__(obj, config) 
+    def __init__(self, obj, exit, jobName):
+        super().__init__(obj, jobName) 
         
         obj.Type = "Exit"
         
         obj.addProperty("App::PropertyDistance",    "SafeHeight",           "Task",     "Safe height")
         obj.addProperty("App::PropertyLinkSub",     "ExitPoint",            "Task",     "Exit Point").ExitPoint = exit
 
+        config = self.getConfigName(obj)
         obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
-        obj.Proxy = self
 
+        obj.Proxy = self
         self.execute(obj)
 
     def execute(self, obj): 
-        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj.ExitPoint[0], obj.ExitPoint[0].getSubObject(obj.ExitPoint[1][0]))
+        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.ExitPoint[0], obj.ExitPoint[0].getSubObject(obj.ExitPoint[1][0]))
 
         if oppositeVertex is None:
             App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
@@ -70,7 +71,7 @@ class MakeExit():
             
             # - Create object
             exit = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Exit")
-            WireExit(exit, objects[0], group.ConfigName)
+            WireExit(exit, objects[0], group.Name)
             WireExitVP(exit.ViewObject)
             exit.ViewObject.PointSize = 4
             

@@ -15,17 +15,20 @@ import FoamCutBase
 import utilities
  
 class Rotation(FoamCutBase.FoamCutBaseObject):
-    def __init__(self, obj, source, config): 
-        super().__init__(obj, config)       
+    def __init__(self, obj, source, jobName): 
+        super().__init__(obj, jobName)       
         obj.Type = "Rotation"  
 
-        obj.addProperty("App::PropertyLink",      "Source",      "Task",   "Source object").Source = source
-        obj.addProperty("App::PropertyAngle",     "Angle",      "Task", "Rotate object by angle").Angle = 90
         obj.addProperty("App::PropertyDistance",   "OriginRotationX", "", "", 5)
+
+        obj.addProperty("App::PropertyLink",      "Source",     "Task",     "Source object").Source = source
+        obj.addProperty("App::PropertyAngle",     "Angle",      "Task",     "Rotate object by angle").Angle = 90
+        
+
+        config = self.getConfigName(obj)
         obj.setExpression(".OriginRotationX", u"<<{}>>.OriginRotationX".format(config))
         
         obj.Proxy = self
-
         self.execute(obj)
 
     def execute(self, obj):
@@ -49,11 +52,11 @@ class RotationVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def claimChildren(self):
         return [self.Object.Source]
 
-    def onDelete(self, feature, subelements):
+    def onDelete(self, obj, subelements):
         try:
             self.Object.Source.ViewObject.Visibility = True
         except Exception as err:
-            FreeCAD.Console.PrintError("Error in onDelete: {0} \n".format(err))
+            App.Console.PrintError("Error in onDelete: {0} \n".format(err))
         return True    
 
 class AddRotation():
@@ -72,12 +75,12 @@ class AddRotation():
             # - Create rotation object
             rt = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Rotation")
             
-            Rotation(rt, source, group.ConfigName)
+            Rotation(rt, source, group.Name)
             RotationVP(rt.ViewObject)
 
             group.addObject(rt)
-            rt.recompute()
             Gui.Selection.clearSelection()
+            FreeCAD.ActiveDocument.recompute()            
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
