@@ -18,16 +18,17 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, objects, jobName):   
         super().__init__(obj, jobName)     
         obj.Type = "Route"  
-        obj.addProperty("App::PropertyLength",      "FieldWidth","","",5)
+        
         obj.addProperty("App::PropertyString",    "Error", "", "", 5) 
 
-        obj.addProperty("App::PropertyLinkList",    "Objects",      "Task",   "Source data").Objects = objects
-        obj.addProperty("App::PropertyIntegerList", "Data",         "Task",   "Data")
-        obj.addProperty("App::PropertyBoolList",    "DataDirection","Task",   "Data Direction")
+        obj.addProperty("App::PropertyLinkList",    "Objects",          "Task",   "Source data").Objects = objects
+        obj.addProperty("App::PropertyIntegerList", "Data",             "Task",   "Data")
+        obj.addProperty("App::PropertyBoolList",    "DataDirection",    "Task",   "Data Direction")
+        obj.addProperty("App::PropertyLength",      "KerfCompensation", "Task",   "Kerf compensation")
 
         config = self.getConfigName(obj)
 
-        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
+        obj.setExpression(".KerfCompensation", u"<<{}>>.KerfCompensation".format(config))
 
         obj.Proxy = self
         self.execute(obj)
