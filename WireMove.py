@@ -44,12 +44,12 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         edges = []
 
         if isCommonPoint(vertex, oppositeVertex):
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertexToVector(vertex)))
         else:
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if isLeft                      \
-                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex)))
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + obj.MoveX, vertex.Z + obj.MoveY), vertexToVector(vertex)) if not isLeft                 \
-                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + obj.MoveX, oppositeVertex.Z + obj.MoveY), vertexToVector(oppositeVertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertexToVector(vertex)) if isLeft                      \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), vertexToVector(oppositeVertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertexToVector(vertex)) if not isLeft                  \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), vertexToVector(oppositeVertex)))
         
         self.createShape(obj, edges, wp, (35, 169, 205))
 

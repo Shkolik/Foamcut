@@ -96,15 +96,18 @@ class AddRotation():
                     return False
                 
                 # - Check object type
-                if selection[0] is None or selection[0].Object is None:                    
+                if selection[0] is None or selection[0].Object is None:   
                     return False      
 
                 obj = selection[0].Object
                 if not hasattr(obj, "Shape"):
                     return False
-                if ((obj.TypeId == "Part::FeaturePython" or obj.TypeId == "App::DocumentObjectGroupPython") and 
-                    (obj.Type == "Path" or obj.Type == "Enter"  or obj.Type == "Job" or obj.Type == "Helper"
-                    or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route")):
+                
+                print(obj.TypeId)
+
+                if (hasattr(obj, "Type") and
+                    (obj.Type == "Path" or obj.Type == "Enter"  or obj.Type == "Job" or obj.Type == "Helper" or obj.Type == "Config"
+                    or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route" or obj.Type == "Projection")):
                     return False
                 
                 return True
