@@ -9,12 +9,14 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import Part
-from utilities import getWorkingPlanes, vertexToVector, isCommonPoint, makePathPointsByEdgesPair, makePathPointsByEdge, START, END
+from utilities import getWorkingPlanes, vertexToVector, isCommonPoint, isMovement, makePathPointsByEdgesPair, makePathPointsByEdge, START, END
 
 class FoamCutBaseObject:
     def __init__(self, obj):
         obj.addProperty("App::PropertyString",    "Type", "", "", 5)
-        obj.setEditorMode("Placement", 3)
+
+        if hasattr(obj, "Placement"):
+            obj.setEditorMode("Placement", 3)
 
     def onChanged(self, obj, prop):
         # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
@@ -53,9 +55,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
-    def isMovement(self, obj):
-        return hasattr(obj, "Type") and (obj.Type == "Path" or obj.Type == "Move" or obj.Type == "Projection")
-    
     def getEdges(self, obj):
         left = None
         right = None
@@ -101,7 +100,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         (left, right) = self.getEdges(parent)
 
         if onPlane:
-            if self.isMovement(parent):
+            if isMovement(parent):
                 point = vertexToVector(vertex)
                 # - Connect
                 if isCommonPoint(parent.Path_L[START], point):
@@ -121,7 +120,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             else:
                 App.Console.PrintError("ERROR:\n Not supported parent object type. Only Path, Move and Projection supported.\n")
         else:
-            if self.isMovement(parent):    
+            if isMovement(parent):    
                 if isCommonPoint(left.firstVertex(), vertex):
                     isLeft = True
                     oppositeVertex = right.firstVertex()
@@ -134,7 +133,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
                     oppositeVertex = left.lastVertex()
             else:
                 for object in group.Group:
-                    if self.isMovement(object):
+                    if isMovement(object):
                         (left, right) = self.getEdges(object)
 
                         if isCommonPoint(left.firstVertex(), vertex):

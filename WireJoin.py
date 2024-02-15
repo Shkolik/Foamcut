@@ -14,7 +14,7 @@ import Part
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects
+from utilities import vertexToVector, getAllSelectedObjects, isCommonPoint, isMovement
 
 class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, end, config):  
@@ -36,113 +36,28 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
-        parentA = obj.StartPoint[0]
-        vertexA = parentA.getSubObject(obj.StartPoint[1][0])
+        
+        (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
+        (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj.EndPoint[0], obj.EndPoint[0].getSubObject(obj.EndPoint[1][0]))
 
-        parentB = obj.EndPoint[0]
-        vertexB = parentB.getSubObject(obj.EndPoint[1][0])
+        if oppositeVertexA is None:
+            App.Console.PrintError("ERROR:\n Unable to locate opposite vertex for the start point.\n")
 
-        pointA = App.Vector(
-            vertexA.X,
-            vertexA.Y,
-            vertexA.Z
-        )
+        if oppositeVertexB is None:
+            App.Console.PrintError("ERROR:\n Unable to locate opposite vertex for the end point.\n")
 
-        pointB = App.Vector(
-            vertexB.X,
-            vertexB.Y,
-            vertexB.Z
-        )
+        if isLeftA != isLeftB:
+            App.Console.PrintError("ERROR:\n Start and End points should be on one side.\n")
 
-        if parentA.Type == "Path":
-            # - Connect
-            if utilities.isCommonPoint(parentA.Path_L[0], pointA) or utilities.isCommonPoint(parentA.Path_R[0], pointA):
-                # - Forward direction
-                obj.PointXLA = parentA.Path_L[0].y
-                obj.PointZLA = parentA.Path_L[0].z
-                obj.PointXRA = parentA.Path_R[0].y
-                obj.PointZRA = parentA.Path_R[0].z
+        edges = []
 
-            elif utilities.isCommonPoint(parentA.Path_L[-1], pointA) or utilities.isCommonPoint(parentA.Path_R[-1], pointA):
-                # - Forward direction
-                obj.PointXLA = parentA.Path_L[-1].y
-                obj.PointZLA = parentA.Path_L[-1].z
-                obj.PointXRA = parentA.Path_R[-1].y
-                obj.PointZRA = parentA.Path_R[-1].z
-
-        elif parentA.Type == "Move":
-            point_start_L = App.Vector(-obj.FieldWidth / 2,  parentA.PointXL, parentA.PointZL)
-            point_start_R = App.Vector( obj.FieldWidth / 2,  parentA.PointXR, parentA.PointZR)
-
-            point_end_L = App.Vector(-obj.FieldWidth / 2,  parentA.PointXL + float(parentA.InXDirection), parentA.PointZL + float(parentA.InZDirection))
-            point_end_R = App.Vector( obj.FieldWidth / 2,  parentA.PointXR + float(parentA.InXDirection), parentA.PointZR + float(parentA.InZDirection))
-
-            # - Connect
-            if utilities.isCommonPoint(point_start_L, pointA) or utilities.isCommonPoint(point_start_R, pointA):
-                # - Forward direction
-                obj.PointXLA = point_start_L.y
-                obj.PointZLA = point_start_L.z
-                obj.PointXRA = point_start_R.y
-                obj.PointZRA = point_start_R.z
-
-            elif utilities.isCommonPoint(point_end_L, pointA) or utilities.isCommonPoint(point_end_R, pointA):
-                # - Backward direction
-                obj.PointXLA = point_end_L.y
-                obj.PointZLA = point_end_L.z
-                obj.PointXRA = point_end_R.y
-                obj.PointZRA = point_end_R.z
-
-        if parentB.Type == "Path":
-            # - Connect
-            if utilities.isCommonPoint(parentB.Path_L[0], pointB) or utilities.isCommonPoint(parentB.Path_R[0], pointB):
-                # - Forward direction
-                obj.PointXLB = parentB.Path_L[0].y
-                obj.PointZLB = parentB.Path_L[0].z
-                obj.PointXRB = parentB.Path_R[0].y
-                obj.PointZRB = parentB.Path_R[0].z
-            elif utilities.isCommonPoint(parentB.Path_L[-1], pointB) or utilities.isCommonPoint(parentB.Path_R[-1], pointB):
-                # - Forward direction
-                obj.PointXLB = parentB.Path_L[-1].y
-                obj.PointZLB = parentB.Path_L[-1].z
-                obj.PointXRB = parentB.Path_R[-1].y
-                obj.PointZRB = parentB.Path_R[-1].z
-
-        elif parentB.Type == "Move":
-            point_start_L = App.Vector(-obj.FieldWidth / 2,  parentB.PointXL, parentB.PointZL)
-            point_start_R = App.Vector( obj.FieldWidth / 2,  parentB.PointXR, parentB.PointZR)
-
-            point_end_L = App.Vector(-obj.FieldWidth / 2,  parentB.PointXL + float(parentB.InXDirection), parentB.PointZL + float(parentB.InZDirection))
-            point_end_R = App.Vector( obj.FieldWidth / 2,  parentB.PointXR + float(parentB.InXDirection), parentB.PointZR + float(parentB.InZDirection))
-
-            # - Connect
-            if utilities.isCommonPoint(point_start_L, pointB) or utilities.isCommonPoint(point_start_R, pointB):
-                # - Forward direction
-                obj.PointXLB = point_start_L.y
-                obj.PointZLB = point_start_L.z
-                obj.PointXRB = point_start_R.y
-                obj.PointZRB = point_start_R.z
-
-            elif utilities.isCommonPoint(point_end_L, pointB) or utilities.isCommonPoint(point_end_R, pointB):
-                # - Forward direction
-                obj.PointXLB = point_end_L.y
-                obj.PointZLB = point_end_L.z
-                obj.PointXRB = point_end_R.y
-                obj.PointZRB = point_end_R.z
-                
-        line_L = Part.makeLine(
-            App.Vector(-obj.FieldWidth / 2,  obj.PointXLA, obj.PointZLA),
-            App.Vector(-obj.FieldWidth / 2,  obj.PointXLB, obj.PointZLB)
-        )
-        line_R = Part.makeLine(
-            App.Vector(obj.FieldWidth / 2,   obj.PointXRA, obj.PointZRA),
-            App.Vector(obj.FieldWidth / 2,   obj.PointXRB, obj.PointZRB)
-        )
-        obj.LeftSegmentLength = line_L.Length
-        obj.RightSegmentLength = line_R.Length
-        obj.Shape = Part.makeCompound([line_L, line_R])
-        obj.ViewObject.LineColor = (0.137, 0.0, 0.803)
-
-        Gui.Selection.clearSelection()
+        if isCommonPoint(vertexA, oppositeVertexA):
+            edges.append(Part.makeLine(vertexToVector(vertexA), vertexToVector(vertexB)))
+        else:
+            edges.append(Part.makeLine(vertexToVector(vertexA), vertexToVector(vertexB)))
+            edges.append(Part.makeLine(vertexToVector(oppositeVertexA), vertexToVector(oppositeVertexB)))
+        
+        self.createShape(obj, edges, wp, (35, 0, 205))
 
 class WireJoinVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def getIcon(self):
@@ -168,7 +83,7 @@ class MakeJoin():
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
         if group is not None and group.Type == "Job":    
             # - Get selecttion
-            objects = utilities.getAllSelectedObjects()
+            objects = getAllSelectedObjects()
             
             # - Create object
             join = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Join")
@@ -177,7 +92,7 @@ class MakeJoin():
             join.ViewObject.PointSize = 4
     
             group.addObject(join)
-
+            Gui.Selection.clearSelection()
             FreeCAD.ActiveDocument.recompute()
     
     def IsActive(self):
@@ -187,34 +102,18 @@ class MakeJoin():
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
             if group is not None and group.Type == "Job":   
                 # - Get selecttion
-                objects = utilities.getAllSelectedObjects()
+                objects = getAllSelectedObjects()
 
                 # - nothing selected
                 if len(objects) < 2:
                     return False
                 
-                objectA = objects[0]
-                parentA = objectA[0]
-                objectB = objects[1]
-                parentB = objectB[0]
+                parentA = objects[0][0]
+                parentB = objects[1][0]
                 # - Check object type
-                if parentA.Type != "Path" and parentA.Type != "Move":                    
-                    return False
+                if isMovement(parentA) or isMovement(parentB):   
+                    return True
                 
-                wp = utilities.getWorkingPlanes(group)
-                if wp is None or len(wp) != 2:
-                    return False
-                    
-                vertexA = parentA.getSubObject(objectA[1][0])
-                vertexB = parentB.getSubObject(objectB[1][0])
-                # Selected point should be on any working plane
-                if (not wp[0].Shape.isInside(App.Vector(vertexA.X, vertexA.Y, vertexA.Z), 0.01, True) 
-                    and not wp[1].Shape.isInside(App.Vector(vertexA.X, vertexA.Y, vertexA.Z), 0.01, True)):
-                    return False
-                if (not wp[0].Shape.isInside(App.Vector(vertexB.X, vertexB.Y, vertexB.Z), 0.01, True) 
-                    and not wp[1].Shape.isInside(App.Vector(vertexB.X, vertexB.Y, vertexB.Z), 0.01, True)):
-                    return False
-                return True
             return False
             
 Gui.addCommand("Join", MakeJoin())

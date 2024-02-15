@@ -37,12 +37,18 @@ def getIconPath(icon):
     return os.path.join(getResourcesPath(), "icons", icon)
 
 '''
-    Checs if we need handle object state in a new fashion
+    Checks if we need handle object state in a new fashion
     It was first introduced in FC v.0.21.2 and was merged into LinkStage3 branch v.2024.113
 '''
 def isNewStateHandling():
     version = FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]+FreeCAD.Version()[2]
     return (version >= '0.212' and version < '2024.1130') or version >= '2024.1130'
+
+'''
+    Checks if object is one of the move objects
+'''
+def isMovement(obj):
+        return hasattr(obj, "Type") and (obj.Type == "Path" or obj.Type == "Move" or obj.Type == "Projection" or obj.Type == "Join")
 
 '''
     Converts Part.Vertex to FreeCAD.Vector

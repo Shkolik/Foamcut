@@ -10,12 +10,14 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
+import FoamCutBase
 import utilities
-from utilities import isCommonPoint
+from utilities import isMovement
 
-class WireRoute:
-    def __init__(self, obj, objects, config):        
-        obj.addProperty("App::PropertyString",      "Type", "", "", 5).Type = "Route"  
+class WireRoute(FoamCutBase.FoamCutBaseObject):
+    def __init__(self, obj, objects, config):   
+        super().__init__(obj)     
+        obj.Type = "Route"  
         obj.addProperty("App::PropertyLength",      "FieldWidth","","",5)
 
         obj.addProperty("App::PropertyLinkList",    "Objects",      "Task",   "Source data").Objects = objects
@@ -28,10 +30,6 @@ class WireRoute:
         obj.Proxy = self
 
         self.execute(obj)
-
-    def onChanged(self, obj, prop):
-        # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
     
     def execute(self, obj): 
         obj.Error = ""
@@ -110,37 +108,18 @@ class WireRoute:
                 continue
             
             # - Get lines on left plane
-            if first.Type   == "Path" or first.Type == "Projection":    
+            if isMovement(first) or first.Type == "Enter":
                 first_line  = first.Path_L
-            elif first.Type == "Enter":   
-                first_line  = first.Path_L#[App.Vector(-obj.FieldWidth / 2, first.PointXL, first.PointZL)]
-            elif first.Type == "Move":    
-                first_line  = first.Path_L
-            elif first.Type == "Join":    
-                first_line  = [
-                    App.Vector(-obj.FieldWidth / 2, first.PointXLA, first.PointZLA),
-                    App.Vector(-obj.FieldWidth / 2, first.PointXLB, first.PointZLB)
-                ]
             else:
                 obj.Error = "ERROR: {} - Unsupported first element. Second = {}".format(first.Label, second.Label)
-                print(obj.Error)                
+                App.Console.PrintError(obj.Error)
                 return False
             
-            if second.Type == "Path" or second.Type == "Projection":   
+            if isMovement(second) or second.Type == "Exit": 
                 second_line = second.Path_L
-            elif second.Type == "Exit": 
-                second_line = second.Path_L
-            elif second.Type == "Move": 
-                second_line = second.Path_L
-            elif second.Type == "Join":    
-                second_line  = [
-                    App.Vector(-obj.FieldWidth / 2, second.PointXLA, second.PointZLA),
-                    App.Vector(-obj.FieldWidth / 2, second.PointXLB, second.PointZLB)
-                ]
             else:
-                print("Unsupported second element")
                 obj.Error = "ERROR: {} - Unsupported second element. First = {}".format(second.Label, first.Label)
-                print(obj.Error) 
+                App.Console.PrintError(obj.Error)
                 return False
             
             if reversed is None:
@@ -163,7 +142,7 @@ class WireRoute:
                     reversed        = True
                 else:
                     obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
-                    print(obj.Error)
+                    App.Console.PrintError(obj.Error)
                     return False
                 
                 # - Store first element
@@ -183,7 +162,7 @@ class WireRoute:
                     reversed = True
                 else:
                     obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
-                    print(obj.Error)
+                    App.Console.PrintError(obj.Error)
                     return False
 
                 # - Store next element
@@ -195,7 +174,7 @@ class WireRoute:
         
         if len(route_data) != len(route_data_dir) or len(route_data) == 0:
             obj.Error("Error: Data calculation error.")
-            print(obj.Error)
+            App.Console.PrintError(obj.Error)
             return False
         
         obj.Data = route_data
@@ -262,11 +241,6 @@ class MakeRoute():
             # - Get selecttion
             objects = [item.Object for item in Gui.Selection.getSelectionEx()]
             
-            # for object in objects:
-            #     object.touch()
-            
-            # group.recompute()
-
             # - Create object
             route = group.newObject("App::FeaturePython", "Route")
             WireRoute(route, objects, group.ConfigName)

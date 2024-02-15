@@ -311,18 +311,24 @@ class Postprocess():
     def makeGCODEFromJoin(self, move, reversed, config):
         GCODE = ["; - Join [%s] :: %s\r\n" % (move.Label, "S < E" if reversed else "S > E")]
 
-        # - Detect directed offset
-        if reversed:
-            # - Move from end to start
-            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate, "",
-                move.PointXLA, move.PointZLA, move.PointXRA, move.PointZRA
-            )
-        else:
-            # - Move from start to end
-            GCODE += self.generateTravel(config, config.CutCommand, move.FeedRate, "", 
-                move.PointXLB, move.PointZLB, move.PointXRB, move.PointZRB
-            )
-        
+         # - Step over each point
+        for i in range(move.PointsCount):
+            # - Get point index
+            index = move.PointsCount - i - 1 if reversed else i
+
+            wirePowerCommand = ""
+            # - generate compensated wire power
+            if config.DynamicWirePower:
+                # - Calculate wire length
+                wire_length = move.Path_L[index].distanceToPoint(move.Path_R[index]);
+                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
+
+            # - Generate CUT travel command
+            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
+            move.Path_L[index].y, move.Path_L[index].z,
+            move.Path_R[index].y, move.Path_R[index].z,
+            ))
+
         if move.AddPause:
             GCODE.append(self.generatePause(config.PauseCommand, move.PauseDuration))
 
