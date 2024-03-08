@@ -9,16 +9,21 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
+import FoamCutBase
+import FoamCutViewProviders
 import utilities
 import Part
  
-class FoamCutWorkingPlane:
-    def __init__(self, obj, config, side):        
-        obj.addProperty("App::PropertyString",    "Type", "", "", 5).Type = "Helper"  
+class FoamCutWorkingPlane(FoamCutBase.FoamCutBaseObject):
+    def __init__(self, obj, jobName, side):     
+        super().__init__(obj, jobName)       
+        obj.Type = "Helper"  
         obj.addProperty("App::PropertyLength",     "Length", "", "", 5).Length = 100                                         # Machine X axis
         obj.addProperty("App::PropertyLength",     "Width", "", "", 5).Width = 100                                          # Machine Y axis
         obj.addProperty("App::PropertyPosition",   "Position", "", "", 5).Position = App.Vector(0.0, 0.0, 0.0)  # Machine base X axis
         
+        config = self.getConfigName(obj)
+
         obj.setExpression(".Width",   u"<<{}>>.VerticalTravel".format(config))
         obj.setExpression(".Length",  u"<<{}>>.HorizontalTravel".format(config))
 
@@ -29,14 +34,10 @@ class FoamCutWorkingPlane:
         else:
             obj.setExpression(".Position.x", u"<<{}>>.FieldWidth / 2".format(config))
 
-        obj.setEditorMode("Placement", 3)
         obj.Proxy = self
 
         self.execute(obj)
-        Gui.Selection.clearSelection()
-
-    def onChanged(this, fp, prop):
-        pass
+        # Gui.Selection.clearSelection()
 
     def execute(self, obj):
         norm = App.Vector(1.0, 0.0, 0.0)
@@ -46,7 +47,7 @@ class FoamCutWorkingPlane:
         obj.Shape     = plane
         obj.Placement = plane.Placement
         
-class FoamCutWorkingPlaneVP:
+class FoamCutWorkingPlaneVP(FoamCutViewProviders.FoamCutBaseViewProvider):   
     def __init__(self, obj):
         obj.LineColor  =  (255, 225, 5)
         obj.ShapeColor = (255, 225, 5)
@@ -63,24 +64,7 @@ class FoamCutWorkingPlaneVP:
     def getIcon(self):
         return utilities.getIconPath("plane.svg")
     
-    def doubleClicked(self, obj):        
-        return True
-
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
     
-def CreateWorkingPlane(obj, config, side):
-    FoamCutWorkingPlane(obj, config, side)
+def CreateWorkingPlane(obj, jobName, side):
+    FoamCutWorkingPlane(obj, jobName, side)
     FoamCutWorkingPlaneVP(obj.ViewObject)

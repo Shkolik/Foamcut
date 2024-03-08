@@ -11,6 +11,7 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import FoamCutBase
+import FoamCutViewProviders
 import utilities
 from utilities import isMovement
 
@@ -183,10 +184,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.DataDirection = route_data_dir
 
 
-class WireRouteVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
+class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
+    
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
@@ -194,26 +193,8 @@ class WireRouteVP:
     def getIcon(self):
         return utilities.getIconPath("route.svg")
 
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    
     def claimChildren(self):
         return [object for object in self.Object.Objects]
-    
-    def doubleClicked(self, obj):
-        return True
     
     def onDelete(self, obj, subelements):
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")

@@ -9,22 +9,23 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
+import FoamCutBase
+import FoamCutViewProviders
 import Draft
 import utilities
 import os
 
-class MachineOrigin:
-    def __init__(self, obj, config):
-        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
+class MachineOrigin(FoamCutBase.FoamCutBaseObject):
+    def __init__(self, obj, jobName):
+        super().__init__(obj, jobName)     
+        obj.Type = "Helper"
         
+        config = self.getConfigName(obj)
         obj.Group = self.createGroup(config)
         
         obj.setEditorMode("Group", 3)
 
         obj.Proxy = self
-
-    def onChanged(self, fp, prop):
-        pass
 
     def execute(self, obj):
         for item in obj.Group:
@@ -78,7 +79,7 @@ class MachineOrigin:
         ss = Draft.make_shapestring(String=str, FontFile=font, Size=10.0, Tracking=0.0)
         ss.Placement = pl
         ss.setExpression(".Placement.Base.x", x_expr)
-        ss.Support=None
+        # ss.Support=None
         ss.ViewObject.ShowInTree = False
         if x:
             ss.ViewObject.ShapeColor = (0,170,0)
@@ -104,46 +105,25 @@ class MachineOrigin:
             ]
 
 
-class MachineOriginVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
+class MachineOriginVP(FoamCutViewProviders.FoamCutBaseViewProvider):    
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
         for child in self.Object.Group:
             utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
 
-    def doubleClicked(self, obj):        
-        return True
-    
     def getIcon(self):
         return utilities.getIconPath("origin.svg")
     
     def claimChildren(self):
         return self.Object.Group
     
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-
 '''
     Creates Origin
     @param obj - Origin object
     @param config - config object name
 '''
-def CreateOrigin(obj, config):
-    MachineOrigin(obj, config)
+def CreateOrigin(obj, jobName):
+    MachineOrigin(obj, jobName)
     MachineOriginVP(obj.ViewObject)
     Gui.Selection.clearSelection()

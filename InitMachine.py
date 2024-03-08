@@ -10,6 +10,8 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
+import FoamCutViewProviders
+import FoamCutBase
 import utilities
 import MachineConfig
 import MachineOrigin
@@ -18,7 +20,7 @@ import FoamBlock
 
 def initChildren(config, machine):
     origin = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Origin")
-    MachineOrigin.CreateOrigin(origin, config.Name)
+    MachineOrigin.CreateOrigin(origin, machine.Name)
 
     CNCVolume = FreeCAD.ActiveDocument.addObject("Part::Box", "CNCVolume")
     CNCVolume.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
@@ -51,26 +53,27 @@ def initChildren(config, machine):
     RotationAxis.ViewObject.LineColor = (1.0, 0.886, 0.023)
     
     wpl = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPL")
-    FoamCut_WorkingPlane.CreateWorkingPlane(wpl, config.Name, utilities.LEFT)
+    FoamCut_WorkingPlane.CreateWorkingPlane(wpl, machine.Name, utilities.LEFT)
     wpl.Label = "Working Plane L"
 
     machine.WPLName = wpl.Name
     
     wpr = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPR")
-    FoamCut_WorkingPlane.CreateWorkingPlane(wpr, config.Name, utilities.RIGHT)
+    FoamCut_WorkingPlane.CreateWorkingPlane(wpr, machine.Name, utilities.RIGHT)
     wpr.Label = "Working Plane R"
 
     machine.WPRName = wpr.Name
 
     block = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Block")
-    FoamBlock.CreateFoamBlock(block, config.Name)
+    FoamBlock.CreateFoamBlock(block, machine.Name)
     block.Label = "Foam Block"
 
     machine.Group = [config, origin, RotationAxis, CNCVolume, wpl, wpr, block]
     
-class Machine:
-    def __init__(self, obj):
-        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Job"
+class Machine(FoamCutBase.FoamCutBaseObject):
+    def __init__(self, obj, jobName):   
+        super().__init__(obj, jobName)  
+        obj.Type = "Job"
         obj.addProperty("App::PropertyString",      "ConfigName", "", "", 5)
         obj.addProperty("App::PropertyString",      "WPLName", "", "", 5)
         obj.addProperty("App::PropertyString",      "WPRName", "", "", 5)
@@ -78,16 +81,11 @@ class Machine:
         obj.setEditorMode("Group",     3)
         obj.Proxy = self
 
-    def onChanged(self, fp, prop):
-        pass
-
     def execute(self, obj):
         pass
 
-class MachineVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
+class MachineVP(FoamCutViewProviders.FoamCutBaseViewProvider):
+    
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
@@ -105,21 +103,6 @@ class MachineVP:
     def getIcon(self):
         return utilities.getIconPath("machine.svg")
     
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-  
 class InitMachine():
     """Init machine"""
 
@@ -129,15 +112,15 @@ class InitMachine():
                 "MenuText": "Init machine",
                 "ToolTip" : "Create Machine object and define working area and machine properties"}
 
-    def Activated(self):        
-        # - Create CNC configuration
-        config = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Config")
-        MachineConfig.createConfig(config)
-
+    def Activated(self):     
         # - Create group
         machine = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Job")
-        Machine(machine)
+        Machine(machine, machine.Name)
         MachineVP(machine.ViewObject)
+
+        # - Create CNC configuration
+        config = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Config")
+        MachineConfig.createConfig(config, machine.Name)
 
         machine.ConfigName = config.Name
         initChildren(config, machine)

@@ -9,11 +9,14 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
+import FoamCutBase
+import FoamCutViewProviders
 import utilities
 
-class MachineConfig:
-    def __init__(self, obj):
-        obj.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
+class MachineConfig(FoamCutBase.FoamCutBaseObject):
+    def __init__(self, obj, jobName):
+        super().__init__(obj, jobName)     
+        obj.Type = "Helper"  
         
         obj.addProperty("App::PropertyLength",     "HorizontalTravel", "Machine Geometry",  "Horizontal travel distance").HorizontalTravel = getParameterFloat("HorizontalTravel", 550)
         obj.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry",  "Vertical travel distance"  ).VerticalTravel = getParameterFloat("VerticalTravel", 300)
@@ -72,43 +75,19 @@ class MachineConfig:
         obj.Proxy = self
         self.execute(obj)
 
-    def onChanged(self, obj, prop):
-        pass
-
     def execute(self, obj):
         pass 
         
 
-class MachineConfigVP:
-    def __init__(self, obj):
-        obj.Proxy = self
-
+class MachineConfigVP(FoamCutViewProviders.FoamCutBaseViewProvider):    
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
         obj.Visibility = True
 
-    def doubleClicked(self, obj):
-        return True
-    
     def getIcon(self):
         return utilities.getIconPath("config.svg")
     
-    if utilities.isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
-        def dumps(self):
-            return {"name": self.Object.Name}
-
-        def loads(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-    else:
-        def __getstate__(self):
-            return {"name": self.Object.Name}
-
-        def __setstate__(self, state):
-            self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
-            return None
-        
 def getParameterFloat(name, default):
     parameters = App.ParamGet("User parameter:BaseApp/Workbench/FoamcutWB/DefaultMachineConfig")
     floats = parameters.GetFloats()
@@ -141,6 +120,6 @@ def getParameterString(name, default):
     
     return parameters.GetString(name)
 
-def createConfig(obj):
-    MachineConfig(obj)
+def createConfig(obj, jobName):
+    MachineConfig(obj, jobName)
     MachineConfigVP(obj.ViewObject)
