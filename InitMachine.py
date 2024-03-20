@@ -19,10 +19,10 @@ import FoamCut_WorkingPlane
 import FoamBlock
 
 def initChildren(config, machine):
-    origin = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Origin")
+    origin = machine.newObject("App::FeaturePython", "Origin")
     MachineOrigin.CreateOrigin(origin, machine.Name)
 
-    CNCVolume = FreeCAD.ActiveDocument.addObject("Part::Box", "CNCVolume")
+    CNCVolume = machine.newObject("Part::Box", "CNCVolume")
     CNCVolume.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
     CNCVolume.setEditorMode("Placement",     3)
     CNCVolume.setEditorMode("Label",         3)
@@ -37,9 +37,12 @@ def initChildren(config, machine):
     CNCVolume.setExpression(".Width",   u"<<{}>>.HorizontalTravel".format(config.Name))
     CNCVolume.setExpression(".Height",   u"<<{}>>.VerticalTravel".format(config.Name))
     CNCVolume.ViewObject.Transparency = 90
+    CNCVolume.ViewObject.LineWidth = 1.0
+    CNCVolume.ViewObject.PointSize = 1.0
+    CNCVolume.ViewObject.ShapeColor = (190, 190, 190)
     utilities.setPickStyle(CNCVolume.ViewObject, utilities.UNPICKABLE)
     
-    RotationAxis = FreeCAD.ActiveDocument.addObject("Part::Line","RotationAxis")
+    RotationAxis = machine.newObject("Part::Line","RotationAxis")
     RotationAxis.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
     RotationAxis.X1 = 0
     RotationAxis.setExpression(".Y1", u"<<{}>>.OriginRotationX".format(config.Name))
@@ -52,23 +55,22 @@ def initChildren(config, machine):
     RotationAxis.ViewObject.Transparency = 70
     RotationAxis.ViewObject.LineColor = (1.0, 0.886, 0.023)
     
-    wpl = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPL")
+    wpl = machine.newObject("Part::FeaturePython", "WPL")
     FoamCut_WorkingPlane.CreateWorkingPlane(wpl, machine.Name, utilities.LEFT)
     wpl.Label = "Working Plane L"
 
     machine.WPLName = wpl.Name
     
-    wpr = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "WPR")
+    wpr = machine.newObject("Part::FeaturePython", "WPR")
     FoamCut_WorkingPlane.CreateWorkingPlane(wpr, machine.Name, utilities.RIGHT)
     wpr.Label = "Working Plane R"
 
     machine.WPRName = wpr.Name
 
-    block = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Block")
+    block = machine.newObject("Part::FeaturePython", "Block")
     FoamBlock.CreateFoamBlock(block, machine.Name)
     block.Label = "Foam Block"
 
-    machine.Group = [config, origin, RotationAxis, CNCVolume, wpl, wpr, block]
     
 class Machine(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, jobName):   
@@ -119,7 +121,7 @@ class InitMachine():
         MachineVP(machine.ViewObject)
 
         # - Create CNC configuration
-        config = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Config")
+        config = machine.newObject("App::DocumentObjectGroupPython", "Config")
         MachineConfig.createConfig(config, machine.Name)
 
         machine.ConfigName = config.Name

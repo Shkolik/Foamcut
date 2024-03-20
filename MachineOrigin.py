@@ -11,112 +11,143 @@ import FreeCADGui
 Gui=FreeCADGui
 import FoamCutBase
 import FoamCutViewProviders
-import Draft
 import utilities
-import os
+import math
+import pivy.coin as coin
 
 class MachineOrigin(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, jobName):
         super().__init__(obj, jobName)     
         obj.Type = "Helper"
+
+        obj.addProperty("App::PropertyDistance", "FieldWidth", "", "", 5)
         
-        config = self.getConfigName(obj)
-        obj.Group = self.createGroup(config)
-        
-        obj.setEditorMode("Group", 3)
+        config = self.getConfig(obj)
+
+        obj.FieldWidth = config.FieldWidth
+        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config.Name))
 
         obj.Proxy = self
-
-    def execute(self, obj):
-        for item in obj.Group:
-            item.recompute()
-
-    '''
-        Creates Origin arrow either X or Y
-        @param x - if set to True - create X arrow, else Y
-        @param x_expr   - expression to get X coordinate
-    '''
-    def createArrow(self, x, x_expr):
-        pl = FreeCAD.Placement()
-        pl.Base = FreeCAD.Vector(0.0, 0.0, 0.0)    
-        points = [FreeCAD.Vector(0.0, 0.0, 0.0), FreeCAD.Vector(0.0, 100.0, 0.0)] if x else [FreeCAD.Vector(0.0, 0.0, 0.0), FreeCAD.Vector(0.0, 0.0, 100.0)]
-        line = Draft.make_wire(points, placement=pl, closed=False, face=False, support=None)
-        line.setExpression(".Placement.Base.x", x_expr)
-        line.setExpression(".Start.x", x_expr)
-        line.setExpression(".End.x", x_expr)
-        line.End.y = 100.0 if x else 0.0
-        line.End.z = 0.0 if x else 100.0
-        if x:
-            line.ViewObject.LineColor = (0,170,0)
-            line.ViewObject.PointColor = (0,170,0)
-            
-        else:
-            line.ViewObject.LineColor = (170,0,0)
-            line.ViewObject.PointColor = (170,0,0)
-
-        line.ViewObject.LineWidth = 2
-        line.ViewObject.PointSize = 1
-        line.ViewObject.ArrowSize = 3
-        line.ViewObject.ArrowType = u"Arrow"
-        line.ViewObject.EndArrow = True
-        line.ViewObject.ShowInTree = False
-        line.recompute()
-        return line
-
-    '''
-        Creates Origin arrow label
-        @param x        - if set to True - create X arrow label, else Y
-        @param x_expr   - expression to get X coordinate
-        @param position - -1 (LEFT) or 1 (RIGHT)
-    '''
-    def createLabel(self, x, x_expr, position):
-        pl = FreeCAD.Placement()
-        pl.Base = FreeCAD.Vector(0.0, 100.0, 8.0) if x else FreeCAD.Vector(0.0, 16.0, 90.0)
-        pl.Rotation.Q = (0.5, -0.5, -0.5, 0.5) if position == utilities.LEFT else (0.5, 0.5, 0.5, 0.5)
-
-        str = ("X" if x else "Y") + ("L" if position == utilities.LEFT else "R")
-        font = os.path.join(utilities.getResourcesPath(), "calibri.ttf")
-        ss = Draft.make_shapestring(String=str, FontFile=font, Size=10.0, Tracking=0.0)
-        ss.Placement = pl
-        ss.setExpression(".Placement.Base.x", x_expr)
-        # ss.Support=None
-        ss.ViewObject.ShowInTree = False
-        if x:
-            ss.ViewObject.ShapeColor = (0,170,0)
-            ss.ViewObject.LineColor = (0,170,0)
-            ss.ViewObject.PointColor = (0,170,0)            
-        else:
-            ss.ViewObject.ShapeColor = (170,0,0)
-            ss.ViewObject.LineColor = (170,0,0)
-            ss.ViewObject.PointColor = (170,0,0)
-        return ss
-
-    '''
-        Creates group of children
-        @param config - config object name
-        @returns - list of child objects
-    '''
-    def createGroup(self, config):    
-        x_expr_l = u"-<<{}>>.FieldWidth / 2".format(config) 
-        x_expr_r = u"<<{}>>.FieldWidth / 2".format(config)  
-        return [
-            self.createArrow(True, x_expr_l), self.createArrow(False, x_expr_l), self.createLabel(True, x_expr_l, utilities.LEFT), self.createLabel(False, x_expr_l, utilities.LEFT),
-            self.createArrow(True, x_expr_r), self.createArrow(False, x_expr_r), self.createLabel(True, x_expr_r, utilities.RIGHT), self.createLabel(False, x_expr_r, utilities.RIGHT)
-            ]
-
 
 class MachineOriginVP(FoamCutViewProviders.FoamCutBaseViewProvider):    
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
-        for child in self.Object.Group:
-            utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
+
+        self.x_axis_so_color = coin.SoBaseColor()
+        self.x_axis_so_color.rgb.setValue(0, 1, 0)
+        self.y_axis_so_color = coin.SoBaseColor()
+        self.y_axis_so_color.rgb.setValue(1, 0, 0)
+        
+        self.axisScale = coin.SoScale()
+        self.axisScale.scaleFactor.setValue(1, 1, 1)
+        
+        self.draw_style = coin.SoDrawStyle()
+        self.draw_style.style = coin.SoDrawStyle.FILLED
+        self.draw_style.lineWidth = 3
+        
+        self.transformL = coin.SoTransform()
+        self.transformR = coin.SoTransform()
+        
+        self.origL = self.drawOrigin(self.transformL, False)
+        self.origR = self.drawOrigin(self.transformR, True)
+        
+        self.node = coin.SoGroup()
+        self.node.addChild(self.origL)
+        self.node.addChild(self.origR)
+
+        obj.addDisplayMode(self.node, "Flat Lines")
 
     def getIcon(self):
         return utilities.getIconPath("origin.svg")
     
-    def claimChildren(self):
-        return self.Object.Group
+    def updateData(self, obj, prop):
+        if prop == "FieldWidth" and obj.FieldWidth:
+            self.updatePlacement(self.transformL, -float(obj.FieldWidth/2))
+            self.updatePlacement(self.transformR, float(obj.FieldWidth/2))
+        
+    def getDisplayModes(self, obj):
+        """Return the display modes that this viewprovider supports."""
+        return ["Flat Lines"]
+    
+    def drawAxis(self, string, length, rotate, mirror, soColor):
+        line = coin.SoLineSet()
+        line.numVertices.setValue(2)
+        coords = coin.SoCoordinate3()
+        coords.point.setValues(0, [[0, 0, 0], [0, length, 0]])
+
+        cone=coin.SoCone()
+        cone.bottomRadius= 2
+        cone.height= 10
+
+        font = coin.SoFont()
+        font.name = "Arial"
+        font.size = 10.0
+
+        text = coin.SoAsciiText()
+        text.string = string
+
+        text_transform = coin.SoTransform()
+        rotation_x = coin.SbRotation(coin.SbVec3f(1, 0, 0), math.radians(0 if rotate else 90))
+        rotation_y = coin.SbRotation(coin.SbVec3f(0, 1, 0), math.radians(270))
+        text_transform.rotation.setValue(rotation_y * rotation_x)
+        if mirror:
+            text_transform.translation = (0, -5, -5) if rotate else (0, -5, 5)
+            text_transform.scaleFactor.setValue(-1, 1, 1)
+        else:
+            text_transform.translation = (0, -5, -15) if rotate else (0, 5, 5)
+            text_transform.scaleFactor.setValue(1, 1, 1)
+
+        shapeHints = coin.SoShapeHints()
+        shapeHints.vertexOrdering = coin.SoShapeHints.CLOCKWISE if mirror else coin.SoShapeHints.COUNTERCLOCKWISE
+
+        cone_transform = coin.SoTransform()
+        cone_transform.translation = (0, length, 0)
+
+        rotation_transform = coin.SoTransform()
+        rotation_transform.rotation.setValue(coin.SbVec3f(1, 0, 0), math.radians(90 if rotate else 0))
+
+        text_node = coin.SoGroup()
+        text_node.addChild(text_transform)
+        text_node.addChild(font)
+        text_node.addChild(shapeHints)
+        text_node.addChild(text)
+        
+
+        axis_node = coin.SoGroup()
+        axis_node.addChild(rotation_transform)
+
+        axis_sep = coin.SoSeparator()
+        axis_sep.addChild(self.axisScale)
+        axis_sep.addChild(self.draw_style)
+        axis_sep.addChild(soColor)
+        axis_sep.addChild(coords)
+        axis_sep.addChild(line)
+
+        axis_sep.addChild(cone_transform)
+        axis_sep.addChild(cone)
+        axis_sep.addChild(text_node)
+        
+
+        axis_node.addChild(axis_sep)
+        
+        return axis_node
+    
+    def drawOrigin(self, soTransform, isRight):
+        sep = coin.SoSeparator()
+        sep.addChild(soTransform)
+
+        X_axis_sep = self.drawAxis("XR" if isRight else "XL", 100, False, isRight, self.x_axis_so_color)
+        Y_axis_sep = self.drawAxis("YR" if isRight else "YL", 100, True, isRight, self.y_axis_so_color)
+
+        sep.addChild(X_axis_sep)
+        sep.addChild(Y_axis_sep)
+
+        return sep
+      
+    def updatePlacement(self, soTransform, x_coord):    
+        soTransform.translation.setValue(x_coord, 0, 0)
+    
     
 '''
     Creates Origin
@@ -126,4 +157,5 @@ class MachineOriginVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 def CreateOrigin(obj, jobName):
     MachineOrigin(obj, jobName)
     MachineOriginVP(obj.ViewObject)
+    utilities.setPickStyle(obj.ViewObject, utilities.UNPICKABLE)
     Gui.Selection.clearSelection()

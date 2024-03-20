@@ -30,6 +30,14 @@ class FoamCutBaseObject:
             App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
                 
         return job.ConfigName
+    
+    def getConfig(self, obj):
+        job = App.ActiveDocument.getObject(obj.JobName)
+
+        if job is None:
+            App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
+                
+        return job.getObject(job.ConfigName)
 
 class FoamCutMovementBaseObject(FoamCutBaseObject):
     def __init__(self, obj, jobName):

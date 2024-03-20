@@ -3,9 +3,11 @@ from utilities import isNewStateHandling
 
 class FoamCutBaseViewProvider:
     def __init__(self, obj):
+        self.Object = obj.Object
         obj.Proxy = self
 
     def attach(self, obj):
+        self.ViewObject = obj
         self.Object = obj.Object
 
     def doubleClicked(self, obj):

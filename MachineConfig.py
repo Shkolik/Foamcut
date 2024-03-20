@@ -21,6 +21,8 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyLength",     "HorizontalTravel", "Machine Geometry",  "Horizontal travel distance").HorizontalTravel = getParameterFloat("HorizontalTravel", 550)
         obj.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry",  "Vertical travel distance"  ).VerticalTravel = getParameterFloat("VerticalTravel", 300)
         obj.addProperty("App::PropertyLength",     "FieldWidth",       "Machine Geometry",  "Distance between wire ends").FieldWidth = getParameterFloat("FieldWidth", 730)
+        obj.addProperty("App::PropertyDistance",   "OriginX",          "Machine Geometry",  "Origin along X axis").OriginX = getParameterFloat("OriginX", 0)
+        obj.addProperty("App::PropertyDistance",   "OriginRotationX",  "Machine Geometry",  "Position of rotation axis along X axis").OriginRotationX = obj.HorizontalTravel / 2
         
         obj.addProperty("App::PropertyString",     "X1AxisName",        "Axis Mapping",     "Name of X1 axis in GCODE").X1AxisName = getParameterString("X1AxisName", "X")
         obj.addProperty("App::PropertyString",     "Z1AxisName",        "Axis Mapping",     "Name of Z1 axis in GCODE").Z1AxisName = getParameterString("Z1AxisName","Y")
@@ -59,11 +61,8 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyString",     "HomingCommand",        "GCODE",         "Command for homing procedure").HomingCommand = "$H"
         obj.addProperty("App::PropertyString",     "InitPositionCommand",  "GCODE",         "Command for initialize position").InitPositionCommand = "G92 {Position}"
 
-        obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = getParameterFloat("SafeHeight", 200)
-        obj.addProperty("App::PropertyDistance",   "OriginX",              "Travel",        "Origin along X axis").OriginX = getParameterFloat("OriginX", 0)
+        obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = getParameterFloat("SafeHeight", 200)        
         obj.addProperty("App::PropertyTime",       "PauseDuration",        "Travel",        "Pause duration seconds").PauseDuration = getParameterFloat("PauseDuration", 1.0)
-
-        obj.addProperty("App::PropertyDistance",   "OriginRotationX",      "Travel",        "Origin of rotation along X axis").OriginRotationX = obj.HorizontalTravel / 2
 
         obj.addProperty("App::PropertyLength",     "BlockWidth",            "Foam Block",   "Foam block size along wire").BlockWidth = getParameterFloat("BlockWidth", 400)
         obj.addProperty("App::PropertyLength",     "BlockLength",           "Foam Block",   "Foam block size along machine X axis").BlockLength = getParameterFloat("BlockLength", 300)
