@@ -24,9 +24,9 @@ class Postprocess():
     '''
     def generateTravelPosition(self, config, X1, Z1, X2, Z2):
         return "%s%.2f %s%.2f %s%.2f %s%.2f" % (
-            config.X1AxisName, float(X1 - config.OriginX),
+            config.X1AxisName, float(X1) - float(config.OriginX),
             config.Z1AxisName, float(Z1),
-            config.X2AxisName, float(X2 - config.OriginX),
+            config.X2AxisName, float(X2) - float(config.OriginX),
             config.Z2AxisName, float(Z2)
             )
 
@@ -95,7 +95,17 @@ class Postprocess():
     
     
     def generateStartBlock(self, config, start_point):
-        GCODE = "; *** START BLOCK ***\r\n"
+        GCODE = ";*** FOAM BLOCK ***\r\n"
+
+        GCODE += ";Width: {}\r\n".format(config.BlockWidth)
+        GCODE += ";Length: {}\r\n".format(config.BlockLength)
+        GCODE += ";Height: {}\r\n".format(config.BlockHeight)
+
+        GCODE += ";Position.X: {}\r\n".format(config.BlockPosition.x)
+        GCODE += ";Position.Y: {}\r\n".format(config.BlockPosition.y)
+        GCODE += ";Position.Z: {}\r\n".format(config.BlockPosition.z)
+        
+        GCODE += "; *** START BLOCK ***\r\n"
 
         if config.EnableHoming:
             # - Homing
@@ -112,17 +122,17 @@ class Postprocess():
             ) + "\r\n"
 
         # - Park
-        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-            config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
-            )
-        GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+        #GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+        #    config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
+        #    )
+        #GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
 
         # - Go to start point on parking Z
         if start_point is not None:
             start_L, start_R = start_point
-            GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-            start_L.y, config.ParkZ, start_R.y, config.ParkZ
-            )
+        #    GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+        #    start_L.y, config.ParkZ, start_R.y, config.ParkZ
+        #    )
 
         wirePower = config.WireMinPower
         # - generate compensated wire power
@@ -136,7 +146,7 @@ class Postprocess():
 
         return GCODE
 
-    def generateEndBlock(self, config, end_point):
+    def generateEndBlock(self, config):
         GCODE = "; *** END BLOCK ***\r\n"
 
         # - Up wire at current position to park height
@@ -148,12 +158,12 @@ class Postprocess():
         GCODE += self.generateWireDisable(config)
 
         # - Park XZ
-        GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-            config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
-            )
+        # GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+        #     config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
+        #     )
 
         # - Park R1
-        GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+        # GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
         return GCODE
 
     '''
@@ -268,13 +278,13 @@ class Postprocess():
             # - Store start point
             if out_start is None: out_start = (path.Path_L[index], path.Path_R[index])
 
-            # - Update end point
-            out_end = (path.Path_L[index], path.Path_R[index])
-
         if path.AddPause:
-            GCODE.append(self.generatePause(config.PauseCommand, path.PauseDuration))
+            print("{}: pause: {}".format(path.Name, path.PauseDuration))
+            pause = self.generatePause(config.PauseCommand, path.PauseDuration)
+            print(pause)
+            GCODE.append(pause)
 
-        return (out_start, out_end, GCODE)
+        return (out_start, GCODE)
 
     '''
     Make GCODE from move element
@@ -355,7 +365,6 @@ class Postprocess():
             TASK += [";\r\n", "; --- Route begin [%s] ---\r\n" % route.Label]
 
             # - Walk throug all route elemets
-            prev_path = False
             for i in range(len(route.Data)):                                
                 # - Access item
                 item = route.Data[i]
@@ -365,22 +374,13 @@ class Postprocess():
 
                 # - This is a Path
                 if object.Type == "Path" or object.Type == "Projection":
-                    # - Remove last point from task as it must be same point as new path start
-                    if prev_path:
-                        del TASK[-1]
-
+                    
                     # - Make GCODE from path
-                    (start, end, text) = self.makeGCODEFromPath(object, reversed, config)
+                    (start, text) = self.makeGCODEFromPath(object, reversed, config)
                     TASK += text
 
                     # - Store first point as start point
                     if start_point is None: start_point = start
-
-                    # - Update end point
-                    end_point = end
-
-                    # - Update prev element type
-                    prev_path = True
 
                 elif object.Type == "Move":
                     # - Make GCODE from move
@@ -390,7 +390,6 @@ class Postprocess():
                 elif object.Type == "Rotation":
                     # - Make GCODE from rotation
                     TASK += self.makeGCODEFromRotation(object, config)
-                    prev_path = False
 
                 elif object.Type == "Enter":
                     TASK += self.makeGCODEFromEnter(object, reversed, config)
@@ -406,7 +405,7 @@ class Postprocess():
 
         # ---- Generate startup block
         START = self.generateStartBlock(config, start_point)        
-        END   = self.generateEndBlock(config, end_point)
+        END   = self.generateEndBlock(config)
 
         program = START + ''.join(TASK) + END
 

@@ -32,20 +32,21 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj): 
-        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.ExitPoint[0], obj.ExitPoint[0].getSubObject(obj.ExitPoint[1][0]))
+        if obj.SafeHeight > 0:
+            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.ExitPoint[0], obj.ExitPoint[0].getSubObject(obj.ExitPoint[1][0]))
 
-        if oppositeVertex is None:
-            App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
+            if oppositeVertex is None:
+                App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
+                
+            edges = []
+
+            if isCommonPoint(vertex, oppositeVertex):
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)))
+            else:
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
             
-        edges = []
-
-        if isCommonPoint(vertex, oppositeVertex):
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)))
-        else:
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
-        
-        self.createShape(obj, edges, wp, (255, 0, 0))
+            self.createShape(obj, edges, wp, (255, 0, 0))
         
 class WireExitVP(FoamCutViewProviders.FoamCutBaseViewProvider):    
     def getIcon(self):        

@@ -53,13 +53,13 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
 
         obj.addProperty("App::PropertyLength",     "KerfCompensation",     "GCODE",         "Kerf compensation").KerfCompensation = 1
         obj.addProperty("App::PropertyLength",     "DiscretizationStep",   "GCODE",         "Discretization step").DiscretizationStep = 0.5
-        obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = "G01 {Position} F{FeedRate} {WirePower}"
-        obj.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",         "Command for move with cold wire").MoveCommand = "G00 {Position} F{FeedRate}"
-        obj.addProperty("App::PropertyString",     "PauseCommand",         "GCODE",         "Command for pause movements").PauseCommand = "G04 P{Duration}"
-        obj.addProperty("App::PropertyString",     "WireOnCommand",        "GCODE",         "Command for enable wire").WireOnCommand = "M03 S{WirePower}"
-        obj.addProperty("App::PropertyString",     "WireOffCommand",       "GCODE",         "Command for disable wire").WireOffCommand = "M05"
-        obj.addProperty("App::PropertyString",     "HomingCommand",        "GCODE",         "Command for homing procedure").HomingCommand = "$H"
-        obj.addProperty("App::PropertyString",     "InitPositionCommand",  "GCODE",         "Command for initialize position").InitPositionCommand = "G92 {Position}"
+        obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = getParameterString("CutCommand", "G01 {Position} F{FeedRate} {WirePower}")
+        obj.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",         "Command for move with cold wire").MoveCommand = getParameterString("MoveCommand", "G00 {Position} F{FeedRate}")
+        obj.addProperty("App::PropertyString",     "PauseCommand",         "GCODE",         "Command for pause movements").PauseCommand = getParameterString("PauseCommand", "G04 P{Duration}")
+        obj.addProperty("App::PropertyString",     "WireOnCommand",        "GCODE",         "Command for enable wire").WireOnCommand = getParameterString("WireOnCommand", "M03 S{WirePower}")
+        obj.addProperty("App::PropertyString",     "WireOffCommand",       "GCODE",         "Command for disable wire").WireOffCommand = getParameterString("WireOffCommand", "M05")
+        obj.addProperty("App::PropertyString",     "HomingCommand",        "GCODE",         "Command for homing procedure").HomingCommand = getParameterString("HomingCommand", "$H")
+        obj.addProperty("App::PropertyString",     "InitPositionCommand",  "GCODE",         "Command for initialize position").InitPositionCommand = getParameterString("InitPositionCommand", "G92 {Position}")
 
         obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = getParameterFloat("SafeHeight", 200)        
         obj.addProperty("App::PropertyTime",       "PauseDuration",        "Travel",        "Pause duration seconds").PauseDuration = getParameterFloat("PauseDuration", 1.0)

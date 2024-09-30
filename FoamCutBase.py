@@ -45,6 +45,8 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
 
+        obj.addProperty("App::PropertyBool",     "EdgesInverted", "Information", "", 1).EdgesInverted = False
+
         obj.addProperty("App::PropertyString",    "LeftEdgeName", "", "", 5)
         obj.addProperty("App::PropertyString",    "RightEdgeName", "", "", 5)
 
@@ -93,7 +95,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         return (left, right if right is not None else left)
 
-
     def findOppositeVertexes(self, obj, parent, vertex):
         oppositeVertex = None
 
@@ -103,68 +104,77 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         wp = getWorkingPlanes(job)
 
+        # check if selected vertex laying on any working plane
         onPlane = wp[0].Shape.isInside(vertexToVector(vertex), 0.01, True) or wp[1].Shape.isInside(vertexToVector(vertex), 0.01, True)
 
         isLeft = False
 
+        # get edges or vertexes on object we cut from parent action (move, join, path...)
         (left, right) = self.getEdges(parent)
 
         if onPlane:
             if isMovement(parent):
+                
                 point = vertexToVector(vertex)
                 # - Connect
                 if isCommonPoint(parent.Path_L[START], point):
                     isLeft = True
-                    vertex = left.firstVertex()
-                    oppositeVertex = right.firstVertex()
+                    vertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
+                    oppositeVertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())
                 elif isCommonPoint(parent.Path_L[END], point):
                     isLeft = True
-                    vertex = left.lastVertex()
-                    oppositeVertex = right.lastVertex()
+                    vertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
+                    oppositeVertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
                 elif isCommonPoint(parent.Path_R[START], point):                
-                    vertex = right.firstVertex()
-                    oppositeVertex = left.firstVertex()
+                    vertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())
+                    oppositeVertex = left if isinstance(left, Part.Vertex) else left.firstVertex()                    
                 elif isCommonPoint(parent.Path_R[END], point):
-                    vertex = right.lastVertex()
-                    oppositeVertex = left.lastVertex()
+                    vertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
+                    oppositeVertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
+
+                    
+                    print(vertex)
+                    print(oppositeVertex)
+
+
             else:
                 App.Console.PrintError("ERROR:\n Not supported parent object type. Only Path, Move and Projection supported.\n")
         else:
             if isMovement(parent):    
-                if isCommonPoint(left.firstVertex(), vertex):
+                if isCommonPoint(left if isinstance(left, Part.Vertex) else left.firstVertex(), vertex):
                     isLeft = True
-                    oppositeVertex = right.firstVertex()
-                elif isCommonPoint(left.lastVertex(), vertex):
+                    oppositeVertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
+                elif isCommonPoint(left if isinstance(left, Part.Vertex) else left.lastVertex(), vertex):
                     isLeft = True
-                    oppositeVertex = right.lastVertex()
-                elif isCommonPoint(right.firstVertex(), vertex):
-                    oppositeVertex = left.firstVertex()
-                elif isCommonPoint(right.lastVertex(), vertex):
-                    oppositeVertex = left.lastVertex()
+                    oppositeVertex = right if isinstance(right, Part.Vertex) else right.lastVertex()
+                elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.firstVertex(), vertex):
+                    oppositeVertex =left if isinstance(left, Part.Vertex) else left.firstVertex()
+                elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.lastVertex(), vertex):
+                    oppositeVertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
             else:
                 for object in job.Group:
                     if isMovement(object):
                         (left, right) = self.getEdges(object)
 
-                        if isCommonPoint(left.firstVertex(), vertex):
+                        if isCommonPoint(left if isinstance(left, Part.Vertex) else left.firstVertex(), vertex):
                             isLeft = True
-                            oppositeVertex = right.firstVertex()
-                        elif isCommonPoint(left.lastVertex(), vertex):
+                            oppositeVertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
+                        elif isCommonPoint(left if isinstance(left, Part.Vertex) else left.lastVertex(), vertex):
                             isLeft = True
-                            oppositeVertex = right.lastVertex()
-                        elif isCommonPoint(right.firstVertex(), vertex):
-                            oppositeVertex = left.firstVertex()
-                        elif isCommonPoint(right.lastVertex(), vertex):
-                            oppositeVertex = left.lastVertex()
+                            oppositeVertex = right if isinstance(right, Part.Vertex) else right.lastVertex()
+                        elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.firstVertex(), vertex):
+                            oppositeVertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
+                        elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.lastVertex(), vertex):
+                            oppositeVertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
 
         return (isLeft, vertex, oppositeVertex, wp)
 
     def createShape(self, obj, edges, planes, lineColor):
         # - Make path between objects on working planes
         if len(edges) == 2:
-            path_points = makePathPointsByEdgesPair(edges[0], edges[1], planes, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
+            (path_points, inverted) = makePathPointsByEdgesPair(edges[0], edges[1], planes, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
         elif len(edges) == 1:
-            path_points = makePathPointsByEdge(edges[0], planes, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
+            (path_points, inverted) = makePathPointsByEdge(edges[0], planes, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
         else:
             App.Console.PrintError("ERROR:\n Not supported number of edges.\n")
 
@@ -173,6 +183,8 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.Path_R       = [item for item in path_points[END]]        
         obj.PointsCount = int(len(path_points[START]))
         #
+
+        obj.EdgesInverted = inverted
 
         shapes = []
         l_points = obj.Path_L

@@ -57,6 +57,14 @@ def isMovement(obj):
 '''
 def vertexToVector(v):
     return FreeCAD.Vector(v.X, v.Y, v.Z)
+
+'''
+    Converts FreeCAD.Vector to Part.Vertex
+    @param v - point to convert
+    @returns Part.Vertex
+'''
+def vectorToVertex(v):
+    return Part.Vertex(v)
       
 '''
   Get all selected Edges and Vertexes
@@ -235,7 +243,7 @@ def makePathByPointSets(first, second, planes, projection = False):
                 plane_points = []
                 for point_index in range(len(first)):            
                     plane_points.append(                
-                        intersectLineAndPlane(first[len(first) - point_index - 1], second[point_index], planes[plane_index])
+                        intersectLineAndPlane(first[point_index], second[len(second) - point_index - 1], planes[plane_index])
                     )
                 pathsLengthInverted.append(distanceToVertex(plane_points[START], plane_points[END]))    
                 resultInverted.append([vertexToVector(point) for point in plane_points])
@@ -249,8 +257,8 @@ def makePathByPointSets(first, second, planes, projection = False):
                     break
             
             # - Done
-            return resultInverted if invert else result
-    return result
+            return (resultInverted if invert else result, invert)
+    return (result, False)
 
 '''
   Make path on working planes by two edges, vertices, or their combination
