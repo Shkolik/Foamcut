@@ -10,10 +10,12 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
+import Part
 import FoamCutBase
 import FoamCutViewProviders
 import utilities
 from utilities import isMovement
+import pivy.coin as coin
 
 class WireRoute(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, objects, jobName):   
@@ -189,25 +191,108 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
+        
+        self.node = coin.SoGroup()
+
+        self.drawRoute()
+        obj.addDisplayMode(self.node, "Flat Lines")
+        utilities.setPickStyle(obj, utilities.UNPICKABLE)
+
+    def drawRoute(self):
+        while self.node.getNumChildren() > 0:
+            self.node.removeChild(0)
+
+        pointsLeft = []
+        pointsRight = []
+
+        pauses = []
+
+        # - Walk throug all route elemets
+        for i in range(len(self.Object.Data)):                                
+            # - Access item
+            item = self.Object.Data[i]
+
+            object = self.Object.Objects[item]
+    
+            pointsLeft.extend(object.Path_L[::-1] if self.Object.DataDirection[i] else object.Path_L)
+            pointsRight.extend(object.Path_R[::-1] if self.Object.DataDirection[i] else object.Path_R)
+            
+            if hasattr(object, "AddPause") and object.AddPause:
+                index = 0 if self.Object.DataDirection[i] else -1
+                pauses.append([object.Path_L[index], float(object.PauseDuration)])
+                pauses.append([object.Path_R[index], float(object.PauseDuration)])
+
+        self.node.addChild(self.drawRouteLine(pointsLeft))
+        self.node.addChild(self.drawRouteLine(pointsRight))
+
+        self.node.addChild(self.drawPauses(pauses))
+
+    def drawPauses(self, points):
+        group = coin.SoGroup()
+        if len(points) > 0:
+            color = coin.SoBaseColor()
+            color.rgb.setValue(1, 0, 0)
+            draw_style = coin.SoDrawStyle()
+            draw_style.style = coin.SoDrawStyle.FILLED
+            draw_style.lineWidth = 1
+            group.addChild(draw_style)
+            group.addChild(color)
+
+            # points is array of pauses each item is also array, where first element is poin coordinates and second is pause duration
+            for i in range(len(points)):
+                sep = coin.SoSeparator()
+                sphere = coin.SoSphere()
+                sphere.radius = points[i][1]
+
+                translation = coin.SoTranslation()
+                translation.translation.setValue(points[i][0].x, points[i][0].y, points[i][0].z)
+                sep.addChild(translation)
+                sep.addChild(sphere)
+
+                group.addChild(sep)
+
+        return group
+
+    def drawRouteLine(self, points):
+        sep = coin.SoSeparator()
+        if len(points) > 0:
+            line = coin.SoLineSet()
+            line.numVertices.setValue(len(points))
+            coords = coin.SoCoordinate3()
+            coords.point.setValues(0, [[p.x, p.y, p.z] for p in points])
+            color = coin.SoBaseColor()
+            color.rgb.setValue(1, 0, 0)
+            draw_style = coin.SoDrawStyle()
+            draw_style.style = coin.SoDrawStyle.FILLED
+            draw_style.lineWidth = 2
+            sep.addChild(draw_style)
+            sep.addChild(color)
+            sep.addChild(coords)
+            sep.addChild(line)
+        return sep    
+            
 
     def getIcon(self):
         return utilities.getIconPath("route.svg")
 
+    def getDisplayModes(self, obj):
+        """Return the display modes that this viewprovider supports."""
+        return ["Flat Lines"]
+    
     def claimChildren(self):
         return [object for object in self.Object.Objects]
     
     def onDelete(self, obj, subelements):
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        group = App.ActiveDocument.getObject(self.Object.JobName)
         if group is not None and group.Type == "Job":
             for object in self.Object.Objects:
                 group.addObject(object)
         return True
     
-    def onChanged(self, obj, prop):
-        if prop == "Visibility":            
-            for object in self.Object.Objects:
-                object.ViewObject.Visibility = self.ViewObject.Visibility
-        pass
+    def updateData(self, obj, prop):
+        if prop == "Data" or prop == "DataDirection" or prop == "Objects":
+            self.drawRoute()
+        
 
 class MakeRoute():
     """Make Route"""
@@ -230,6 +315,7 @@ class MakeRoute():
             WireRouteVP(route.ViewObject)
 
             for obj in objects:
+                obj.ViewObject.Visibility = False
                 group.removeObject(obj)
 
             App.ActiveDocument.recompute()
