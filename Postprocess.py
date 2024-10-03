@@ -14,7 +14,7 @@ import PySide
 from PySide import QtCore
 from PySide import QtGui
 import utilities
-
+import os
 
 class Postprocess():
     """Make Gcode"""
@@ -411,11 +411,10 @@ class Postprocess():
 
         print ("GCODE generated")
 
+        dialog = PySide.QtGui.QFileDialog()
+        lastDir = dialog.directory().absolutePath()
         # - Open save file dialog
-        try:
-            save_path = QFileDialog.getSaveFileName(None, QString.fromLocal8Bit("Save GCODE"), "", "*.gcode") # PyQt4
-        except Exception:
-            save_path, save_filter = PySide.QtGui.QFileDialog.getSaveFileName(None, "Save GCODE", "", "*.gcode") # PySide
+        save_path, save_filter = dialog.getSaveFileName(None, "Save GCODE", os.path.join(lastDir, route_list[0].Label), "*.gcode") # PySide
 
         # - Check path
         if save_path == "":

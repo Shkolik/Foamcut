@@ -27,7 +27,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyLinkList",    "Objects",          "Task",   "Source data").Objects = objects
         obj.addProperty("App::PropertyIntegerList", "Data",             "Task",   "Data")
         obj.addProperty("App::PropertyBoolList",    "DataDirection",    "Task",   "Data Direction")
-        obj.addProperty("App::PropertyLength",      "KerfCompensation", "Task",   "Kerf compensation")
+        obj.addProperty("App::PropertyLength",      "KerfCompensation", "", "", 5) # - no used for now, and, probably, will not
 
         config = self.getConfigName(obj)
 
