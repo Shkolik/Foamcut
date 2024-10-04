@@ -12,8 +12,9 @@ import FreeCADGui
 Gui=FreeCADGui
 import FoamCutViewProviders
 import FoamCutBase
+import Part
 import utilities
-from utilities import getWorkingPlanes, getAllSelectedObjects
+from utilities import getWorkingPlanes, getAllSelectedObjects, edgesFromFace
 
 
 class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
@@ -60,18 +61,38 @@ class MakeProjection():
                 "MenuText": "Create Projection",
                 "ToolTip" : "Create projection object from selected edge or vertex"}
 
+    def CreateFromEdge(self, group, edge):
+        obj = group.newObject("Part::FeaturePython","Projection")
+            
+        ProjectionSection(obj, 
+                    (FreeCAD.ActiveDocument.getObject((edge)[0].Name), (edge)[1][0]), 
+                    group.Name)
+        ProjectionSectionVP(obj.ViewObject)
+        obj.ViewObject.PointSize = 4
+
     def Activated(self):
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
         if group is not None and group.Type == "Job":
             # - Get selected objects
-            objects = getAllSelectedObjects()
-            obj = group.newObject("Part::FeaturePython","Projection")
+            objects = getAllSelectedObjects(True)
+
+            baseObjects = []
             
-            ProjectionSection(obj, 
-                        (FreeCAD.ActiveDocument.getObject((objects[0])[0].Name), (objects[0])[1][0]), 
-                        group.Name)
-            ProjectionSectionVP(obj.ViewObject)
-            obj.ViewObject.PointSize = 4
+            for object in objects:
+                if object[1][0].startswith("Face"):
+                    # - prepare base object. 
+                    # - Sometimes, after reopening file it is nessesary to recompute em or list of edges will be empty
+                    if object[0].Name not in baseObjects:
+                        object[0].touch()
+                        baseObjects.append(object[0].Name)
+                        object[0].recompute(True)
+
+                    edges = edgesFromFace(object[0], object[0].getSubObject(object[1][0]))
+                    print(edges)
+                    for edge in edges:
+                        self.CreateFromEdge(group, edge)
+                else:
+                    self.CreateFromEdge(group, object)
 
             App.ActiveDocument.recompute()
             Gui.Selection.clearSelection()
@@ -82,11 +103,11 @@ class MakeProjection():
         else:
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
             if group is not None and group.Type == "Job":  
-                # - Get selected objects
-                objects = getAllSelectedObjects()
+                # - Get selected objects including Faces
+                objects = getAllSelectedObjects(True)
 
-                # - Number of edges should be two
-                if len(objects) < 1:               
+                # - at least one Edge, Vertex or Face should be selected
+                if len(objects) == 0:               
                     return False
                 
                 wp = getWorkingPlanes(group)

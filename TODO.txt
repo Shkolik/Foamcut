@@ -3,6 +3,7 @@
 - kerf settings - postponed for very far future
 - unpicable helper geometry in one group - Done
 - configuration setup panel
+- projection produced by selecting face - DONE
 - paths produced by selecting face
 - G93 mode - nothing to do here
 - mirroring gcode tool - DONE

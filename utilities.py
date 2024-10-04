@@ -69,15 +69,26 @@ def vectorToVertex(v):
 '''
   Get all selected Edges and Vertexes
 '''
-def getAllSelectedObjects():
+def getAllSelectedObjects(includeFace = False):
     objects = []
     for obj in  Gui.Selection.getSelectionEx():
         if obj.HasSubObjects:
             i = 0
             for subobj in obj.SubObjects:
-                if issubclass(type(subobj), Part.Edge) or issubclass(type(subobj), Part.Vertex):
+                if issubclass(type(subobj), Part.Edge) or issubclass(type(subobj), Part.Vertex) or (includeFace and issubclass(type(subobj), Part.Face)):
                     objects.append((obj.Object, [obj.SubElementNames[i]]))
                 i += 1
+    return objects
+
+def edgesFromFace(obj, face):
+    objects = []
+    for fe in face.Edges:
+        for i, edge in enumerate(obj.Shape.Edges, start=1):
+            if fe.isEqual(edge):
+                objects.append([obj, ['Edge{}'.format(i)]])
+            edge.reverse()
+            if fe.isEqual(edge):
+                objects.append([obj, ['Edge{}'.format(i)]])
     return objects
 
 '''
