@@ -70,7 +70,16 @@ class AddRotation():
 
     def Activated(self):   
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        setActive = False
+        # - if machine is not active, try to select first one in a document
+        if group is None or group.Type != "Job":
+            group = App.ActiveDocument.getObject("Job")
+            setActive = True
+
         if group is not None and group.Type == "Job":
+            if setActive:
+                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+            
             source = Gui.Selection.getSelectionEx()[0].Object      
             # - Create rotation object
             rt = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Rotation")
@@ -87,6 +96,11 @@ class AddRotation():
             return False
         else:
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            
+            # - if machine is not active, try to select first one in a document
+            if group is None or group.Type != "Job":
+                group = App.ActiveDocument.getObject("Job")
+
             if group is not None and group.Type == "Job":
                 # - Get selecttion
                 selection = Gui.Selection.getSelectionEx()

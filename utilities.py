@@ -80,9 +80,11 @@ def getAllSelectedObjects(includeFace = False):
                 i += 1
     return objects
 
-def edgesFromFace(obj, face):
+def getEdgesLinks(obj, source):
     objects = []
-    for fe in face.Edges:
+    edges = source.Edges if issubclass(type(source), Part.Face) else source
+
+    for fe in edges:
         for i, edge in enumerate(obj.Shape.Edges, start=1):
             if fe.isEqual(edge):
                 objects.append([obj, ['Edge{}'.format(i)]])
@@ -90,7 +92,7 @@ def edgesFromFace(obj, face):
             if fe.isEqual(edge):
                 objects.append([obj, ['Edge{}'.format(i)]])
     return objects
-
+    
 '''
   Get all selected Edges
 '''

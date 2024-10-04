@@ -14,7 +14,7 @@ import FoamCutViewProviders
 import FoamCutBase
 import Part
 import utilities
-from utilities import getWorkingPlanes, getAllSelectedObjects, edgesFromFace
+from utilities import getWorkingPlanes, getAllSelectedObjects, getEdgesLinks
 
 
 class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
@@ -61,7 +61,7 @@ class MakeProjection():
                 "MenuText": "Create Projection",
                 "ToolTip" : "Create projection object from selected edge or vertex"}
 
-    def CreateFromEdge(self, group, edge):
+    def CreateFromEdge(self, edge, group):
         obj = group.newObject("Part::FeaturePython","Projection")
             
         ProjectionSection(obj, 
@@ -72,12 +72,21 @@ class MakeProjection():
 
     def Activated(self):
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        setActive = False
+        # - if machine is not active, try to select first one in a document
+        if group is None or group.Type != "Job":
+            group = App.ActiveDocument.getObject("Job")
+            setActive = True
+
         if group is not None and group.Type == "Job":
+            if setActive:
+                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+            
             # - Get selected objects
             objects = getAllSelectedObjects(True)
 
             baseObjects = []
-            
+
             for object in objects:
                 if object[1][0].startswith("Face"):
                     # - prepare base object. 
@@ -87,12 +96,12 @@ class MakeProjection():
                         baseObjects.append(object[0].Name)
                         object[0].recompute(True)
 
-                    edges = edgesFromFace(object[0], object[0].getSubObject(object[1][0]))
-                    print(edges)
+                    edges = getEdgesLinks(object[0], object[0].getSubObject(object[1][0]))
+                    
                     for edge in edges:
-                        self.CreateFromEdge(group, edge)
+                        self.CreateFromEdge(edge, group)
                 else:
-                    self.CreateFromEdge(group, object)
+                    self.CreateFromEdge(object, group)
 
             App.ActiveDocument.recompute()
             Gui.Selection.clearSelection()
@@ -102,6 +111,10 @@ class MakeProjection():
             return False
         else:
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            # - if machine is not active, try to select first one in a document
+            if group is None or group.Type != "Job":
+                group = App.ActiveDocument.getObject("Job")
+
             if group is not None and group.Type == "Job":  
                 # - Get selected objects including Faces
                 objects = getAllSelectedObjects(True)

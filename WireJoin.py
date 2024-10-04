@@ -83,7 +83,16 @@ class MakeJoin():
 
     def Activated(self):         
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        if group is not None and group.Type == "Job":    
+        setActive = False
+        # - if machine is not active, try to select first one in a document
+        if group is None or group.Type != "Job":
+            group = App.ActiveDocument.getObject("Job")
+            setActive = True
+
+        if group is not None and group.Type == "Job":
+            if setActive:
+                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+            
             # - Get selecttion
             objects = getAllSelectedObjects()
             
@@ -102,6 +111,11 @@ class MakeJoin():
             return False
         else:
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            
+            # - if machine is not active, try to select first one in a document
+            if group is None or group.Type != "Job":
+                group = App.ActiveDocument.getObject("Job")
+
             if group is not None and group.Type == "Job":   
                 # - Get selecttion
                 objects = getAllSelectedObjects()

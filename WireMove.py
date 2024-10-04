@@ -73,7 +73,16 @@ class MakeMove():
 
     def Activated(self):    
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        if group is not None and group.Type == "Job":        
+        setActive = False
+        # - if machine is not active, try to select first one in a document
+        if group is None or group.Type != "Job":
+            group = App.ActiveDocument.getObject("Job")
+            setActive = True
+
+        if group is not None and group.Type == "Job":
+            if setActive:
+                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+            
             # - Get selecttion
             objects = getAllSelectedObjects()
             
@@ -85,13 +94,21 @@ class MakeMove():
 
             group.addObject(move)
 
-            move.recompute()
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(App.ActiveDocument.Name,move.Name)
+            
+            App.ActiveDocument.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
             group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+            
+            # - if machine is not active, try to select first one in a document
+            if group is None or group.Type != "Job":
+                group = App.ActiveDocument.getObject("Job")
+
             if group is not None and group.Type == "Job":    
                 # - Get selecttion
                 objects = getAllSelectedObjects()
