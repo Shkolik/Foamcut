@@ -10,7 +10,7 @@ import FreeCADGui
 Gui=FreeCADGui
 import Part
 import os
-from math import sqrt
+from math import sqrt, isclose
 
 START       = 0           # - Segment start point index
 END         = -1          # - Segment end point index
@@ -20,6 +20,8 @@ RIGHT = 1
 
 FC_TYPES = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join", "Route", "Job", "Helper"]
 FC_TYPES_TO_ROUTE = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join"]
+
+FC_KERF_DIRECTIONS = ["Positive", "None", "Negative"]
 
 '''
     Returns the current module path.
@@ -43,6 +45,18 @@ def getIconPath(icon):
 def isNewStateHandling():
     version = FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]+FreeCAD.Version()[2]
     return (version >= '0.212' and version < '2024.1130') or version >= '2024.1130'
+
+'''
+    Checks if edge is strait line
+'''
+def isStraitLine(edge):
+    #check single edge
+    if len(edge.Vertexes) == 2:
+        len1 = (edge.Vertexes[0].Point - edge.Vertexes[1].Point).Length
+        return isclose(abs(len1), edge.Length, rel_tol=1e-7)    
+    else:
+        return False
+
 
 '''
     Checks if object is one of the move objects
@@ -279,12 +293,16 @@ def makePathByPointSets(first, second, planes, projection = False):
   @param second - Second edge / vertex
   @param step - Distance between points in edge discretization
 '''
-def makePathPointsByEdgesPair(first, second, planes, step = 0.5):    
+def makePathPointsByEdgesPair(first, second, planes, step = 0.5, isStraitLine = False):    
     # - Find longest edge
     maxlen = first.Length if first.Length >= second.Length else second.Length
 
     # - Calculate number of discretization points
     points_count = int(float(maxlen) / float(step))
+
+    if points_count < 2: #looks like edge too short and we can treat it as strait line
+        points_count = 2
+        isStraitLine = True
 
     #print("Point count = %d" % points_count)
 
@@ -295,16 +313,17 @@ def makePathPointsByEdgesPair(first, second, planes, step = 0.5):
     if first.ShapeType == "Vertex":
         for i in range(points_count): first_set.append(first.Point)
     else:
-        first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
+        first_set = first.discretize(Number=points_count) if points_count > 2 and not isStraitLine else [first.firstVertex().Point, first.lastVertex().Point]
 
     # - Discretize second edge
     if second.ShapeType == "Vertex":
         for i in range(points_count): second_set.append(second.Point)
     else:
-        second_set = second.discretize(Number=points_count) if points_count > 2 else [second.firstVertex().Point, second.lastVertex().Point]
+        second_set = second.discretize(Number=points_count) if points_count > 2 and not isStraitLine else [second.firstVertex().Point, second.lastVertex().Point]
 
     # - Make path
-    return makePathByPointSets(first_set, second_set, planes)
+    (result, inverted) = makePathByPointSets(first_set, second_set, planes)
+    return None if result is None else (result, inverted, points_count)
 
 '''
   Make projected path on working planes by one edge or vertex
@@ -312,7 +331,7 @@ def makePathPointsByEdgesPair(first, second, planes, step = 0.5):
   @param planes - working planes 
   @param step - Distance between points in edge discretization
 '''
-def makePathPointsByEdge(first, planes, step = 0.5):    
+def makePathPointsByEdge(first, planes, step = 0.5, isStraitLine = False):    
     # - Detect vertex and vertex
     if first.ShapeType == "Vertex":
         return makePathByPointSets([first.Point], None, planes, True)
@@ -323,10 +342,11 @@ def makePathPointsByEdge(first, planes, step = 0.5):
     #print("Point count = %d" % points_count)
 
     # - Discretize first edge
-    first_set = first.discretize(Number=points_count) if points_count > 2 else [first.firstVertex().Point, first.lastVertex().Point]
+    first_set = first.discretize(Number=points_count) if points_count > 2 and not isStraitLine else [first.firstVertex().Point, first.lastVertex().Point]
 
     # - Make path
-    return makePathByPointSets(first_set, None,  planes, True)
+    (result, inverted) = makePathByPointSets(first_set, None,  planes, True)
+    return None if result is None else (result, inverted, points_count)
 
 '''
   Enumeration for the pick style

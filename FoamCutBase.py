@@ -9,7 +9,7 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import Part
-from utilities import getWorkingPlanes, vertexToVector, isCommonPoint, isMovement, makePathPointsByEdgesPair, makePathPointsByEdge, START, END
+from utilities import *
 
 class FoamCutBaseObject:
     def __init__(self, obj, jobName):
@@ -59,7 +59,10 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.addProperty("App::PropertyBool",        "AddPause",             "Task", "Add pause at the end of move").AddPause = False
         obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
         obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Task", "Show projection lines between planes").ShowProjectionLines = False
-        
+        obj.addProperty("App::PropertyEnumeration", "KerfCompensationDirection", "Task",   "Kerf compensation direction").KerfCompensationDirection = FC_KERF_DIRECTIONS
+        obj.KerfCompensationDirection = 0 # Positive compensation by default
+
+
         config = self.getConfigName(obj)
         obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
         obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
@@ -72,7 +75,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
                 obj.setEditorMode("PauseDuration", 0)
             else:
                 obj.setEditorMode("PauseDuration", 3)
-        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
     def getEdges(self, obj):
@@ -171,17 +173,19 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
     def createShape(self, obj, edges, planes, lineColor):
         # - Make path between objects on working planes
+        discretizationStep = obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5
         if len(edges) == 2:
-            (path_points, inverted) = makePathPointsByEdgesPair(edges[0], edges[1], planes, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
+            isLine = isStraitLine(edges[0]) and isStraitLine(edges[1])
+            (path_points, inverted, points_count) = makePathPointsByEdgesPair(edges[0], edges[1], planes, discretizationStep, isLine)
         elif len(edges) == 1:
-            (path_points, inverted) = makePathPointsByEdge(edges[0], planes, obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5)
+            (path_points, inverted, points_count) = makePathPointsByEdge(edges[0], planes, discretizationStep, isStraitLine(edges[0]))
         else:
             App.Console.PrintError("ERROR:\n Not supported number of edges.\n")
 
         # - Set data
         obj.Path_L       = [item for item in path_points[START]]
         obj.Path_R       = [item for item in path_points[END]]        
-        obj.PointsCount = int(len(path_points[START]))
+        obj.PointsCount  = points_count
         #
 
         obj.EdgesInverted = inverted

@@ -23,6 +23,8 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyLinkSub",     "LeftEdge",             "Edges",    "Left Edge").LeftEdge = edge_l
         obj.addProperty("App::PropertyLinkSub",     "RightEdge",            "Edges",    "Right Edge").RightEdge = edge_r
         
+        obj.setEditorMode("KerfCompensationDirection", 3)
+        
         obj.Proxy = self
         self.execute(obj)
 

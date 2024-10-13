@@ -22,7 +22,9 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
         super().__init__(obj, jobName)
         obj.Type = "Projection"
         obj.addProperty("App::PropertyLinkSub",     "Source",               "Data",         "Source object to project").Source = source
-                
+
+        obj.setEditorMode("KerfCompensationDirection", 3)
+        
         obj.Proxy = self
         self.execute(obj)
 

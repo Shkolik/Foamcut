@@ -50,8 +50,8 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyBool",       "DynamicWirePower",  "Wire",             "Dynamic wire power. " + 
                         "Power will vary depending on wire length. When enabling be sure that your controller set to Laser mode, " + 
                         "otherwise machine will halt for a brif moment after each move.").DynamicWirePower = getParameterBool("DynamicWirePower", False)
-
-        obj.addProperty("App::PropertyLength",     "KerfCompensation",      "", "", 5)  # - no used for now, and, probably, will not
+        obj.addProperty("App::PropertyLength",     "KerfCompensation",      "Wire",    "Kerf Compensation").KerfCompensation = getParameterFloat("KerfCompensation", 0.6)
+        
         obj.addProperty("App::PropertyLength",     "DiscretizationStep",   "GCODE",         "Discretization step").DiscretizationStep = 0.5
         obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = getParameterString("CutCommand", "G01 {Position} F{FeedRate} {WirePower}")
         obj.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",         "Command for move with cold wire").MoveCommand = getParameterString("MoveCommand", "G00 {Position} F{FeedRate}")
@@ -75,6 +75,7 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
+        
         pass 
         
 
