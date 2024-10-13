@@ -92,8 +92,7 @@ class Postprocess():
             power = max_power
 
         return power
-    
-    
+        
     def generateStartBlock(self, config, start_point):
         GCODE = ";*** FOAM BLOCK ***\r\n"
 
@@ -101,6 +100,7 @@ class Postprocess():
         GCODE += ";Length: {}\r\n".format(config.BlockLength)
         GCODE += ";Height: {}\r\n".format(config.BlockHeight)
 
+        GCODE += ";Position - Left-Bottom-Front corner\r\n"
         GCODE += ";Position.X: {}\r\n".format(config.BlockPosition.x)
         GCODE += ";Position.Y: {}\r\n".format(config.BlockPosition.y)
         GCODE += ";Position.Z: {}\r\n".format(config.BlockPosition.z)
@@ -111,7 +111,7 @@ class Postprocess():
             # - Homing
             GCODE += config.HomingCommand + "\r\n"
 
-            # - Initizlie position
+            # - Initialize position
             GCODE += config.InitPositionCommand.replace("{Position}",
                 self.generateTravelPosition(config,
                 config.HomingX1, config.HomingZ1, config.HomingX2, config.HomingZ2
@@ -163,7 +163,7 @@ class Postprocess():
         #     )
 
         # - Park R1
-        # GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+        GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
         return GCODE
 
     '''
@@ -177,229 +177,67 @@ class Postprocess():
         return GCODE
 
     '''
-    Make GCODE from enter element
+    Calculate dynamic power if needed and return gcode for command
     '''
-    def makeGCODEFromEnter(self, enter, reversed, config):
-        GCODE = ["; - Enter: [%s]\r\n" % enter.Label]
-
-        # out_start = None
-        # out_end   = None
-
-        # - Step over each point
-        for i in range(enter.PointsCount):
-            # - Get point index
-            index = enter.PointsCount - i - 1 if reversed else i
-
-            # - Move to entry point
-            if i == 0:
-                GCODE.append(self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-                    enter.Path_L[index].y, enter.SafeHeight, enter.Path_R[index].y, enter.SafeHeight))
-                
-            wirePowerCommand = ""
-            # - generate compensated wire power
-            if config.DynamicWirePower:
-                # - Calculate wire length
-                wire_length = enter.Path_L[index].distanceToPoint(enter.Path_R[index]);
-                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
-
-            # - Generate CUT travel command
-            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
-            enter.Path_L[index].y, enter.Path_L[index].z,
-            enter.Path_R[index].y, enter.Path_R[index].z,
-            ))
-
-        if enter.AddPause:
-            GCODE.append(self.generatePause(config.PauseCommand, enter.PauseDuration))
-
-            # # - Store start point
-            # if out_start is None: out_start = (enter.Path_L[index], enter.Path_R[index])
-
-            # # - Update end point
-            # out_end = (enter.Path_L[index], enter.Path_R[index])
-
-        return GCODE
-
-    '''
-    Make GCODE from exit element
-    '''
-    def makeGCODEFromExit(self, exit, config):
-        GCODE = ["; - Exit [%s]\r\n" % exit.Label]
-
-         # - Step over each point
-        for i in range(exit.PointsCount):
-            # - Get point index
-            index = exit.PointsCount - i - 1 if reversed else i
-                
-            wirePowerCommand = ""
-            # - generate compensated wire power
-            if config.DynamicWirePower:
-                # - Calculate wire length
-                wire_length = exit.Path_L[index].distanceToPoint(exit.Path_R[index]);
-                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
-
-            # - Generate CUT travel command
-            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
-            exit.Path_L[index].y, exit.Path_L[index].z,
-            exit.Path_R[index].y, exit.Path_R[index].z,
-            ))
-
-        
-        if exit.AddPause:
-            GCODE.append(self.generatePause(config.PauseCommand, exit.PauseDuration))
-
-        return GCODE
-
-    '''
-    Make GCODE from path element
-    '''
-    def makeGCODEFromPath(self, path, reversed, config):
-        GCODE     = ["; - Path [%s]\r\n" % path.Label]
-        out_start = None
-        out_end   = None
-
-        # - Step over each point
-        for i in range(path.PointsCount):
-            # - Get point index
-            index = path.PointsCount - i - 1 if reversed else i
-
-            wirePowerCommand = ""
-            # - generate compensated wire power
-            if config.DynamicWirePower:
-                # - Calculate wire length
-                wire_length = path.Path_L[index].distanceToPoint(path.Path_R[index]);
-                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
-
-            # - Generate CUT travel command
-            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
-            path.Path_L[index].y, path.Path_L[index].z,
-            path.Path_R[index].y, path.Path_R[index].z,
-            ))
-
-            # - Store start point
-            if out_start is None: out_start = (path.Path_L[index], path.Path_R[index])
-
-        if path.AddPause:
-            print("{}: pause: {}".format(path.Name, path.PauseDuration))
-            pause = self.generatePause(config.PauseCommand, path.PauseDuration)
-            print(pause)
-            GCODE.append(pause)
-
-        return (out_start, GCODE)
-
-    '''
-    Make GCODE from move element
-    '''
-    def makeGCODEFromMove(self, move, reversed, config):
-        GCODE = ["; - Move [%s] :: %s\r\n" % (move.Label, "S < E" if reversed else "S > E")]
-
-        # - Step over each point
-        for i in range(move.PointsCount):
-            # - Get point index
-            index = move.PointsCount - i - 1 if reversed else i
-
-            wirePowerCommand = ""
-            # - generate compensated wire power
-            if config.DynamicWirePower:
-                # - Calculate wire length
-                wire_length = move.Path_L[index].distanceToPoint(move.Path_R[index]);
-                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
-
-            # - Generate CUT travel command
-            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
-            move.Path_L[index].y, move.Path_L[index].z,
-            move.Path_R[index].y, move.Path_R[index].z,
-            ))
-
-        if move.AddPause:
-            GCODE.append(self.generatePause(config.PauseCommand, move.PauseDuration))
-
-        return GCODE
+    def getDynamicWirePowerCommand(self, point1, point2, config):
+        wirePowerCommand = ""
+        # - generate compensated wire power
+        if config.DynamicWirePower:
+            # - Calculate wire length
+            wire_length = point1.distanceToPoint(point2);
+            wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
+        return wirePowerCommand
     
-    '''
-    Make GCODE from join element
-    '''
-    def makeGCODEFromJoin(self, move, reversed, config):
-        GCODE = ["; - Join [%s] :: %s\r\n" % (move.Label, "S < E" if reversed else "S > E")]
-
-         # - Step over each point
-        for i in range(move.PointsCount):
-            # - Get point index
-            index = move.PointsCount - i - 1 if reversed else i
-
-            wirePowerCommand = ""
-            # - generate compensated wire power
-            if config.DynamicWirePower:
-                # - Calculate wire length
-                wire_length = move.Path_L[index].distanceToPoint(move.Path_R[index]);
-                wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
-
-            # - Generate CUT travel command
-            GCODE.append(self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
-            move.Path_L[index].y, move.Path_L[index].z,
-            move.Path_R[index].y, move.Path_R[index].z,
-            ))
-
-        if move.AddPause:
-            GCODE.append(self.generatePause(config.PauseCommand, move.PauseDuration))
-
-        return GCODE
-
     '''
     Generate GCODE from route
     '''
     def makeGCODE(self, route_list, config):
-        # - Check routes type
-        for route in route_list:
-            if not hasattr(route, "Type") or (route.Type != "Route"):
-                print ("ERROR: Not supported input")
-                return
-
-        start_point = None
-        end_point   = None
-
+        
         # - Task GCODE buffer
         TASK = [";\r\n", "; *** TASK BLOCK ***\r\n"]
-
+        start_point = None
         # - Wal all routes
         for route in route_list:
             TASK += [";\r\n", "; --- Route begin [%s] ---\r\n" % route.Label]
 
-            # - Walk throug all route elemets
+            point_index = 0
+
+            # - Store first point as start point
+            if start_point is None: 
+                start_point = (route.Offset_L[0], route.Offset_R[0])
+
             for i in range(len(route.Data)):                                
                 # - Access item
-                item = route.Data[i]
+                object_index = route.Data[i]
 
-                object = route.Objects[item]
-                reversed = route.DataDirection[i]
+                object = route.Objects[object_index]
 
-                # - This is a Path
-                if object.Type == "Path" or object.Type == "Projection":
-                    
-                    # - Make GCODE from path
-                    (start, text) = self.makeGCODEFromPath(object, reversed, config)
-                    TASK += text
-
-                    # - Store first point as start point
-                    if start_point is None: start_point = start
-
-                elif object.Type == "Move":
-                    # - Make GCODE from move
-                    TASK += self.makeGCODEFromMove(object, reversed, config)
-
-                # - This is a Rotation
-                elif object.Type == "Rotation":
-                    # - Make GCODE from rotation
+                if object.Type == "Rotation": # - Make GCODE from rotation
                     TASK += self.makeGCODEFromRotation(object, config)
+                else:
+                    addPause = object.AddPause if hasattr(object, "AddPause") else False
+                    duration = object.PauseDuration if hasattr(object, "PauseDuration") else 0
 
-                elif object.Type == "Enter":
-                    TASK += self.makeGCODEFromEnter(object, reversed, config)
+                    TASK += ["; - %s [%s]\r\n" % (object.Type, object.Label)]
 
-                elif object.Type == "Exit":
-                    TASK += self.makeGCODEFromExit(object, config)
+                    points_count = object.PointsCount if i == 0 else object.PointsCount - 1
+                    # - Step over each point
+                    for _ in range(points_count):
+                        point_l = route.Offset_L[point_index]
+                        point_r = route.Offset_R[point_index]
 
-                elif object.Type == "Join":
-                    TASK += self.makeGCODEFromJoin(object, reversed, config)
-                
+                        wirePowerCommand = self.getDynamicWirePowerCommand(point_l, point_r, config)
+                        
+                        # - Generate CUT travel command
+                        TASK += self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
+                        point_l.y, point_l.z, point_r.y, point_r.z, )
+
+                        if addPause and duration > 0:
+                            TASK += self.generatePause(config.PauseCommand, duration)
+                        
+                        # - Increase point index
+                        point_index += 1
+               
 
             TASK += ["; --- Route end [%s] ---\r\n" % route.Label, ";\r\n"]
 
@@ -434,48 +272,59 @@ class Postprocess():
                 "ToolTip" : "Generate GCODE file from selected route"}
 
     def Activated(self):
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        if group is not None and group.Type == "Job":     
-            # - Get CNC configuration
-            config = FreeCAD.ActiveDocument.getObject(group.ConfigName)
+        # - Get selecttion
+        routes = [item.Object for item in Gui.Selection.getSelectionEx()]
+        
+        job_name = routes[0].JobName
 
-            # - Get selecttion
-            routes = [item.Object for item in Gui.Selection.getSelectionEx()]
-            
-            hasError = False
-            for route in routes:
-                route.touch()
-                route.recompute()
-                if route.Error is not None and len(route.Error) > 0:
-                    print(route.Error)
-                    hasError = True
-                    break
+        group = FreeCAD.ActiveDocument.getObject(job_name)
+        if group is None:
+            PySide.QtGui.QMessageBox.critical(None, "Job not found.", "Job [{}] not found in active document.".format(job_name))
+            return
+        
+        # - Get CNC configuration
+        config = FreeCAD.ActiveDocument.getObject(group.ConfigName)
 
-            if hasError:
-                PySide.QtGui.QMessageBox.critical(None, "Error generating Gcode", "Route data is incorrect. Check Selected routes.")
-            else:
-                self.makeGCODE(routes, config)
+        # - Check routes type
+        for route in routes:
+            if not hasattr(route, "Type") or (route.Type != "Route"):
+                PySide.QtGui.QMessageBox.critical(None, "Error generating Gcode", "Object type not supported. Check Selected objects.")
+        
+        hasError = False
+        for route in routes:
+            if route.Error is not None and len(route.Error) > 0:
+                print(route.Error)
+                hasError = True
+                break
 
-            App.ActiveDocument.recompute()
+        if hasError:
+            PySide.QtGui.QMessageBox.critical(None, "Error generating Gcode", "Route data is incorrect. Check Selected routes.")
+        else:
+            self.makeGCODE(routes, config)
+
+        App.ActiveDocument.recompute()
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
         else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-            if group is not None and group.Type == "Job":
-                # - Get selecttion
-                routes = [item.Object for item in Gui.Selection.getSelectionEx()]
+            # - Get selecttion
+            routes = [item.Object for item in Gui.Selection.getSelectionEx()]
 
-                # - nothing selected
-                if len(routes) == 0:
+            # - nothing selected
+            if len(routes) == 0:
+                return False
+            
+            # - Check types
+            for route in routes:
+                if not hasattr(route, "Type") or (route.Type != "Route"):
                     return False
                 
-                # - Check types
-                for route in routes:
-                    if not hasattr(route, "Type") or (route.Type != "Route"):
-                        return False
-                return True
-            return False
+            job_name = routes[0].JobName
+            for  route in routes:
+                if route.JobName != job_name:
+                    return False
+                
+            return True
             
 Gui.addCommand("MakeGcode", Postprocess())
