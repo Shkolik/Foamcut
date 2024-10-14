@@ -711,10 +711,10 @@ class MakeRoute():
     """Make Route"""
 
     def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("route.svg"), # the name of a svg file available in the resources
+        return {"Pixmap"  : utilities.getIconPath("route.svg"),
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Create a route",
-                "ToolTip" : "Create a route from selected paths"}
+                "ToolTip" : "Create a route from selected objects."}
 
     def Activated(self): 
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")

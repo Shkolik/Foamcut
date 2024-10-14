@@ -61,7 +61,7 @@ class MakeProjection():
         return {"Pixmap"  : utilities.getIconPath("projection.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Create Projection",
-                "ToolTip" : "Create projection object from selected edge or vertex"}
+                "ToolTip" : "Create projection object from selected face, edge or vertex. Separate projection will be created for each edge or vertex."}
 
     def CreateFromEdge(self, edge, group):
         obj = group.newObject("Part::FeaturePython","Projection")

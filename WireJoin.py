@@ -79,7 +79,7 @@ class MakeJoin():
         return {"Pixmap"  : utilities.getIconPath("join.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Join 2 points",
-                "ToolTip" : "Join 2 selected coplanar points"}
+                "ToolTip" : "Join 2 selected points"}
 
     def Activated(self):         
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")

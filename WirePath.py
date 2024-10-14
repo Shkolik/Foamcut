@@ -58,7 +58,7 @@ class MakePath():
         return {"Pixmap"  : utilities.getIconPath("path.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Create path",
-                "ToolTip" : "Create path object from 2 selected opposite edges"}
+                "ToolTip" : "Create path object from 2 selected opposite edges or faces. If 2 faces selected, separate path will be created for each edge pair."}
 
     def CreateFromEdges(self, edges, group):
         obj = group.newObject("Part::FeaturePython","Path")

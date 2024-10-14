@@ -66,7 +66,7 @@ class AddRotation():
         return {"Pixmap"  : utilities.getIconPath("rotation.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Rotate target",
-                "ToolTip" : "Rotate target object by given angle"}
+                "ToolTip" : "Rotate target object by given angle around rotation axis"}
 
     def Activated(self):   
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
