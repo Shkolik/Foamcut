@@ -50,7 +50,7 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
             self.createShape(obj, edges, wp, (0, 255, 0))
 
 
-class WireEnterVP(FoamCutViewProviders.FoamCutBaseViewProvider):
+class WireEnterVP(FoamCutViewProviders.FoamCutMovementViewProvider):
     def getIcon(self):
         return utilities.getIconPath("enter.svg")
     

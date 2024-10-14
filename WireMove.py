@@ -55,7 +55,7 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         
         self.createShape(obj, edges, wp, (35, 169, 205))
 
-class WireMoveVP(FoamCutViewProviders.FoamCutBaseViewProvider):     
+class WireMoveVP(FoamCutViewProviders.FoamCutMovementViewProvider):     
     def getIcon(self):
         return utilities.getIconPath("move.svg")
 

@@ -19,10 +19,6 @@ class FoamCutBaseObject:
         if hasattr(obj, "Placement"):
             obj.setEditorMode("Placement", 3)
 
-    def onChanged(self, obj, prop):
-        # FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
-
     def getConfigName(self, obj):
         job = App.ActiveDocument.getObject(obj.JobName)
 
@@ -58,7 +54,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         
         obj.addProperty("App::PropertyBool",        "AddPause",             "Task", "Add pause at the end of move").AddPause = False
         obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
-        obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Task", "Show projection lines between planes").ShowProjectionLines = False
         obj.addProperty("App::PropertyEnumeration", "KerfCompensationDirection", "Task",   "Kerf compensation direction").KerfCompensationDirection = FC_KERF_DIRECTIONS
         obj.KerfCompensationDirection = 0 # Positive compensation by default
 
@@ -234,10 +229,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         
         for edge in edges:
             shapes.append(edge)
-        
-        if obj.ShowProjectionLines:
-            shapes.append(Part.makeLine(obj.Path_L[START] , obj.Path_R[START]))
-            shapes.append(Part.makeLine(obj.Path_L[END] , obj.Path_R[END] ))
         
         obj.Shape = Part.makeCompound(shapes)
         obj.ViewObject.LineColor = lineColor

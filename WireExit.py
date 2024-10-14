@@ -48,7 +48,7 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
             
             self.createShape(obj, edges, wp, (255, 0, 0))
         
-class WireExitVP(FoamCutViewProviders.FoamCutBaseViewProvider):    
+class WireExitVP(FoamCutViewProviders.FoamCutMovementViewProvider):    
     def getIcon(self):        
         return utilities.getIconPath("exit.svg")
 

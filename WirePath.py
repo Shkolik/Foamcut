@@ -40,7 +40,8 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
         
         self.createShape(obj, [leftEdge, rightEdge], wp, (0, 0, 0))
 
-class PathSectionVP(FoamCutViewProviders.FoamCutBaseViewProvider): 
+class PathSectionVP(FoamCutViewProviders.FoamCutMovementViewProvider): 
+    
     def getIcon(self):
         return utilities.getIconPath("path.svg")
 

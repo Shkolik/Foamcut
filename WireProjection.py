@@ -45,7 +45,7 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
         self.createShape(obj, [source], wp, (0, 0, 0))
                 
 
-class ProjectionSectionVP(FoamCutViewProviders.FoamCutBaseViewProvider):     
+class ProjectionSectionVP(FoamCutViewProviders.FoamCutMovementViewProvider):     
     def getIcon(self):
         return utilities.getIconPath("projection.svg")
 

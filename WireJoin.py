@@ -61,7 +61,7 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         
         self.createShape(obj, edges, wp, (35, 0, 205))
 
-class WireJoinVP(FoamCutViewProviders.FoamCutBaseViewProvider):
+class WireJoinVP(FoamCutViewProviders.FoamCutMovementViewProvider):
     def getIcon(self):
         return utilities.getIconPath("join.svg")
 
