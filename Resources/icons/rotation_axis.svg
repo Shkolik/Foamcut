@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   version="1.0"
+   width="48pt"
+   height="48pt"
+   viewBox="0 0 48 48"
+   preserveAspectRatio="xMidYMid"
+   id="svg1"
+   sodipodi:docname="rotation_axis.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1">
+    <marker
+       style="overflow:visible"
+       id="Triangle"
+       refX="-1"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Triangle arrow"
+       markerWidth="0.40000001"
+       markerHeight="0.40000001"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:0.5pt"
+         d="M 2.885,0 -1.44,2.5 v -5 z"
+         id="path135" />
+    </marker>
+    <inkscape:path-effect
+       effect="bspline"
+       id="path-effect1"
+       is_visible="true"
+       lpeversion="1.3"
+       weight="33.333333"
+       steps="2"
+       helper_size="0"
+       apply_no_weight="true"
+       apply_with_weight="true"
+       only_selected="false"
+       uniform="false" />
+    <marker
+       style="overflow:visible"
+       id="Triangle-7"
+       refX="-1"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Triangle arrow"
+       markerWidth="0.40000001"
+       markerHeight="0.40000001"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:0.5pt"
+         d="M 2.885,0 -1.44,2.5 v -5 z"
+         id="path135-1" />
+    </marker>
+  </defs>
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="pt"
+     inkscape:zoom="14.766378"
+     inkscape:cx="20.451867"
+     inkscape:cy="29.69584"
+     inkscape:window-width="2400"
+     inkscape:window-height="1261"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <path
+     style="fill:none;stroke:#2514eb;stroke-width:5.98703;stroke-linejoin:round;stroke-dasharray:none;marker-start:url(#Triangle-7)"
+     d="M 7.8981088,21.907578 C 5.4727827,19.734809 4.2107626,17.198573 4.6869198,14.813875 5.63924,10.044476 13.183631,7.6873002 21.537801,9.5489747 25.714883,10.47981 26.750132,10.837718 29.175458,13.01049"
+     id="path3-5"
+     sodipodi:nodetypes="cssc" />
+  <path
+     style="fill:#ffff00;stroke:#ebcd14;stroke-width:2.06477;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+     d="M 7.1107485,14.577035 C 7.1446092,10.192073 7.1784699,5.8071112 7.2123306,1.4221497"
+     id="path1"
+     inkscape:path-effect="#path-effect1"
+     inkscape:original-d="M 7.1107485,14.577035 C 7.1446092,10.192073 7.1784699,5.8071112 7.2123306,1.4221497"
+     transform="matrix(3.3849756,0,0,3.6192308,-0.12179581,-4.8774082)" />
+  <path
+     style="fill:none;stroke:#2514eb;stroke-width:5.98703;stroke-linejoin:round;stroke-dasharray:none;marker-start:url(#Triangle)"
+     d="m 39.425989,22.92377 c 2.425326,2.17277 3.687346,4.709005 3.211189,7.093704 -0.95232,4.769399 -8.496711,7.126574 -16.850879,5.2649 -4.177083,-0.930836 -5.212332,-1.288743 -7.63766,-3.461516"
+     id="path3"
+     sodipodi:nodetypes="cssc" />
+</svg>

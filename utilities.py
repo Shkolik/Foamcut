@@ -6,6 +6,7 @@ __license__ = "LGPL 2.1"
 __doc__ = "Foamcut workbench utilities common to all tools."
 
 import FreeCAD
+App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 import Part
@@ -22,6 +23,7 @@ FC_TYPES = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join", "
 FC_TYPES_TO_ROUTE = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join"]
 
 FC_KERF_DIRECTIONS = ["Positive", "None", "Negative"]
+FC_TIME_UNITS = ["Seconds", "Milliseconds"]
 
 '''
     Returns the current module path.
@@ -395,3 +397,19 @@ def setPickStyle(viewprovider, style):
     node = getPickStyleNode(viewprovider, create = style != 0)
     if node is not None:
         return node.style.setValue(style)
+    
+def createRotationAxis(machine, config):
+    if machine.getObject("RotationAxis") is None:
+        RotationAxis = machine.newObject("Part::Line","RotationAxis")
+        RotationAxis.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
+        RotationAxis.X1 = 0
+        RotationAxis.setExpression(".Y1", u"<<{}>>.OriginRotationX".format(config.Name))
+        RotationAxis.Z1 = 0
+        RotationAxis.X2 = 0
+        RotationAxis.setExpression(".Y2", u"<<{}>>.OriginRotationX".format(config.Name))
+        RotationAxis.setExpression(".Z2", u"<<{}>>.VerticalTravel + 50mm".format(config.Name))
+        RotationAxis.Placement = App.Placement(App.Vector(0.00,0.00,0.00),App.Rotation(App.Vector(0.00,0.00,1.00),0.00))
+        RotationAxis.ViewObject.PointSize = 0
+        RotationAxis.ViewObject.Transparency = 70
+        RotationAxis.ViewObject.LineColor = (1.0, 0.886, 0.023)
+        RotationAxis.Label = "Rotation Axis"

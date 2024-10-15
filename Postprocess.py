@@ -111,34 +111,35 @@ class Postprocess():
             # - Homing
             GCODE += config.HomingCommand + "\r\n"
 
-            # - Initialize position
-            GCODE += config.InitPositionCommand.replace("{Position}",
-                self.generateTravelPosition(config,
+            initPosCommand = self.generateTravelPosition(config,
                 config.HomingX1, config.HomingZ1, config.HomingX2, config.HomingZ2
-                ) + " " +
-                self.generateRotationPosition(config,
-                config.HomingR1
                 )
-            ) + "\r\n"
+            
+            if config.FiveAxisMachine:
+                initPosCommand += " " + self.generateRotationPosition(config, config.HomingR1 )
 
-        # - Park
-        #GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-        #    config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
-        #    )
-        #GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+            # - Initialize position
+            GCODE += config.InitPositionCommand.replace("{Position}", initPosCommand ) + "\r\n"
 
-        # - Go to start point on parking Z
+        if config.EnableParking:
+            # - Park
+            GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+               config.ParkX, config.ParkZ, config.ParkX, config.ParkZ )
+            if config.FiveAxisMachine:
+                GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+
+        # - Go to start point on parking Z if parking enabled
         if start_point is not None:
             start_L, start_R = start_point
-        #    GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-        #    start_L.y, config.ParkZ, start_R.y, config.ParkZ
-        #    )
+            if config.EnableParking:
+                GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+                start_L.y, config.ParkZ, start_R.y, config.ParkZ)
 
         wirePower = config.WireMinPower
         # - generate compensated wire power
         if config.DynamicWirePower:
             # - Calculate wire length
-            wire_length = start_L.distanceToPoint(start_R);
+            wire_length = start_L.distanceToPoint(start_R)
             wirePower = self.generateWireCompensatedPower(config, wire_length)
 
         # - Enable wire
@@ -150,20 +151,21 @@ class Postprocess():
         GCODE = "; *** END BLOCK ***\r\n"
 
         # - Up wire at current position to park height
-        #up_posistion  = "%s%.2f %s%.2f" % (config.Z1AxisName, config.ParkZ, config.Z2AxisName, config.ParkZ)
-        #feed_rate     = config.FeedRateMove
-        #GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
+        if config.EnableParking:
+            up_posistion  = "%s%.2f %s%.2f" % (config.Z1AxisName, config.ParkZ, config.Z2AxisName, config.ParkZ)
+            feed_rate     = config.FeedRateMove
+            GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
 
         # - Disable wire
         GCODE += self.generateWireDisable(config)
 
         # - Park XZ
-        # GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-        #     config.ParkX, config.ParkZ, config.ParkX, config.ParkZ
-        #     )
-
-        # - Park R1
-        GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+        if config.EnableParking:
+            GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
+                config.ParkX, config.ParkZ, config.ParkX, config.ParkZ )
+            # - Park R1
+            if config.FiveAxisMachine:
+                GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
         return GCODE
 
     '''
@@ -233,6 +235,8 @@ class Postprocess():
                         point_l.y, point_l.z, point_r.y, point_r.z, )
 
                         if addPause and duration > 0:
+                            if config.TimeUnits == 1: #["Seconds", "Milliseconds"]
+                                duration = duration * 1000
                             TASK += self.generatePause(config.PauseCommand, duration)
                         
                         # - Increase point index

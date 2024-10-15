@@ -102,6 +102,12 @@ class AddRotation():
                 group = App.ActiveDocument.getObject("Job")
 
             if group is not None and group.Type == "Job":
+
+                config = group.getObject(group.ConfigName)
+
+                if not config.FiveAxisMachine:
+                    return False
+                
                 # - Get selecttion
                 selection = Gui.Selection.getSelectionEx()
 
