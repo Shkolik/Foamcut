@@ -35,7 +35,10 @@ When you restart FreeCAD, "FoamCut" workbench should now show up in the [workben
 
 ## Video Tutorial
 
-For now only old tutorial available (using macro), but workflow is the same (in Russian).
+Quick workflow example:
+[FoamCut workflow](https://youtu.be/15t2KHbIPVY)
+
+Old tutorials (using macro), but workflow is the same (in Russian).
 [ЧПУ пенорезка на 5 осей. Подготовка задания в FreeCAD.](https://youtu.be/TuBmqCTIS20?si=CNeAytixMs9086Nn) 
 
 ## Example file
@@ -120,8 +123,7 @@ Mirror selected GCODE file around YZ plane. Useful for cutting symmetrical piece
  - many more I forgot for sure ;) 
  
 ## Discussion
-Please offer feedback or connect with the developer via the [dedicated FreeCAD forum thread].
-Will be added soon
+Please offer feedback or connect with the developer via the [dedicated FreeCAD forum thread](https://forum.freecad.org/viewtopic.php?style=10&t=91419).
 
 ## License
 GNU Lesser General Public License v2.1
