@@ -106,7 +106,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         isLeft = False
 
-        # get edges or vertexes on object we cut from parent action (move, join, path...)
+        # get edges or vertices on object we cut from parent action (move, join, path...)
         (left, right) = self.getEdges(parent)
 
         if onPlane:

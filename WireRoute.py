@@ -3,7 +3,7 @@
 __title__ = "Create Route"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
-__doc__ = "Create a route from selected pathes."
+__doc__ = "Create a route from selected paths."
 __usage__ = """Select multiple paths in order of cutting and activate tool."""
 
 import FreeCAD
@@ -91,7 +91,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 route_data.append(item_index - 1)
                 route_data_dir.append(False)
 
-                # - Check is rotation is firts element
+                # - Check is rotation is first element
                 if item_index == 1:
                     # - Do not skip next element
                     first = second
@@ -286,7 +286,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     if off == None:
                         App.Console.PrintError("ERROR: LEFT OFFSET Something wrong near point: {}; idx: {}".format(intersections_L[i], i))
                     
-                    # - discretize wire so it will have same count of vertexes as source wire
+                    # - discretize wire so it will have same count of vertices as source wire
                     firstWirePoints = self.getWirepoints(off[0], points_count[i])
                     for pi in range(len(firstWirePoints) - 1):
                         resultPoints_L.append(firstWirePoints[pi])
@@ -307,7 +307,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     if off == None:
                         print("ERROR: RIGHT OFFSET Something wrong near point: {}; idx: {}".format(intersections_R[i], i))
                     
-                    # - discretize wire so it will have same count of vertexes as source wire
+                    # - discretize wire so it will have same count of vertices as source wire
                     firstWirePoints = self.getWirepoints(off[0], points_count[i])
                     for pi in range(len(firstWirePoints) - 1):
                         resultPoints_R.append(firstWirePoints[pi])
@@ -357,7 +357,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.Redraw += 1 #change of this property will trigger VP to redraw
 
     ''' 
-        reate wire from list of points
+        Create wire from list of points
     '''
     def makeWire(self, points):
         edges = []
@@ -367,7 +367,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
     '''
         create offset wire
-        @param wire - source wire (should be strait line, only start and end vertexes will be used)
+        @param wire - source wire (should be strait line, only start and end vertices will be used)
         @param offset - distance to offset, where: negative - offset to the left; 0 - no offset; positive - offset to the right.
         
         @return offset wire
@@ -452,7 +452,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 #If one wire has high curvature (is arc or circle, or even spline) we can get 2 or more points of intersection.
                 return (v1, 2)
             else:
-                # TODO: most likelly need to check what edges to extend to the intersection point. 90% of time it will be last and first edges.
+                # TODO: most likely need to check what edges to extend to the intersection point. 90% of time it will be last and first edges.
                 # wires not intersect, so calculate intersection by using first wire last edge and second wire first edge
                 L1_end = wire1.Edges[-1]
                 L2_start = wire2.Edges[0]
@@ -491,7 +491,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             wire2 = None
             # check if intersection is on line or outside for L1 offset
             (topo1, index1, param1, topo2, index2, param2) = infos1[0]
-            # intersection is ouside. We need to add ane more edge to offset
+            # intersection is outside. We need to add one more edge to offset
             if dist1 > 0 and topo2 == "Vertex": 
                 points = [v.Point for v in o1_wire.Vertexes] + [point] 
                 wire1 = self.makeWire(points)
@@ -499,7 +499,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 wire1 = self.trimWireEnd(o1_wire, index2, point)
             
             (topo1, index1, param1, topo2, index2, param2) = infos2[0]
-            # intersection is ouside. We need to add ane more edge to offset
+            # intersection is outside. We need to add one more edge to offset
             if dist1 > 0 and topo2 == "Vertex": 
                 points = [point] + [v.Point for v in o2_wire.Vertexes]
                 wire2 = self.makeWire(points)
@@ -526,7 +526,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         @return new wire, where point is it's last vertex
     '''
     def trimWireEnd(self, wire, index, point):
-        # no edges to trim - create new one fron wire start point and point of intersection
+        # no edges to trim - create new one from wire start point and point of intersection
         if index == 0:
             return Part.Wire(Part.LineSegment(wire.Edges[0].firstVertex().Point, point).toShape())
         
@@ -609,7 +609,7 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
             group.addChild(draw_style)
             group.addChild(color)
 
-            # points is array of pauses each item is also array, where first element is poin coordinates and second is pause duration
+            # points is array of pauses each item is also array, where first element is point coordinates and second is pause duration
             for i in range(len(points)):
                 sep = coin.SoSeparator()                
                

@@ -54,7 +54,7 @@ Creates path by 2 given opposite edges. Opposite faces also supported - command 
 ![Path example](Examples/Path.png)
 
 ### ![projectionIcon](./Resources/icons/projection.svg) Create projection
-Creates projection path from selected single edge, multiple edges or face. Projection is basicaly emulation of 2 axis macine with 4 axis. Can be used for preparing foam blocks, cutting "hershi-bar" wings or decorative signs.
+Creates projection path from selected single edge, multiple edges or face. Projection is basically emulation of 2 axis macine with 4 axis. Can be used for preparing foam blocks, cutting "hershi-bar" wings or decorative signs.
 Projection and Path objects cannot be mixed in a same route. Command will create projection for each edge. 
 
 ![Projection example](Examples/Projection.png)
@@ -65,7 +65,7 @@ Creates path from selected vertex in specified direction
 ![Move example](Examples/Move.png)
 
 ### ![joinIcon](./Resources/icons/join.svg) Join
-Creates path between 2 selected vertexes
+Creates path between 2 selected vertices
 
 ![Join example](Examples/Join.png)
 
@@ -94,7 +94,7 @@ Kerf compensation currently supported and kerf direction can be specified for ea
 Generates Gcode and save it to the specified file
 
 ### ![gcodeIcon](./Resources/icons/mirrorgcode.svg) Mirror Gcode
-Mirror selected GCODE file around YZ plane. Usefull for cutting symetrical pieces like wing consoles. At the moment there is no validation or changing metadata in resulted files - be carefull using this command.
+Mirror selected GCODE file around YZ plane. Useful for cutting symmetrical pieces like wing consoles. At the moment there is no validation or changing metadata in resulted files - be careful using this command.
 
 ## Limitations/TODO
 
@@ -114,7 +114,7 @@ Mirror selected GCODE file around YZ plane. Usefull for cutting symetrical piece
  - ~~Edge projection normal to the working plane~~ DONE
  - ~~Toggle projection lines~~ DONE
  - ~~Add package.xml~~ DONE
- - Automaticaly place model inside machine and create foam block around it. Right now it's recommended to create a parametric copy of your model (like Draft.Clone) after placing model where you want, to reset model placement.
+ - Automatically place model inside machine and create foam block around it. Right now it's recommended to create a parametric copy of your model (like Draft.Clone) after placing model where you want, to reset model placement.
  - Add video tutorial
  - Add examples
  - many more I forgot for sure ;) 

@@ -128,7 +128,7 @@ class MakePath():
             for object in objects:
                 if object[1][0].startswith("Face"):
                     # - prepare base object. 
-                    # - Sometimes, after reopening file it is nessesary to recompute em or list of edges will be empty
+                    # - Sometimes, after reopening file it is necessary to recompute em or list of edges will be empty
                     if object[0].Name not in baseObjects:
                         object[0].touch()
                         baseObjects.append(object[0].Name)

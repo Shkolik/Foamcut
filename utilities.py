@@ -135,7 +135,7 @@ def isCommonPoint(first, second):
     return True if first.distanceToPoint(second) < 0.01 else False
   
 '''
-    Calculates distance between 2 vertexes in 3d space
+    Calculates distance between 2 vertices in 3d space
     @param v1 - Vertex 1
     @param v2 - Vertex 2
 '''
@@ -143,9 +143,9 @@ def distanceToVertex(v1, v2):
     return sqrt((v2.X - v1.X)**2 + (v2.Y - v1.Y)**2 + (v2.Z - v1.Z)**2) 
 
 '''
-  Synchronize direction of two edges using their end vertexes
+  Synchronize direction of two edges using their end vertices
   Sometimes it can produce wrong result (for example for heavy sweeped wing where tip leading edge past root trailing edge)
-  Take it into account and check if reversing one set of vertexes produce shortest line when projecting to working planes
+  Take it into account and check if reversing one set of vertices produce shortest line when projecting to working planes
   @return (vertex00, vertex01, vertex10, vertex11)
 '''
 def getSynchronizedVertices(first, second):
@@ -181,7 +181,7 @@ def intersectLineAndPlane(v0, v1, plane):
 '''
     Get Config object by it's name
     @param config - Config object name
-    @retuns Config
+    @returns Config
 '''
 def getConfigByName(config):
     if config is None or len(config) == 0:
@@ -248,7 +248,7 @@ def makePathByPointSets(first, second, planes, projection = False):
     else: 
         pathsLength = []
         
-        # try inverted edge only if we are working with edges, not with vertexes
+        # try inverted edge only if we are working with edges, not with vertices
         examineLength = len(first) > 1 and  len(second) > 1 and not projection
 
         # - Intersect line by each point pair and each plane
