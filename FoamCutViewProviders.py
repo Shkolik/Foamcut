@@ -40,8 +40,6 @@ class FoamCutMovementViewProvider(FoamCutBaseViewProvider):
         obj.RootNode.addChild(self.projection)      
 
     def drawProjections(self):
-        print("drawProjections from {}".format(self.ViewObject)) 
-
         if not hasattr(self.ViewObject, "ShowProjectionLines") or not hasattr(self.Object, "Path_L") or not hasattr(self.Object, "Path_R"):            
             return
 
