@@ -14,7 +14,7 @@ import Part
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, isCommonPoint
+from utilities import getWorkingPlanes, getAllSelectedObjects, isCommonPoint
 
 class WireMove(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, jobName):     
@@ -46,12 +46,12 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         edges = []
 
         if isCommonPoint(vertex, oppositeVertex):
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertexToVector(vertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point))
         else:
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertexToVector(vertex)) if isLeft                      \
-                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), vertexToVector(oppositeVertex)))
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertexToVector(vertex)) if not isLeft                  \
-                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), vertexToVector(oppositeVertex)))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if isLeft                      \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if not isLeft                  \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
         
         self.createShape(obj, edges, wp, (35, 169, 205))
 

@@ -14,7 +14,7 @@ import Part
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import getWorkingPlanes, vertexToVector, getAllSelectedObjects, isCommonPoint
+from utilities import getWorkingPlanes, getAllSelectedObjects, isCommonPoint
 
 
 class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
@@ -42,10 +42,10 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
             edges = []
 
             if isCommonPoint(vertex, oppositeVertex):
-                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)))
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertex.Point))
             else:
-                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
-                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertexToVector(vertex)) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), vertexToVector(oppositeVertex)))
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertex.Point) if isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), oppositeVertex.Point))
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y, obj.SafeHeight), vertex.Point) if not isLeft else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y, obj.SafeHeight), oppositeVertex.Point))
             
             self.createShape(obj, edges, wp, (0, 255, 0))
 

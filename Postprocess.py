@@ -10,8 +10,6 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
-import PySide
-from PySide import QtCore
 from PySide import QtGui
 import utilities
 import os
@@ -253,7 +251,7 @@ class Postprocess():
 
         print ("GCODE generated")
 
-        dialog = PySide.QtGui.QFileDialog()
+        dialog = QtGui.QFileDialog()
         lastDir = dialog.directory().absolutePath()
         # - Open save file dialog
         save_path, save_filter = dialog.getSaveFileName(None, "Save GCODE", os.path.join(lastDir, route_list[0].Label), "*.gcode") # PySide
@@ -283,7 +281,7 @@ class Postprocess():
 
         group = FreeCAD.ActiveDocument.getObject(job_name)
         if group is None:
-            PySide.QtGui.QMessageBox.critical(None, "Job not found.", "Job [{}] not found in active document.".format(job_name))
+            QtGui.QMessageBox.critical(None, "Job not found.", "Job [{}] not found in active document.".format(job_name))
             return
         
         # - Get CNC configuration
@@ -292,7 +290,7 @@ class Postprocess():
         # - Check routes type
         for route in routes:
             if not hasattr(route, "Type") or (route.Type != "Route"):
-                PySide.QtGui.QMessageBox.critical(None, "Error generating Gcode", "Object type not supported. Check Selected objects.")
+                QtGui.QMessageBox.critical(None, "Error generating Gcode", "Object type not supported. Check Selected objects.")
         
         hasError = False
         for route in routes:
@@ -302,7 +300,7 @@ class Postprocess():
                 break
 
         if hasError:
-            PySide.QtGui.QMessageBox.critical(None, "Error generating Gcode", "Route data is incorrect. Check Selected routes.")
+            QtGui.QMessageBox.critical(None, "Error generating Gcode", "Route data is incorrect. Check Selected routes.")
         else:
             self.makeGCODE(routes, config)
 

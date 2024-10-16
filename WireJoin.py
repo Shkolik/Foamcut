@@ -14,7 +14,7 @@ import Part
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import vertexToVector, getAllSelectedObjects, isCommonPoint, isMovement
+from utilities import getAllSelectedObjects, isCommonPoint, isMovement
 
 class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, end, jobName):  
@@ -54,10 +54,10 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         edges = []
 
         if isCommonPoint(vertexA, oppositeVertexA):
-            edges.append(Part.makeLine(vertexToVector(vertexA), vertexToVector(vertexB)))
+            edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
         else:
-            edges.append(Part.makeLine(vertexToVector(vertexA), vertexToVector(vertexB)))
-            edges.append(Part.makeLine(vertexToVector(oppositeVertexA), vertexToVector(oppositeVertexB)))
+            edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
+            edges.append(Part.makeLine(oppositeVertexA.Point, oppositeVertexB.Point))
         
         self.createShape(obj, edges, wp, (35, 0, 205))
 

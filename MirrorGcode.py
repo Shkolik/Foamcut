@@ -10,8 +10,6 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
-import PySide
-from PySide import QtCore
 from PySide import QtGui
 import utilities
 import re
@@ -19,7 +17,7 @@ import re
 class MirrorG():
     """Mirror Gcode"""
 
-    def mirrorGcode(self, file):
+    def mirrorGcode(self, file: str):
 
         print ("> Reading source file {}]".format(file))
 
@@ -81,11 +79,10 @@ class MirrorG():
                 out_data.append(line + ("" if line.endswith("\r\n") or len(line) == 0 else "\r\n"))
 
 
+        fileName = file.replace(".gcode", "-mirror.gcode")
         # - Open save file dialog
-        try:
-            save_path = PySide.QtGui.QFileDialog.getSaveFileName(None, QString.fromLocal8Bit("Save GCODE"), "", "*.gcode") # PyQt4
-        except Exception:
-            save_path, save_filter = PySide.QtGui.QFileDialog.getSaveFileName(None, "Save GCODE", "", "*.gcode") # PySide
+        save_path, save_filter = QtGui.QFileDialog().getSaveFileName(None, "Save GCODE", fileName, "*.gcode") # PySide
+
 
         # - Check path
         if save_path == "":
@@ -105,11 +102,10 @@ class MirrorG():
                 "ToolTip" : "Mirror selected GCODE file"}
 
     def Activated(self):
+        dialog = QtGui.QFileDialog()
+        lastDir = dialog.directory().absolutePath()
         # - Open save file dialog
-        try:
-            open_path = QFileDialog.getOpenFileName(None, QString.fromLocal8Bit("Open GCODE"), "", "*.gcode") # PyQt4
-        except Exception:
-            open_path, filter = PySide.QtGui.QFileDialog.getOpenFileName(None, "Open GCODE", "", "*.gcode") # PySide
+        open_path, filter = dialog.getOpenFileName(None, "Open GCODE", lastDir, "*.gcode") # PySide
 
         print("Open file path: {}".format(open_path))
 

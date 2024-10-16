@@ -13,7 +13,7 @@ Gui=FreeCADGui
 import FoamCutViewProviders
 import FoamCutBase
 import utilities
-from utilities import getWorkingPlanes, getAllSelectedObjects, distanceToVertex, getEdgesLinks
+from utilities import getWorkingPlanes, getAllSelectedObjects, getEdgesLinks
 
 class PathSection(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, edge_l, edge_r, jobName):
@@ -71,21 +71,34 @@ class MakePath():
         obj.ViewObject.PointSize = 4
         
     def SortEdges(self, parent_l, parent_r, edges_l, edges_r):
+        """
+        Sort right edges to form opposite edge pairs
+
+        @param parent_l - feature containing edges_l
+        @param parent_r - feature containing edges_r
+        @param edges_l - list of edges on a left side
+        @param edges_r - list of edges on a right side 
+
+        @returns list of edge pairs
+        """
+
         objects = []
         firstLeftEdge = edges_l[0]
-        v1_l = firstLeftEdge.firstVertex()
+        v1_l = firstLeftEdge.firstVertex().Point
+        v2_l = firstLeftEdge.lastVertex().Point
         
 
-        minDistance = distanceToVertex(v1_l, edges_r[0].firstVertex())
+        minDistance = min(v1_l.distanceToPoint(edges_r[0].firstVertex().Point), v1_l.distanceToPoint(edges_r[0].lastVertex().Point)) + \
+        min(v2_l.distanceToPoint(edges_r[0].firstVertex().Point), v2_l.distanceToPoint(edges_r[0].lastVertex().Point))
+
         firstRightEdgeIndex = 0
         for i, edge in enumerate(edges_r):
-            v1_r = edge.firstVertex()
-            v2_r = edge.lastVertex()
-            dist1 = distanceToVertex(v1_l, v1_r)
-            dist2 = distanceToVertex(v1_l, v2_r)
-
-            if min(dist1, dist2) < minDistance:
-                minDistance = min(dist1, dist2)
+            v1_r = edge.firstVertex().Point
+            v2_r = edge.lastVertex().Point
+            dist = min(v1_l.distanceToPoint(v1_r), v1_l.distanceToPoint(v2_r)) + min(v2_l.distanceToPoint(v1_r), v2_l.distanceToPoint(v2_r))
+            
+            if dist < minDistance:
+                minDistance = dist
                 firstRightEdgeIndex = i
         
         edges_r_sorted = []
@@ -144,8 +157,8 @@ class MakePath():
                     break
 
             if len(edges_l) > 1 and len(edges_l) == len(edges_r):
-                print("Left edges: {}".format(edges_l))
-                print("Right edges: {}".format(edges_r))
+                #print("Left edges: {}".format(edges_l))
+                #print("Right edges: {}".format(edges_r))
                 edgesPairs = self.SortEdges(objects[0][0], objects[1][0], edges_l, edges_r)
 
             for pair in edgesPairs:

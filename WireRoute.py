@@ -356,25 +356,29 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
         obj.Redraw += 1 #change of this property will trigger VP to redraw
 
-    ''' 
-        Create wire from list of points
-    '''
     def makeWire(self, points):
+        ''' 
+        Create wire from list of points
+
+        @param points - list of points
+        '''
         edges = []
         for i in range(len(points) - 1):
             edges.append(Part.LineSegment(points[i], points[i+1]))    
         return Part.Wire([edge.toShape() for edge in edges])
 
-    '''
-        create offset wire
+    
+    def makeLineOffset(self, wire, offset):
+        '''
+        Create offset wire
+        
         @param wire - source wire (should be strait line, only start and end vertices will be used)
         @param offset - distance to offset, where: negative - offset to the left; 0 - no offset; positive - offset to the right.
         
         @return offset wire
-    '''
-    def makeLineOffset(self, wire, offset):
-        start = utilities.vertexToVector(wire.Vertexes[0])
-        end = utilities.vertexToVector(wire.Vertexes[-1])
+        '''
+        start = wire.Vertexes[0].Point
+        end = wire.Vertexes[-1].Point
         
         direction = end - start
         direction.normalize()

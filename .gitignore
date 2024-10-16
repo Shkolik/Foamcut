@@ -1,2 +1,3 @@
 *.FCStd*
 __pycache__
+.vscode

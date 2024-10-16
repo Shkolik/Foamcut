@@ -12,6 +12,8 @@ import Part
 from utilities import *
 
 class FoamCutBaseObject:
+    """FoamCut base object"""
+
     def __init__(self, obj, jobName):
         obj.addProperty("App::PropertyString",    "Type", "", "", 5)
         obj.addProperty("App::PropertyString",    "JobName", "", "", 5).JobName = jobName
@@ -102,7 +104,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         wp = getWorkingPlanes(job)
 
         # check if selected vertex laying on any working plane
-        onPlane = wp[0].Shape.isInside(vertexToVector(vertex), 0.01, True) or wp[1].Shape.isInside(vertexToVector(vertex), 0.01, True)
+        onPlane = wp[0].Shape.isInside(vertex.Point, 0.01, True) or wp[1].Shape.isInside(vertex.Point, 0.01, True)
 
         isLeft = False
 
@@ -112,7 +114,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         if onPlane:
             if isMovement(parent):
                 
-                point = vertexToVector(vertex)
+                point = vertex.Point
                 # - Connect
                 if isCommonPoint(parent.Path_L[START], point):
                     isLeft = True
