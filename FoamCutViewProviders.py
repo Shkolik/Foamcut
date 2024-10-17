@@ -11,7 +11,7 @@ class FoamCutBaseViewProvider:
         self.ViewObject = obj
         self.Object = obj.Object
 
-    def doubleClicked(self, obj):
+    def doubleClicked(self, _):
         return True
 
     if isNewStateHandling(): # - currently supported only in main branch FreeCad v0.21.2 and up
@@ -72,10 +72,10 @@ class FoamCutMovementViewProvider(FoamCutBaseViewProvider):
                 sep.addChild(line)
                 self.projection.addChild(sep)
 
-    def updateData(self, fp, prop):   
+    def updateData(self, _, prop):   
         if prop == "Path_R" or prop == "Path_L":
             self.drawProjections()
         
-    def onChanged(self, vp, prop):
+    def onChanged(self, _, prop):
         if prop == "ShowProjectionLines":
             self.drawProjections()

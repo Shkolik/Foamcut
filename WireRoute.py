@@ -74,7 +74,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 first = second
                 if first.Type == "Enter" and reversed is not None:
                     route_data.append(item_index)
-                    route_data_dir.append(True) #enter is always reversed
+                    route_data_dir.append(False)
 
                 #print("SKIP: %s" % second.Type)               
                 continue
@@ -112,6 +112,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 continue
             elif first.Type == "Exit" and second.Type == "Enter":
                 print("EXIT -> ENTER")
+                print("reversed: {}".format(reversed))
                 # - Store first item
                 if len(route_data) == 0:
                     # - Store element
@@ -120,9 +121,10 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
                 # - Store element
                 route_data.append(item_index)
-                route_data_dir.append(True) #enter is always reversed
+                route_data_dir.append(False)
 
                 first = second
+                reversed = False # enter always normal
                 continue
             
             # - Get lines on left plane
@@ -217,29 +219,23 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             points_count = []
             offset_dir = []
 
-            newGroup = False
-
             lastObjectType = None
 
             for i in range(len(route_data)):
-                if newGroup:
+                if lastObjectType == "Rotation" or lastObjectType == "Exit":
+                    breaks.append(lastObjectPoint)
                     edgesGroups.append((edges_L, edges_R, points_count, offset_dir))
 
                     edges_L = []
                     edges_R = []
                     points_count = []
                     offset_dir = []
-                    newGroup = False
 
                 item = route_data[i]
-
                 object = obj.Objects[item]
-
                 lastObjectType = object.Type
 
-                if lastObjectType == "Rotation":
-                    breaks.append(lastObjectPoint)
-                    newGroup = True                    
+                if lastObjectType == "Rotation":                                   
                     continue
 
                 points_count.append(object.PointsCount)
@@ -463,6 +459,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 res = L1_end.Curve.intersectCC(L2_start.Curve)
 
                 if len(res) == 0:
+                    Part.show(wire1, "wire1")
+                    Part.show(wire2, "wire2")
                     message = "Wires not intersect. Check offset direction."
                     raise Exception(message)
                 
