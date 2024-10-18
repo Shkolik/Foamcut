@@ -9,6 +9,7 @@ import FreeCADGui
 Gui=FreeCADGui
 import Part
 import os
+import math
 from math import isclose
 
 START       = 0           # - Segment start point index
@@ -119,6 +120,22 @@ def getAllSelectedEdges():
                     objects.append((obj.Object, [obj.SubElementNames[i]]))
                 i += 1
     return objects
+
+def canMergeToBSpline(first, second, angleTolerance = 5.0):
+    """
+    Check if 2 edges could be merged into 1 bspline 
+
+    @param first - first edge
+    @param second - second edge
+    @param angleTolerance (optional) - minimum angle between 2 edges. 5.0 degrees by default
+
+    @returns True if angle between 2 edges less than tolerance
+    """
+    dir1 = first.Vertexes[0].Point.sub(first.Vertexes[1].Point)
+    dir2 = second.Vertexes[0].Point.sub(second.Vertexes[1].Point)
+    angle = math.degrees(dir2.getAngle(dir1))
+
+    return angle < angleTolerance
 
 def isCommonPoint(first, second, tolerance = 0.01):
     '''

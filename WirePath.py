@@ -28,15 +28,16 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
         obj.Proxy = self
         self.execute(obj)
 
-    def execute(self, obj):  
+    def execute(self, obj): 
+
         job = App.ActiveDocument.getObject(obj.JobName)
         if job is None or job.Type != "Job":
             App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
 
         wp = getWorkingPlanes(job)
       
-        leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1])[0]
-        rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1])[0]
+        leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
+        rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
         
         self.createShape(obj, [leftEdge, rightEdge], wp, (0, 0, 0))
 

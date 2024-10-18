@@ -40,6 +40,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyBoolList",    "DataDirection",    "Task",   "Data Direction")
         obj.addProperty("App::PropertyLength",      "KerfCompensation", "Task",   "Kerf Compensation")
         obj.addProperty("App::PropertyBool", "FlipKerfCompensation",    "Task",   "Flip kerf compensation direction").FlipKerfCompensation = False 
+        obj.addProperty("App::PropertyBool", "DynamicKerfCompensation",    "Task",   "Dynamic kerf compensation").DynamicKerfCompensation = False 
 
         config = self.getConfigName(obj)
 
@@ -48,7 +49,14 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.Proxy = self
         self.execute(obj)
     
-    def execute(self, obj): 
+    def onDocumentRestored(self, obj):
+        # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
+        if not hasattr(obj, "DynamicKerfCompensation"):
+            obj.addProperty("App::PropertyBool", "DynamicKerfCompensation",    "Task",   "Dynamic kerf compensation").DynamicKerfCompensation = False 
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding DynamicKerfCompensation property.".format(obj.Label))
+            
+
+    def execute(self, obj):
         obj.Error = ""
 
         first       = obj.Objects[0]
@@ -219,17 +227,22 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             points_count = []
             offset_dir = []
 
+            offset_len_L =[]
+            offset_len_R =[]
+
             lastObjectType = None
 
             for i in range(len(route_data)):
                 if lastObjectType == "Rotation" or lastObjectType == "Exit":
                     breaks.append(lastObjectPoint)
-                    edgesGroups.append((edges_L, edges_R, points_count, offset_dir))
+                    edgesGroups.append((edges_L, edges_R, offset_len_L, offset_len_R, points_count))
 
                     edges_L = []
                     edges_R = []
                     points_count = []
                     offset_dir = []
+                    offset_len_L =[]
+                    offset_len_R =[]
 
                 item = route_data[i]
                 object = obj.Objects[item]
@@ -243,25 +256,48 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
                 idx = FC_KERF_DIRECTIONS.index(object.KerfCompensationDirection) if object.KerfCompensationDirection in FC_KERF_DIRECTIONS else 0
                 dir = -1 * (idx - 1) if obj.FlipKerfCompensation else idx - 1;
-                offset_dir.append(dir)
-
+                
                 path_l = object.Path_L[::-1] if route_data_dir[i] else object.Path_L
                 path_r = object.Path_R[::-1] if route_data_dir[i] else object.Path_R
 
+                leftEdgeLen = float(object.LeftEdgeLength) if object.LeftEdgeLength > 0 else 0.1
+                rightEdgeLen = float(object.RightEdgeLength) if object.RightEdgeLength > 0 else 0.1
+
+                leftSegmentLen = float(object.LeftSegmentLength) if object.LeftSegmentLength > 0 else 0.1
+                rightSegmentLen = float(object.RightSegmentLength) if object.RightSegmentLength > 0 else 0.1
+
+                len_l = obj.KerfCompensation * dir
+                len_r = obj.KerfCompensation * dir
+
+                if obj.DynamicKerfCompensation:
+                    #calculate compensation for edges
+                    dEdges = leftEdgeLen/rightEdgeLen # if dEdges > 1 then left longer
+
+                    dLeft =  leftEdgeLen/leftSegmentLen if dEdges > 1 else leftEdgeLen/rightSegmentLen# if > 1 -> left segment longer than edge
+                    dRight = rightEdgeLen/leftSegmentLen if dEdges > 1 else rightEdgeLen/rightSegmentLen # if > 1 -> right segment longer than edge
+                    
+                    len_l = (len_l/dLeft) * dir
+                    len_r = (len_r/dRight) * dir
+
+                    print("Object {}; Left comp: {}; Right comp: {}".format(object.Label, len_l, len_r))
+
                 edges_L.append(self.makeWire(path_l))
                 edges_R.append(self.makeWire(path_r))
+
+                offset_len_L.append(len_l)
+                offset_len_R.append(len_r)
 
                 if hasattr(object, "AddPause") and object.AddPause:
                     pauses.append(lastObjectPoint)
                     pausesDuration.append(float(object.PauseDuration)) 
             
             if lastObjectType != "Rotation":
-                edgesGroups.append((edges_L, edges_R, points_count, offset_dir))
+                edgesGroups.append((edges_L, edges_R, offset_len_L, offset_len_R, points_count))
 
-            for (edges_L, edges_R, points_count, offset_dir) in edgesGroups:
+            for (edges_L, edges_R, offset_len_L, offset_len_R, points_count) in edgesGroups:
                 
-                offsets_L = self.makeOffsets(obj.KerfCompensation, edges_L, offset_dir)
-                offsets_R = self.makeOffsets(obj.KerfCompensation, edges_R, offset_dir)
+                offsets_L = self.makeOffsets(offset_len_L, edges_L)
+                offsets_R = self.makeOffsets(offset_len_R, edges_R)
 
                 intersections_L = []
                 intersections_R = []
@@ -362,7 +398,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         for i in range(len(points) - 1):
             edges.append(Part.LineSegment(points[i], points[i+1]))    
         return Part.Wire([edge.toShape() for edge in edges])
-
     
     def makeLineOffset(self, wire, offset):
         '''
@@ -386,14 +421,16 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         res_end = end + float(offset) * perpendicular
         
         return Part.Wire(Part.LineSegment(res_start, res_end).toShape())
+    
+    def makeOffset(self, offset, source):
+        '''
+        Create offset wire
 
-    '''
-        create offset wire
         @param offset - distance to offset, where: negative - offset to the left; 0 - no offset; positive - offset to the right.
         @param source = source wire
-        @return offset wire
-    '''
-    def makeOffset(self, offset, source):
+        @returns offset wire
+        '''
+
         if offset == 0:
             return source
         
@@ -415,29 +452,30 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             wire = Part.Wire(offset1.Edges[::-1])
         return wire
 
-    '''
+    def makeOffsets(self, offset, wires):
+        '''
         create offsetted wires 
-        @param offset - distance to offset
+        @param offset - list of distances to offset, where: < 0 - offset to the left; 0 - no offset; > 0 - offset to the right.
         @param wires - list of source wires
-        @param dirs - list of offset directions, where: -1 - offset to the left; 0 - no offset; 1 - offset to the right. len(dirs) should be equal len(wires)
         @return list of wires
-    '''
-    def makeOffsets(self, offset, wires, dirs):
+        '''
         offsets = []
-        for i, wire in enumerate(wires):
-            length = offset * dirs[i]    
-            offsets.append(self.makeOffset(length, wire))
-        return offsets
+        for i, wire in enumerate(wires): 
+            offsets.append(self.makeOffset(offset[i], wire))
 
-    '''
+        for o in offsets:
+            Part.show(o)
+        return offsets
+    
+    def intersectWires(self, wire1, wire2):
+        '''
         Check how wires intersect on a plane
         
-        @return intersection of 2 wires as (intersection, type) where:
-        - intersection is App.Vector() with coordinates of intersection
-        - type - type of inersection: 0 - connected in point, 1 - need extend edges, 2 - need trim edges
-    '''
-    def intersectWires(self, wire1, wire2):
-        
+        @returns intersection of 2 wires as (intersection, type) where:
+            - intersection is App.Vector() with coordinates of intersection
+            - type - type of inersection: 0 - connected in point, 1 - need extend edges, 2 - need trim edges
+        '''
+
         (dist, vectors, infos) = wire1.distToShape(wire2)
         
         (topo1, index1, param1, topo2, index2, param2) = infos[0]
@@ -465,16 +503,17 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     raise Exception(message)
                 
                 return (App.Vector(res[0].X, res[0].Y, res[0].Z), 1)
-
-    '''
+    
+    def fixOffsets(self, o1_wire, o2_wire, intersection):
+        '''
         Extend/Trim offsets wires to the point of intersection
         @param o1_wire - first offset wire
         @param o2_wire - second offset wire
         @param intersection - (point, type) - intersection point of 2 wires and it's type ->
         (0 - already connected; 2 - intersection on both wires; 1 - not intersect directly, or endpoint of one wire is on the edge of another)
-        @return pair of wires
-    '''
-    def fixOffsets(self, o1_wire, o2_wire, intersection):
+        @returns pair of wires
+        '''
+        
         (point, tp) = intersection
         vertex = Part.Vertex(point)
         points = []
@@ -519,15 +558,15 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             wire2 = self.trimWireStart(o2_wire, index2, point)
             return [wire1, wire2]
         return None
-
-    '''
+    
+    def trimWireEnd(self, wire, index, point):
+        '''
         trim wire at specified point from the end
         @param wire - wire to trim
         @param index - index of the edge where point lay
         @param point - coordinates of trim point
         @return new wire, where point is it's last vertex
-    '''
-    def trimWireEnd(self, wire, index, point):
+        '''
         # no edges to trim - create new one from wire start point and point of intersection
         if index == 0:
             return Part.Wire(Part.LineSegment(wire.Edges[0].firstVertex().Point, point).toShape())
@@ -536,15 +575,15 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         if wire.Edges[index - 1].lastVertex().Point != point:
             edges.append(Part.LineSegment(wire.Edges[index - 1].lastVertex().Point, point).toShape())
         return Part.Wire(edges)
-
-    '''
+    
+    def trimWireStart(self, wire, index, point):
+        '''
         trim wire at specified point from the start
         @param wire - wire to trim
         @param index - index of the edge where point lay
         @param point - coordinates of trim point
         @return new wire, where point is it's first vertex
-    '''
-    def trimWireStart(self, wire, index, point):
+        '''
         # last segment, create new one        
         if index == len(wire.Edges) - 1:
             Part.Wire(Part.LineSegment(point, wire.Edges[-1].lastVertex().Point).toShape())
@@ -554,13 +593,13 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             edges.insert(0, Part.LineSegment(point, wire.Edges[index].lastVertex().Point).toShape())
         return Part.Wire(edges)
 
-    '''
+    def getWirepoints(self, wire, num_points):
+        '''
         Make a Bspline from wire, discretize it with specified number of points
         @param wire - wire to discretize
         @param num_points - number of points
         @return list of points 
-    '''
-    def getWirepoints(self, wire, num_points):
+        '''
         if num_points <= 2: # short strait line - no need to convert
             return [wire.Vertexes[0].Point, wire.Vertexes[-1].Point]
         
@@ -685,8 +724,7 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
             sep.addChild(coords)
             sep.addChild(line)
         return sep
-            
-
+       
     def getIcon(self):
         return utilities.getIconPath("route.svg")
 

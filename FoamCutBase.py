@@ -53,7 +53,9 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.addProperty("App::PropertyLength",      "DiscretizationStep",   "Information", "Discretization step")
         obj.addProperty("App::PropertyInteger",     "PointsCount",          "Information", "Number of points", 1)
 
-        
+        obj.addProperty("App::PropertyDistance",    "LeftEdgeLength",     "", "", 5) 
+        obj.addProperty("App::PropertyDistance",    "RightEdgeLength",     "", "", 5)
+
         obj.addProperty("App::PropertyBool",        "AddPause",             "Task", "Add pause at the end of move").AddPause = False
         obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
         obj.addProperty("App::PropertyEnumeration", "KerfCompensationDirection", "Task",   "Kerf compensation direction").KerfCompensationDirection = FC_KERF_DIRECTIONS
@@ -66,13 +68,29 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         obj.setEditorMode("PauseDuration", 3)
 
-    def onChanged(self, obj, prop):
+    def onDocumentRestored(self, obj):
+        touched = False   
+        # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
+        if not hasattr(obj, "LeftEdgeLength"):
+            obj.addProperty("App::PropertyDistance",    "LeftEdgeLength",     "", "", 5)   
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding LeftEdgeLength property.".format(obj.Label))
+            touched = True
+        if not hasattr(obj, "RightEdgeLength"):
+            obj.addProperty("App::PropertyDistance",    "RightEdgeLength",     "", "", 5)
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding RightEdgeLength property.".format(obj.Label))  
+            touched = True
+
+        if touched:
+            obj.recompute()
+
+
+    def onChanged(self, obj, prop):        
         if prop == "AddPause":
             if obj.AddPause:
                 obj.setEditorMode("PauseDuration", 0)
             else:
                 obj.setEditorMode("PauseDuration", 3)
-        pass
+        return
 
     def getEdges(self, obj):
         left = None
@@ -130,11 +148,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
                 elif isCommonPoint(parent.Path_R[END], point):
                     vertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
                     oppositeVertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
-
-                    
-                    print(vertex)
-                    print(oppositeVertex)
-
 
             else:
                 App.Console.PrintError("ERROR:\n Not supported parent object type. Only Path, Move and Projection supported.\n")
@@ -194,7 +207,9 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         if obj.PointsCount == 1:
             shapes = [Part.Point(obj.Path_L[START]), Part.Point(obj.Path_R[START])]
             obj.LeftSegmentLength = 0.0
-            obj.RightSegmentLength = 0.0      
+            obj.RightSegmentLength = 0.0   
+            obj.LeftEdgeLength = 0.0
+            obj.RightEdgeLength = 0.0
         else:
             if len(edges) == 1:
                 sameY = True
@@ -225,6 +240,13 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             
             obj.LeftSegmentLength = float(path_L.length())
             obj.RightSegmentLength = float(path_R.length())
+
+            if len(edges) == 1:
+                obj.LeftEdgeLength = edges[0].Length
+                obj.RightEdgeLength = obj.LeftEdgeLength
+            else:
+                obj.LeftEdgeLength = edges[0].Length
+                obj.RightEdgeLength = edges[1].Length
 
             shapes = [path_L.toShape(), path_R.toShape()]
 
