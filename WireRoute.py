@@ -14,9 +14,13 @@ import Part
 import FoamCutBase
 import FoamCutViewProviders
 import utilities
-from utilities import isMovement, isStraitLine, FC_KERF_DIRECTIONS
+from utilities import isMovement, isStraitLine, FC_KERF_DIRECTIONS, FC_KERF_STRATEGY, FC_ROUTE_KERF_DIRECTIONS
 import pivy.coin as coin
 import math
+
+FC_KERF_STRATEGY_NONE = 0
+FC_KERF_STRATEGY_UNI = 1
+FC_KERF_STRATEGY_DYN = 2
 
 class WireRoute(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, objects, jobName):   
@@ -38,23 +42,72 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyLinkList",    "Objects",          "Task",   "Source data").Objects = objects
         obj.addProperty("App::PropertyIntegerList", "Data",             "Task",   "Data")
         obj.addProperty("App::PropertyBoolList",    "DataDirection",    "Task",   "Data Direction")
-        obj.addProperty("App::PropertyLength",      "KerfCompensation", "Task",   "Kerf Compensation")
-        obj.addProperty("App::PropertyBool", "FlipKerfCompensation",    "Task",   "Flip kerf compensation direction").FlipKerfCompensation = False 
-        obj.addProperty("App::PropertyBool", "DynamicKerfCompensation",    "Task",   "Dynamic kerf compensation").DynamicKerfCompensation = False 
 
+        obj.addProperty("App::PropertyLength",      "KerfCompensation",         "Kerf Compensation",   "Kerf Compensation")
+        obj.addProperty("App::PropertyEnumeration", "CompensationDirection",    "Kerf Compensation",   "Kerf compensation direction.").CompensationDirection = FC_ROUTE_KERF_DIRECTIONS 
+        obj.CompensationDirection = 0
+
+        obj.addProperty("App::PropertyEnumeration", "CompensationStrategy",     "Kerf Compensation",   "Kerf compensation strategy. \r\n\
+                            None - do no compensate for kerf. \r\n\
+                            Uniform - same amount of compensation on both sides. Doesn'd take into account wire speed. \r\n\
+                            Dynamic - compensation depends on wire speed (that depends on edge length). Slower speed - more compensation.").CompensationStrategy = FC_KERF_STRATEGY 
+        obj.CompensationStrategy = 0   
+
+        obj.addProperty("App::PropertyFloat",     "CompensationDegree",        "Kerf Compensation",    "Kerf Compensation coefficient. \r\n\
+                        This coefficient help calculate kerf compensation when wire speed is less than nominal. \r\n\
+                        Usually kerf thickness is directly related to movement speed. Lesser speed - thicker kerf. \
+                        But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
+                        Normally it should be 1.0, but for denser foam it could be bigger.")
+        obj.setEditorMode("CompensationDegree", 2)
         config = self.getConfigName(obj)
 
         obj.setExpression(".KerfCompensation", u"<<{}>>.KerfCompensation".format(config))
+        obj.setExpression(".CompensationDegree", u"<<{}>>.CompensationDegree".format(config))
         
         obj.Proxy = self
         self.execute(obj)
     
     def onDocumentRestored(self, obj):
+        touched = False
         # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
-        if not hasattr(obj, "DynamicKerfCompensation"):
-            obj.addProperty("App::PropertyBool", "DynamicKerfCompensation",    "Task",   "Dynamic kerf compensation").DynamicKerfCompensation = False 
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding DynamicKerfCompensation property.".format(obj.Label))
-            
+        if not hasattr(obj, "CompensationStrategy"):
+            obj.addProperty("App::PropertyEnumeration", "CompensationStrategy",    "Kerf Compensation",   "Kerf compensation strategy. \r\n\
+                            None - do no compensate for kerf. \r\n\
+                            Uniform - same amount of compensation on both sides. Doesn'd take into account wire speed. \r\n\
+                            Dynamic - compensation depends on wire speed (that depends on edge length). Slower speed - more compensation.").CompensationStrategy = FC_KERF_STRATEGY 
+            obj.CompensationStrategy = 0                        
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationStrategy property.".format(obj.Label))
+            touched = True
+
+        if not hasattr(obj, "CompensationDegree"):
+            obj.addProperty("App::PropertyFloat",     "CompensationDegree",      "Kerf Compensation",    "Kerf Compensation coefficient. \r\n\
+                        This coefficient help calculate kerf compensation when wire speed is less than nominal. \r\n\
+                        Usually kerf thickness is directly related to movement speed. Lesser speed - thicker kerf. \
+                        But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
+                        Normally it should be 1.0, but for denser foam it could be bigger.")
+            obj.setEditorMode("CompensationDegree", 2)
+            config = self.getConfigName(obj)            
+            obj.setExpression(".CompensationDegree", u"<<{}>>.CompensationDegree".format(config))
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDegree property.".format(obj.Label))
+            touched = True
+
+        if hasattr(obj, "KerfCompensation") and obj.getGroupOfProperty("KerfCompensation") != "Kerf Compensation":
+            obj.setGroupOfProperty("KerfCompensation", "Kerf Compensation")
+        
+        if hasattr(obj, "FlipKerfCompensation"):
+            dir = 1 if obj.FlipKerfCompensation else 0            
+            obj.removeProperty("FlipKerfCompensation")
+            print("{} - Migrating from 0.1.2 to 0.1.3 - removing FlipKerfCompensation property.".format(obj.Label))  
+            touched = True
+
+        if not hasattr(obj, "CompensationDirection"):
+            obj.addProperty("App::PropertyEnumeration", "CompensationDirection",   "Kerf Compensation",   "Kerf compensation direction.").CompensationDirection = FC_ROUTE_KERF_DIRECTIONS 
+            obj.CompensationDirection = dir
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.".format(obj.Label))
+            touched = True
+
+        if touched:
+            obj.recompute()
 
     def execute(self, obj):
         obj.Error = ""
@@ -119,8 +172,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 reversed = None
                 continue
             elif first.Type == "Exit" and second.Type == "Enter":
-                print("EXIT -> ENTER")
-                print("reversed: {}".format(reversed))
+                #print("EXIT -> ENTER")
+                #print("reversed: {}".format(reversed))
                 # - Store first item
                 if len(route_data) == 0:
                     # - Store element
@@ -218,14 +271,13 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         
         lastObjectPoint = 0
 
-        if obj.KerfCompensation > 0:
-            # list of (edges_l, edges_r, points_count, offset_dir)
+        if obj.KerfCompensation > 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) > FC_KERF_STRATEGY_NONE:
+            # list of (edges_l, edges_r, offset_len_L, offset_len_R, points_count)
             edgesGroups = []
 
             edges_L = []
             edges_R = []
             points_count = []
-            offset_dir = []
 
             offset_len_L =[]
             offset_len_R =[]
@@ -237,10 +289,9 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     breaks.append(lastObjectPoint)
                     edgesGroups.append((edges_L, edges_R, offset_len_L, offset_len_R, points_count))
 
-                    edges_L = []
+                    edges_L = [] 
                     edges_R = []
                     points_count = []
-                    offset_dir = []
                     offset_len_L =[]
                     offset_len_R =[]
 
@@ -254,9 +305,12 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 points_count.append(object.PointsCount)
                 lastObjectPoint += object.PointsCount - 1
 
-                idx = FC_KERF_DIRECTIONS.index(object.KerfCompensationDirection) if object.KerfCompensationDirection in FC_KERF_DIRECTIONS else 0
-                dir = -1 * (idx - 1) if obj.FlipKerfCompensation else idx - 1;
+                idx = FC_KERF_DIRECTIONS.index(object.CompensationDirection) if object.CompensationDirection in FC_KERF_DIRECTIONS else 0
                 
+                dir = -1 * (idx - 1) if obj.CompensationDirection in FC_ROUTE_KERF_DIRECTIONS and FC_ROUTE_KERF_DIRECTIONS.index(obj.CompensationDirection) == 1 else idx - 1;
+                
+                #print("Offset dir: {}".format(dir))
+
                 path_l = object.Path_L[::-1] if route_data_dir[i] else object.Path_L
                 path_r = object.Path_R[::-1] if route_data_dir[i] else object.Path_R
 
@@ -266,20 +320,25 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 leftSegmentLen = float(object.LeftSegmentLength) if object.LeftSegmentLength > 0 else 0.1
                 rightSegmentLen = float(object.RightSegmentLength) if object.RightSegmentLength > 0 else 0.1
 
-                len_l = obj.KerfCompensation * dir
-                len_r = obj.KerfCompensation * dir
+                len_l = float(obj.KerfCompensation) * dir
+                len_r = float(obj.KerfCompensation) * dir
 
-                if obj.DynamicKerfCompensation:
+                if dir != 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) == FC_KERF_STRATEGY_DYN:
                     #calculate compensation for edges
                     dEdges = leftEdgeLen/rightEdgeLen # if dEdges > 1 then left longer
 
                     dLeft =  leftEdgeLen/leftSegmentLen if dEdges > 1 else leftEdgeLen/rightSegmentLen# if > 1 -> left segment longer than edge
                     dRight = rightEdgeLen/leftSegmentLen if dEdges > 1 else rightEdgeLen/rightSegmentLen # if > 1 -> right segment longer than edge
                     
-                    len_l = (len_l/dLeft) * dir
-                    len_r = (len_r/dRight) * dir
+                    left_c = 1.0 
+                    right_c = 1.0
 
-                    print("Object {}; Left comp: {}; Right comp: {}".format(object.Label, len_l, len_r))
+                    if obj.CompensationDegree > 0 and not math.isclose(leftEdgeLen, rightEdgeLen, rel_tol=5e-2): #if degree is specified and edges length difference more that 5%  
+                        left_c = obj.CompensationDegree if dEdges < 1 else left_c
+                        right_c = right_c if dEdges < 1 else obj.CompensationDegree
+
+                    len_l = len_l/(float(dLeft) * left_c)
+                    len_r = len_r/(float(dRight) * right_c)
 
                 edges_L.append(self.makeWire(path_l))
                 edges_R.append(self.makeWire(path_r))
@@ -463,8 +522,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         for i, wire in enumerate(wires): 
             offsets.append(self.makeOffset(offset[i], wire))
 
-        for o in offsets:
-            Part.show(o)
         return offsets
     
     def intersectWires(self, wire1, wire2):
@@ -492,17 +549,45 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             else:
                 # TODO: most likely need to check what edges to extend to the intersection point. 90% of time it will be last and first edges.
                 # wires not intersect, so calculate intersection by using first wire last edge and second wire first edge
+                #print("Closest distance between wires {}; {}".format(dist, infos))
+
                 L1_end = wire1.Edges[-1]
                 L2_start = wire2.Edges[0]
                 res = L1_end.Curve.intersectCC(L2_start.Curve)
 
-                if len(res) == 0:
-                    Part.show(wire1, "wire1")
-                    Part.show(wire2, "wire2")
+                if len(res) == 0:                    
                     message = "Wires not intersect. Check offset direction."
                     raise Exception(message)
+                else:
+                    intPoint = App.Vector(res[0].X, res[0].Y, res[0].Z)
+
+                    int_L1_start = intPoint.distanceToPoint(wire1.Edges[0].Vertexes[0].Point)
+                    int_L1_end = intPoint.distanceToPoint(L1_end.Vertexes[-1].Point)
+                    int_L2_start = intPoint.distanceToPoint(L2_start.Vertexes[0].Point)
+                    int_L2_end = intPoint.distanceToPoint(L2_start.Vertexes[0].Point)
+
+                    # check where intersection located. If it's on other end of any wire then we have almost parallel lines
+                    # and proper offset intersection will not work. 
+                    # We assyme that it's better to place inersection point somewhere close to the end of one of the wires 
+                    # than throw an error
+                    # TODO: Think about better solution for this situation
+                    if dist > 0 and (int_L1_end > int_L1_start or int_L2_start > int_L2_end): 
+                        wire = wire1 if int_L1_end > int_L1_start else wire2
+                        end = int_L1_end > int_L1_start 
+
+                        if len(wire.Edges) == 1:
+                            dir = wire.Edges[0].Vertexes[-1].Point.sub(wire.Edges[0].Vertexes[0].Point) if end else wire.Edges[0].Vertexes[0].Point.sub(wire.Edges[0].Vertexes[-1].Point)
+                            dir.normalize()
+                            intPoint = wire.Edges[0].Vertexes[-1].Point - dir*dist if end else wire.Edges[0].Vertexes[0].Point + dir*dist#wire.Edges[0].CenterOfMass
+                        else:
+                            intPoint = wire.Vertexes[1].Point
+
+                        App.Console.PrintWarning(
+"Intersection point too far from ideal position or not exists. \r\n \
+It happens when 2 connected paths has too different compensation. \r\n \
+Check route for any logical errors, try another kerf compensation strategy or rethink paths set if result not pleasant. \r\n")    
                 
-                return (App.Vector(res[0].X, res[0].Y, res[0].Z), 1)
+                return (intPoint, 1)
     
     def fixOffsets(self, o1_wire, o2_wire, intersection):
         '''

@@ -30,12 +30,12 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
 
     def execute(self, obj):
        
-        job = App.ActiveDocument.getObject(obj.JobName)
+        job = obj.Document.getObject(obj.JobName)
         if job is None or job.Type != "Job":
             FreeCAD.Console.PrintError("ERROR:\n Error updating Projection - active Job not found\n")
 
         # - Get working planes
-        wp = getWorkingPlanes(job)
+        wp = getWorkingPlanes(job, obj.Document)
         
         if wp is None or len(wp) != 2:
             FreeCAD.Console.PrintError("ERROR:\n Error updating Path - working planes not found in Parent object '{}'\n".format(job.Label if job is not None else "None"))
@@ -125,7 +125,7 @@ class MakeProjection():
                 if len(objects) == 0:               
                     return False
                 
-                wp = getWorkingPlanes(group)
+                wp = getWorkingPlanes(group, App.ActiveDocument)
                 if wp is None or len(wp) != 2:
                     return False                    
                 return True

@@ -30,11 +30,11 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
 
     def execute(self, obj): 
 
-        job = App.ActiveDocument.getObject(obj.JobName)
+        job = obj.Document.getObject(obj.JobName)
         if job is None or job.Type != "Job":
             App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
 
-        wp = getWorkingPlanes(job)
+        wp = getWorkingPlanes(job, obj.Document)
       
         leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
         rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
@@ -196,7 +196,7 @@ class MakePath():
                 if object1[1][0].startswith("Face") != object2[1][0].startswith("Face"):
                     return False
 
-                wp = getWorkingPlanes(group)
+                wp = getWorkingPlanes(group, App.ActiveDocument)
                 if wp is None or len(wp) != 2:
                     return False                    
                 return True

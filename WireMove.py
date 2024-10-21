@@ -124,7 +124,7 @@ class MakeMove():
                 if not issubclass(type(vertex), Part.Vertex):
                     return False
                 
-                wp = getWorkingPlanes(group)
+                wp = getWorkingPlanes(group, App.ActiveDocument)
                 if wp is None or len(wp) != 2:
                     return False
                 

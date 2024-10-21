@@ -54,7 +54,12 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyBool",       "DynamicWirePower",  "Wire",             "Dynamic wire power. " + 
                         "Power will vary depending on wire length. When enabling be sure that your controller set to Laser mode, " + 
                         "otherwise machine will halt for a brif moment after each move.").DynamicWirePower = getParameterBool("DynamicWirePower", False)
-        obj.addProperty("App::PropertyLength",     "KerfCompensation",      "Wire",    "Kerf Compensation").KerfCompensation = getParameterFloat("KerfCompensation", 0.6)
+        obj.addProperty("App::PropertyLength",     "KerfCompensation",      "Kerf Compensation",    "Kerf Compensation").KerfCompensation = getParameterFloat("KerfCompensation", 0.6)
+        obj.addProperty("App::PropertyFloat",     "CompensationDegree",      "Kerf Compensation",    "Kerf Compensation coefficient. \r\n\
+                        This coefficient help calculate kerf compensation when wire speed is less than nominal. \r\n\
+                        Usually kerf thickness is directly related to movement speed. Lesser speed - thicker kerf. \
+                        But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
+                        Normally it should be 1.0, but for denser foam it could be bigger.").CompensationDegree = getParameterFloat("CompensationDegree", 1.0)
         
         obj.addProperty("App::PropertyLength",     "DiscretizationStep",   "GCODE",         "Discretization step").DiscretizationStep = 0.5
         obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = getParameterString("CutCommand", "G01 {Position} F{FeedRate} {WirePower}")
@@ -92,6 +97,19 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.setEditorMode("Group",     3)
         obj.Proxy = self
         self.execute(obj)
+
+    def onDocumentRestored(self, obj):
+        # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
+        if not hasattr(obj, "CompensationDegree"):
+            obj.addProperty("App::PropertyFloat",     "CompensationDegree",      "Kerf Compensation",    "Kerf Compensation coefficient. \r\n\
+                        This coefficient help calculate kerf compensation when wire speed is less than nominal. \r\n\
+                        Usually kerf thickness is directly related to movement speed. Lesser speed - thicker kerf. \
+                        But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
+                        Normally it should be 1.0, but for denser foam it could be bigger.").CompensationDegree = getParameterFloat("CompensationDegree", 1.0)
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDegree property.".format(obj.Label))
+
+        if hasattr(obj, "KerfCompensation") and obj.getGroupOfProperty("KerfCompensation") != "Kerf Compensation":
+            obj.setGroupOfProperty("KerfCompensation", "Kerf Compensation")
 
     def execute(self, obj):
         

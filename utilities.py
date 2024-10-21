@@ -21,7 +21,9 @@ RIGHT = 1
 FC_TYPES = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join", "Route", "Job", "Helper"]
 FC_TYPES_TO_ROUTE = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join"]
 
-FC_KERF_DIRECTIONS = ["Positive", "None", "Negative"]
+FC_KERF_DIRECTIONS = ["Normal", "None", "Reversed"]
+FC_ROUTE_KERF_DIRECTIONS = ["Normal", "Reversed"]
+FC_KERF_STRATEGY = ["None", "Uniform", "Dynamic"]
 FC_TIME_UNITS = ["Seconds", "Milliseconds"]
 
 def get_module_path():
@@ -169,18 +171,20 @@ def intersectLineAndPlane(v0, v1, plane):
     
     return App.Vector(point.X, point.Y, point.Z)
 
-def getConfigByName(config):
+def getConfigByName(config, doc):
     '''
     Get Config object by it's name
 
     @param config - Config object name
+    @param doc - FreeCAD document
     @returns Config
     '''
+
     if config is None or len(config) == 0:
         FreeCAD.Console.PrintError("Error: Config name is empty.\n")
         return
                 
-    configObj = FreeCAD.ActiveDocument.getObject(config)
+    configObj = doc.getObject(config)
 
     if configObj is None:
         FreeCAD.Console.PrintError("Error: Config not found.\n")
@@ -188,22 +192,23 @@ def getConfigByName(config):
     
     return configObj
 
-def getWorkingPlanes(group):
+def getWorkingPlanes(group, doc):
     '''
     Get working planes
     @param group - Job object
+    @param doc - FreeCAD document
     @returns list of working planes
     '''
     if group is not None and group.Type == "Job":
         # - Initialize result
         result = []
-        wpl = FreeCAD.ActiveDocument.getObject(group.WPLName)
+        wpl = doc.getObject(group.WPLName)
         if wpl is not None:
             result.append(wpl)
         else:
             FreeCAD.Console.PrintError("ERROR:\n Left working plane not found.\n")
             return None
-        wpr = FreeCAD.ActiveDocument.getObject(group.WPRName)
+        wpr = doc.getObject(group.WPRName)
         if wpr is not None:
             result.append(wpr)
         else:

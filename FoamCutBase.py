@@ -22,7 +22,7 @@ class FoamCutBaseObject:
             obj.setEditorMode("Placement", 3)
 
     def getConfigName(self, obj):
-        job = App.ActiveDocument.getObject(obj.JobName)
+        job = obj.Document.getObject(obj.JobName)
 
         if job is None:
             App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
@@ -58,8 +58,9 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         obj.addProperty("App::PropertyBool",        "AddPause",             "Task", "Add pause at the end of move").AddPause = False
         obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
-        obj.addProperty("App::PropertyEnumeration", "KerfCompensationDirection", "Task",   "Kerf compensation direction").KerfCompensationDirection = FC_KERF_DIRECTIONS
-        obj.KerfCompensationDirection = 0 # Positive compensation by default
+
+        obj.addProperty("App::PropertyEnumeration", "CompensationDirection", "Kerf Compensation",   "Kerf compensation direction").CompensationDirection = FC_KERF_DIRECTIONS
+        obj.CompensationDirection = 0 # Normal compensation by default
 
 
         config = self.getConfigName(obj)
@@ -78,6 +79,16 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         if not hasattr(obj, "RightEdgeLength"):
             obj.addProperty("App::PropertyDistance",    "RightEdgeLength",     "", "", 5)
             print("{} - Migrating from 0.1.2 to 0.1.3 - adding RightEdgeLength property.".format(obj.Label))  
+            touched = True
+        if hasattr(obj, "KerfCompensationDirection"):
+            dir = FC_KERF_DIRECTIONS.index(obj.KerfCompensationDirection) if obj.KerfCompensationDirection in FC_KERF_DIRECTIONS else 0            
+            obj.removeProperty("KerfCompensationDirection")
+            print("{} - Migrating from 0.1.2 to 0.1.3 - removing KerfCompensationDirection property.".format(obj.Label))  
+            touched = True
+        if not hasattr(obj, "CompensationDirection"):
+            obj.addProperty("App::PropertyEnumeration", "CompensationDirection", "Kerf Compensation",   "Kerf compensation direction").CompensationDirection = FC_KERF_DIRECTIONS
+            obj.CompensationDirection = dir
+            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.".format(obj.Label))  
             touched = True
 
         if touched:
@@ -115,11 +126,13 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
     def findOppositeVertexes(self, obj, parent, vertex):
         oppositeVertex = None
 
-        job = App.ActiveDocument.getObject(obj.JobName)
+        doc = obj.Document
+
+        job = doc.getObject(obj.JobName)
         if job is None or job.Type != "Job":
             App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
 
-        wp = getWorkingPlanes(job)
+        wp = getWorkingPlanes(job, doc)
 
         # check if selected vertex laying on any working plane
         onPlane = wp[0].Shape.isInside(vertex.Point, 0.01, True) or wp[1].Shape.isInside(vertex.Point, 0.01, True)
