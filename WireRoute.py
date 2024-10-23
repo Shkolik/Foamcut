@@ -69,13 +69,20 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
     
     def onDocumentRestored(self, obj):
         touched = False
+        if hasattr(obj, "DynamicKerfCompensation"):
+            dynamic = obj.DynamicKerfCompensation       
+            obj.removeProperty("DynamicKerfCompensation")
+            print("{} - Migrating from 0.1.2 to 0.1.3 - removing DynamicKerfCompensation property.".format(obj.Label))  
+            touched = True
+
         # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
         if not hasattr(obj, "CompensationStrategy"):
             obj.addProperty("App::PropertyEnumeration", "CompensationStrategy",    "Kerf Compensation",   "Kerf compensation strategy. \r\n\
                             None - do no compensate for kerf. \r\n\
                             Uniform - same amount of compensation on both sides. Doesn'd take into account wire speed. \r\n\
                             Dynamic - compensation depends on wire speed (that depends on edge length). Slower speed - more compensation.").CompensationStrategy = FC_KERF_STRATEGY 
-            obj.CompensationStrategy = 0                        
+            obj.CompensationStrategy = FC_KERF_STRATEGY.index("Dynamic") if dynamic else 0
+                               
             print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationStrategy property.".format(obj.Label))
             touched = True
 
