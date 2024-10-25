@@ -12,6 +12,8 @@ import os
 import math
 from math import isclose
 
+DEFAULT_CONFIG_PATH = "User parameter:BaseApp/Workbench/FoamcutWB/DefaultMachineConfig"
+
 START       = 0           # - Segment start point index
 END         = -1          # - Segment end point index
 
@@ -47,6 +49,38 @@ def getIconPath(icon: str):
     @param icon - icon file name
     '''
     return os.path.join(getResourcesPath(), "icons", icon)
+
+def getParameterFloat(name, default):
+    parameters = App.ParamGet(DEFAULT_CONFIG_PATH)
+    floats = parameters.GetFloats()
+    if name not in floats:
+        parameters.SetFloat(name, default)
+    
+    return parameters.GetFloat(name)
+
+def getParameterInt(name, default):
+    parameters = App.ParamGet(DEFAULT_CONFIG_PATH)
+    ints = parameters.GetInts()
+    if name not in ints:
+        parameters.SetInt(name, default)
+    
+    return parameters.GetInt(name)
+
+def getParameterBool(name, default):
+    parameters = App.ParamGet(DEFAULT_CONFIG_PATH)
+    bools = parameters.GetBools()
+    if name not in bools:
+        parameters.SetBool(name, default)
+    
+    return parameters.GetBool(name)
+
+def getParameterString(name, default):
+    parameters = App.ParamGet(DEFAULT_CONFIG_PATH)
+    strings = parameters.GetStrings()
+    if name not in strings:
+        parameters.SetString(name, default)
+    
+    return parameters.GetString(name)
 
 def isNewStateHandling():
     '''

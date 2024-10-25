@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 __title__ = "Create Route"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
@@ -21,6 +19,8 @@ import math
 FC_KERF_STRATEGY_NONE = 0
 FC_KERF_STRATEGY_UNI = 1
 FC_KERF_STRATEGY_DYN = 2
+
+SUPPRESS_WARNINGS = utilities.getParameterBool("SuppressWarnings", True)
 
 class WireRoute(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, objects, jobName):   
@@ -515,7 +515,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     wire = Part.Wire(offset1.Edges[::-1])
             except Exception as ex:
                 #print("Source points: {}".format([v.Point for v in source.Vertexes]))
-                App.Console.PrintWarning("Unable to create offset using makeOffset2D. Fallback to my calculation.\n {}".format(ex))
+                if not SUPPRESS_WARNINGS:
+                    App.Console.PrintWarning("Unable to create offset using makeOffset2D. Fallback to my calculation.\n {}".format(ex))
 
                 wires = []
                 for edge in source.Edges:
@@ -624,8 +625,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                             intPoint = wire.Edges[0].Vertexes[-1].Point - dir*dist if end else wire.Edges[0].Vertexes[0].Point + dir*dist#wire.Edges[0].CenterOfMass
                         else:
                             intPoint = wire.Vertexes[1].Point
-
-                        App.Console.PrintWarning(
+                        if not SUPPRESS_WARNINGS:
+                            App.Console.PrintWarning(
 "Intersection point too far from ideal position or not exists. \r\n \
 It happens when 2 connected paths has too different compensation. \r\n \
 Check route for any logical errors, try another kerf compensation strategy or rethink paths set if result not pleasant. \r\n")    
