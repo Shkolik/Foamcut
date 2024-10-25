@@ -2,11 +2,21 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.4] - Not released yet
+## [0.1.5] - TBA
    
 ### Added
 
 ### Fixed 
+
+
+## [0.1.4] - 2024-10-25
+   
+### Added
+- parameter to suppress warnings
+
+### Fixed 
+- offset calculation improved. When makeOffset2D fails code fallback to custom calculations
+- route points calculations improved by using interpolation instead of aproximation
 
 ## [0.1.3] - 2024-10-23
    
