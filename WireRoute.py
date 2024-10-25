@@ -388,7 +388,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     firstWirePoints = self.getWirepoints(off[0], points_count[i])
                     for pi in range(len(firstWirePoints) - 1):
                         resultPoints_L.append(firstWirePoints[pi])
-                        
+                    
                     firstWire = off[1]
 
                 lastWirePoints = self.getWirepoints(firstWire if firstWire is not None else offsets_L[-1], points_count[-1])
@@ -506,16 +506,45 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         else:
             try:
                 offset1 = source.makeOffset2D(offset,2, False, True, True)
-            except Exception as ex:
-                print("Source points: {}".format([v.Point for v in source.Vertexes]))
-                raise ex
+                
+                wire = Part.Wire(offset1.Edges) # we need it to have sorted edges, it will help to operate with edges in a future
 
-        wire = Part.Wire(offset1.Edges) # we need it to have sorted edges, it will help to operate with edges in a future
-        
-        (_, _, infos)  = source.Vertexes[0].distToShape(wire)
-        (_, idx1, _, _, idx2, _) = infos[0]
-        if idx1 != idx2: #offset wire reversed, reverse edges
-            wire = Part.Wire(offset1.Edges[::-1])
+                (_, _, infos)  = source.Vertexes[0].distToShape(wire)
+                (_, idx1, _, _, idx2, _) = infos[0]
+                if idx1 != idx2: #offset wire reversed, reverse edges
+                    wire = Part.Wire(offset1.Edges[::-1])
+            except Exception as ex:
+                #print("Source points: {}".format([v.Point for v in source.Vertexes]))
+                App.Console.PrintWarning("Unable to create offset using makeOffset2D. Fallback to my calculation.\n {}".format(ex))
+
+                wires = []
+                for edge in source.Edges:
+                    wires.append(self.makeLineOffset(edge, offset))
+                
+                intersections = []
+                for i in range(len(wires) - 1):                
+                    intersections.append(self.intersectWires(wires[i], wires[i + 1]))
+
+                points = []
+                firstWire = None
+                for i in range(len(wires) - 1):
+                    if firstWire == None:
+                        firstWire = wires[i]
+                        
+                    (first, second) = self.fixOffsets(firstWire, wires[i + 1], intersections[i])
+                    
+                    for vi in range(len(first.Vertexes) - 1):
+                        points.append(first.Vertexes[vi].Point)
+                        
+                    firstWire = second
+
+                if firstWire is None:
+                    firstWire = wires[-1]
+                
+                for v in firstWire.Vertexes:
+                        points.append(v.Point)
+                wire = self.makeWire(points)
+
         return wire
 
     def makeOffsets(self, offset, wires):
@@ -531,10 +560,13 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
         return offsets
     
-    def intersectWires(self, wire1, wire2):
+    def intersectWires(self, wire1, wire2, tolerance = 1e-4):
         '''
         Check how wires intersect on a plane
         
+        @param wire1 - first wire
+        @param wire2 - first wire
+
         @returns intersection of 2 wires as (intersection, type) where:
             - intersection is App.Vector() with coordinates of intersection
             - type - type of inersection: 0 - connected in point, 1 - need extend edges, 2 - need trim edges
@@ -545,7 +577,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         (topo1, index1, param1, topo2, index2, param2) = infos[0]
         (v1, v2) = vectors[0]
         
-        if dist == 0 and topo1 == topo2 == "Vertex":
+        if math.isclose(0.0, dist, abs_tol=tolerance) and topo1 == topo2 == "Vertex":
             # wires already connected in intersection point
             return (v1, 0)
         else:
@@ -562,9 +594,13 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 L2_start = wire2.Edges[0]
                 res = L1_end.Curve.intersectCC(L2_start.Curve)
 
-                if len(res) == 0:                    
-                    message = "Wires not intersect. Check offset direction."
-                    raise Exception(message)
+                if len(res) == 0:
+                    # wires are parallel but endpoints close togeter withing tolerance
+                    if math.isclose(0.0, dist, abs_tol=tolerance):                        
+                        return (v1, 0)
+                    else:                                         
+                        message = "Wires not intersect. Check offset direction. Distance between edges = {}".format(dist)
+                        raise Exception(message)
                 else:
                     intPoint = App.Vector(res[0].X, res[0].Y, res[0].Z)
 
@@ -696,7 +732,8 @@ Check route for any logical errors, try another kerf compensation strategy or re
             return [wire.Vertexes[0].Point, wire.Vertexes[-1].Point]
         
         bs = Part.BSplineCurve()
-        bs.approximate(Points = [v.Point for v in wire.Vertexes], Continuity="C0")
+        #bs.approximate(Points = [v.Point for v in wire.Vertexes], Continuity="C0")
+        bs.interpolate([v.Point for v in wire.Vertexes])
         res = bs.discretize(Number=num_points)
         
         return res
@@ -799,6 +836,23 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
                 group.addChild(self.drawRouteLine(pg))
         return group
     
+    """ def drawRouteLine(self, points):
+        sep = coin.SoSeparator()
+        if len(points) > 0:            
+            p = coin.SoPointSet()
+            coords = coin.SoCoordinate3()
+            coords.point.setValues(0, [[p.x, p.y, p.z] for p in points])
+            color = coin.SoBaseColor()
+            color.rgb.setValue(1, 0, 0)
+            draw_style = coin.SoDrawStyle()
+            draw_style.style = coin.SoDrawStyle.FILLED
+            draw_style.pointSize = 2
+            sep.addChild(draw_style)
+            sep.addChild(color)
+            sep.addChild(coords)
+            sep.addChild(p)
+        return sep """
+    
     def drawRouteLine(self, points):
         sep = coin.SoSeparator()
         if len(points) > 0:            
@@ -815,8 +869,8 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
             sep.addChild(color)
             sep.addChild(coords)
             sep.addChild(line)
-        return sep
-       
+        return sep 
+    
     def getIcon(self):
         return utilities.getIconPath("route.svg")
 
