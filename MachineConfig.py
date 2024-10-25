@@ -110,6 +110,10 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
 
         if hasattr(obj, "KerfCompensation") and obj.getGroupOfProperty("KerfCompensation") != "Kerf Compensation":
             obj.setGroupOfProperty("KerfCompensation", "Kerf Compensation")
+        
+        if hasattr(obj, "CompensationDegree"):
+            print("{} - Migrating from 0.1.3 to 0.1.4 - hiding CompensationDegree property.".format(obj.Label))
+            obj.setEditorMode("CompensationDegree", 2)
 
     def execute(self, obj):
         
