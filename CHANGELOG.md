@@ -16,7 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed 
 - offset calculation improved. When makeOffset2D fails code fallback to custom calculations
-- route points calculations improved by using interpolation instead of aproximation
+- route points calculations improved by using interpolation instead of approximation
 
 ## [0.1.3] - 2024-10-23
    
