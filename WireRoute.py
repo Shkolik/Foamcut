@@ -596,7 +596,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 res = L1_end.Curve.intersectCC(L2_start.Curve)
 
                 if len(res) == 0:
-                    # wires are parallel but endpoints close togeter withing tolerance
+                    # wires are parallel but endpoints close together within tolerance
                     if math.isclose(0.0, dist, abs_tol=tolerance):                        
                         return (v1, 0)
                     else:                                         
