@@ -19,6 +19,8 @@ Enjoy!
 
 - Search for FoamCut and click install.
 
+<details><summary>Expand for details regarding Manual installation</summary>
+
 ### Manual Installation via Git
 
 Linux:
@@ -48,6 +50,8 @@ Windows:
 ```
 %APPDATA%\FreeCAD\Mod 
 ```
+
+</details>
 
 When you restart FreeCAD, "FoamCut" workbench should now show up in the [workbench dropdown list](https://freecadweb.org/wiki/Std_Workbench).
 
