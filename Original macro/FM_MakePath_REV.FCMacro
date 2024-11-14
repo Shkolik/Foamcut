@@ -275,7 +275,7 @@ def makePath():
   # - Check object types
   for obj in objects:
     if obj.ShapeType != "Vertex" and obj.ShapeType != "Edge":
-      print("ERROR: Selected objects shoul be vertex or edge")
+      print("ERROR: Selected objects should be vertex or edge")
       return
 
   # - Make path between objects on working planes

@@ -262,7 +262,7 @@ def makeGCODE(route_list, config):
 
     TASK += [";\r\n", "; --- Route begin [%s] ---\r\n" % route.Label]
 
-    # - Walk throug all route elemets
+    # - Walk through all route elements
     prev_path = False
     for i in range(len(route.Data)):
       # - Access item

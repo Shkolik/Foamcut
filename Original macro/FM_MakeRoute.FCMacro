@@ -163,7 +163,7 @@ def join():
       entry.Reversed  = False
       route_data.append(entry)
 
-      # - Check is rotation is firts element
+      # - Check if rotation is first element
       if item_index == 1:
         # - Do no skip next element
         first = second
