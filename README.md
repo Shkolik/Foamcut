@@ -13,11 +13,13 @@ Enjoy!
 
 ## Installation
 
-### Automatic Installation
+### Automatic Installation via Addon Manager (Recommended)
 
-Not available for now
+- Open Tools > Addon Manager
 
-### Manual Installation
+- Search for FoamCut and click install.
+
+### Manual Installation via Git
 
 Linux:
 ```bash
@@ -29,6 +31,22 @@ Windows:
 ```bash
 cd %APPDATA%\FreeCAD\Mod 
 git clone https://github.com/Shkolik/Foamcut.git
+```
+
+### Manual Installation via Zip
+
+- Go to https://github.com/Shkolik/Foamcut
+- Click on Code > Download ZIP
+- Extract content of ZIP archive to your Mod directory
+
+Linux:
+```
+~/FreeCAD/Mod/
+```
+
+Windows:
+```
+%APPDATA%\FreeCAD\Mod 
 ```
 
 When you restart FreeCAD, "FoamCut" workbench should now show up in the [workbench dropdown list](https://freecadweb.org/wiki/Std_Workbench).
