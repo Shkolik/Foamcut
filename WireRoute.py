@@ -438,10 +438,23 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 path_l = object.Path_L[::-1] if route_data_dir[i] else object.Path_L
                 path_r = object.Path_R[::-1] if route_data_dir[i] else object.Path_R
 
-                for idx in range(len(path_l) - 1):
-                    resultPoints_L.append(path_l[idx])
-                for idx in range(len(path_r) - 1):
-                    resultPoints_R.append(path_r[idx])
+                if len(path_l) == object.PointsCount:
+                    for idx in range(len(path_l) - 1):
+                        resultPoints_L.append(path_l[idx])
+                else:
+                    wire = self.makeWire(path_l)
+                    points = self.getWirepoints(wire, object.PointsCount)
+                    for idx in range(len(points) - 1):
+                        resultPoints_L.append(points[idx])
+                if len(path_r) == object.PointsCount:
+                    for idx in range(len(path_r) - 1):
+                        resultPoints_R.append(path_r[idx])
+                else:
+                    wire = self.makeWire(path_r)
+                    points = self.getWirepoints(wire, object.PointsCount)
+                    for idx in range(len(points) - 1):
+                        resultPoints_R.append(points[idx])
+                
                 if i == len(route_data) - 1:
                     resultPoints_L.append(path_l[-1])
                     resultPoints_R.append(path_r[-1])

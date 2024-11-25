@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 ### Fixed 
-
+- generating Gcode from route without compensation that has strait lines (regression from optimization)
 
 ## [0.1.4] - 2024-10-25
    
