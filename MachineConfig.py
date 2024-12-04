@@ -52,8 +52,14 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyBool",       "DynamicWirePower",  "Wire",             "Dynamic wire power. " + 
                         "Power will vary depending on wire length. When enabling be sure that your controller set to Laser mode, " + 
                         "otherwise machine will halt for a brif moment after each move.").DynamicWirePower = utilities.getParameterBool("DynamicWirePower", False)
+        obj.addProperty("App::PropertyBool",       "WireStretchVerification",    "Wire",             "Verify wire ellongation. " + 
+                        "If wire stretch past machine campatibility it can break. " + 
+                        "Enabling this setting will give warning if given path will stretch wire too much. " +
+                        "Working in pair with WireEllongationLength. Will take any effect only if length greater than 0mm.").WireStretchVerification = utilities.getParameterBool("WireStretchVerification", False)
+        obj.addProperty("App::PropertyLength",     "WireStretchLength",      "Wire",    "Wire ellongation specify how much wire can stretch before breaking. " +
+                        "Set value greater than 0mm to enable verification.").WireStretchLength = utilities.getParameterFloat("WireStretchLength", 0.0)
         obj.addProperty("App::PropertyLength",     "KerfCompensation",      "Kerf Compensation",    "Kerf Compensation").KerfCompensation = utilities.getParameterFloat("KerfCompensation", 0.6)
-        obj.addProperty("App::PropertyFloat",     "CompensationDegree",      "Kerf Compensation",    "Kerf Compensation coefficient. \r\n\
+        obj.addProperty("App::PropertyFloat",      "CompensationDegree",    "Kerf Compensation",    "Kerf Compensation coefficient. \r\n\
                         This coefficient help calculate kerf compensation when wire speed is less than nominal. \r\n\
                         Usually kerf thickness is directly related to movement speed. Lesser speed - thicker kerf. \
                         But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
@@ -113,6 +119,18 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
             print("{} - Migrating from 0.1.3 to 0.1.4 - hiding CompensationDegree property.".format(obj.Label))
             obj.setEditorMode("CompensationDegree", 2)
 
+        # Migrating from 0.1.4 to 0.1.5 - this properties needed for wire stretch verification
+        if not hasattr(obj, "WireStretchVerification"):
+            obj.addProperty("App::PropertyBool",       "WireStretchVerification",    "Wire",             "Verify wire ellongation. " + 
+                        "If wire stretch past machine campatibility it can break. " + 
+                        "Enabling this setting will give warning if given path will stretch wire too much. " +
+                        "Working in pair with WireEllongationLength. Will take any effect only if length greater than 0mm.").WireStretchVerification = utilities.getParameterBool("WireStretchVerification", False)
+            print("{} - Migrating from 0.1.4 to 0.1.5 - adding WireStretchVerification property.".format(obj.Label))
+        if not hasattr(obj, "WireStretchLength"):
+            obj.addProperty("App::PropertyLength",     "WireStretchLength",      "Wire",    "Wire ellongation specify how much wire can stretch before breaking. " +
+                        "Set value greater than 0mm to enable verification.").WireStretchLength = utilities.getParameterFloat("WireStretchLength", 0.0)
+            print("{} - Migrating from 0.1.4 to 0.1.5 - adding WireStretchLength property.".format(obj.Label))
+
     def execute(self, obj):
         
         pass 
@@ -149,7 +167,8 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
             obj.setEditorMode("HomingZ1", 0 if obj.EnableHoming else 3)
             obj.setEditorMode("HomingZ2", 0 if obj.EnableHoming else 3)
             obj.setEditorMode("HomingR1", 0 if obj.EnableHoming and obj.FiveAxisMachine else 3) 
-                  
+        if prop == "WireStretchVerification" and hasattr(obj, "WireStretchLength"):
+            obj.setEditorMode("WireStretchLength", 0 if obj.WireStretchVerification else 3)          
         pass
 
 class MachineConfigVP(FoamCutViewProviders.FoamCutBaseViewProvider):    

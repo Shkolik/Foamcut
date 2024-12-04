@@ -94,7 +94,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         if touched:
             obj.recompute()
 
-
     def onChanged(self, obj, prop):        
         if prop == "AddPause":
             if obj.AddPause:
@@ -263,6 +262,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
             shapes = [path_L.toShape(), path_R.toShape()]
 
+        self.validateWireStretch(obj)
         
         for edge in edges:
             shapes.append(edge)
@@ -274,3 +274,25 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             obj.LeftEdgeName = "Edge%d" % (shapes.index(edges[0]) + 1)
         if hasattr(obj, "RightEdgeName") and len(edges) > 1:
             obj.RightEdgeName = "Edge%d" % (shapes.index(edges[1]) + 1)
+
+    def validateWireStretch(self, obj):
+        config = self.getConfig(obj)
+
+        if not config.WireStretchVerification or not float(config.WireStretchLength) > 0.0:
+            return True
+
+        if len(obj.Path_L) != len(obj.Path_R):
+            App.Console.PrintError("ERROR:\n Number of point doesn't match.\n Object - {}".format(obj.Label))
+            return False
+        
+        delta = float(config.WireStretchLength)
+        wireLength = float(config.FieldWidth)
+
+        for i in range(len(obj.Path_L)):
+            stretch = obj.Path_L[i].distanceToPoint(obj.Path_R[i]) - wireLength
+
+            if stretch > delta:
+                App.Console.PrintWarning("Warning:\n Wire about to break cutting {}. Wire stretch is {:.2f}mm that is greater than allowed {:.2f}mm \n".format(obj.Label, stretch, delta))
+                return False
+
+        return True
