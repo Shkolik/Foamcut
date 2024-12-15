@@ -2,9 +2,11 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.5] - TBA
+## [0.1.5] - 2024-12-15
    
 ### Added
+
+- wire stretch verification. For now it provide user a warning if wire stretch exceed maximum and do not prevent gcode to be produced.
 
 ### Fixed 
 - generating Gcode from route without compensation that has strait lines (regression from optimization)
