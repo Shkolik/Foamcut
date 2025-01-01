@@ -2,6 +2,13 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 2024-12-15
+   
+### Added
+
+### Fixed 
+- Edge pairs detection when creating set of edges from 2 selected faces and edges on these faces are going in different directions.
+
 ## [0.1.5] - 2024-12-15
    
 ### Added

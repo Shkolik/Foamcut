@@ -71,23 +71,17 @@ class MakePath():
         PathSectionVP(obj.ViewObject)
         obj.ViewObject.PointSize = 4
         
-    def SortEdges(self, parent_l, parent_r, edges_l, edges_r):
+    def FindOppositeEdgeIndex(self, edge, edges_r):
         """
-        Sort right edges to form opposite edge pairs
+        Try to find edge in collection of edges that most close to edge provided
 
-        @param parent_l - feature containing edges_l
-        @param parent_r - feature containing edges_r
-        @param edges_l - list of edges on a left side
-        @param edges_r - list of edges on a right side 
+        @param edge - edge on a left side
+        @param edges_r - edges on a right side
 
-        @returns list of edge pairs
+        @returns index of closest edge on a right side
         """
-
-        objects = []
-        firstLeftEdge = edges_l[0]
-        v1_l = firstLeftEdge.firstVertex().Point
-        v2_l = firstLeftEdge.lastVertex().Point
-        
+        v1_l = edge.firstVertex().Point
+        v2_l = edge.lastVertex().Point
 
         minDistance = min(v1_l.distanceToPoint(edges_r[0].firstVertex().Point), v1_l.distanceToPoint(edges_r[0].lastVertex().Point)) + \
         min(v2_l.distanceToPoint(edges_r[0].firstVertex().Point), v2_l.distanceToPoint(edges_r[0].lastVertex().Point))
@@ -101,12 +95,44 @@ class MakePath():
             if dist < minDistance:
                 minDistance = dist
                 firstRightEdgeIndex = i
+
+        return firstRightEdgeIndex
+
+    def SortEdges(self, parent_l, parent_r, edges_l, edges_r):
+        """
+        Sort right edges to form opposite edge pairs
+
+        @param parent_l - feature containing edges_l
+        @param parent_r - feature containing edges_r
+        @param edges_l - list of edges on a left side
+        @param edges_r - list of edges on a right side 
+
+        @returns list of edge pairs
+        """
+
+        objects = []
+
+        if len(edges_l) == 1 and len(edges_r) == 1:
+            edges_l_links = getEdgesLinks(parent_l, edges_l)
+            edges_r_links = getEdgesLinks(parent_r, edges_r)
+            objects.append([edges_l_links[0], edges_r_links[0]])
+            return objects
         
+        firstRightEdgeIndex = self.FindOppositeEdgeIndex(edges_l[0], edges_r)
+        secondRightEdgeIndex = self.FindOppositeEdgeIndex(edges_l[1], edges_r)
+
         edges_r_sorted = []
-        for i in range(firstRightEdgeIndex, len(edges_r)):
-            edges_r_sorted.append(edges_r[i])
-        for i in range(firstRightEdgeIndex):
-            edges_r_sorted.append(edges_r[i])
+       
+        if (firstRightEdgeIndex + 1 == len(edges_r) and secondRightEdgeIndex == 0) or firstRightEdgeIndex < secondRightEdgeIndex:
+            for i in range(firstRightEdgeIndex, len(edges_r)):
+                edges_r_sorted.append(edges_r[i])
+            for i in range(firstRightEdgeIndex):
+                edges_r_sorted.append(edges_r[i])
+        else:
+            for i in range(firstRightEdgeIndex, -1, -1):
+                edges_r_sorted.append(edges_r[i])
+            for i in range(len(edges_r) - 1, firstRightEdgeIndex, - 1):
+                edges_r_sorted.append(edges_r[i])
 
         edges_l_links = getEdgesLinks(parent_l, edges_l)
         edges_r_links = getEdgesLinks(parent_r, edges_r_sorted)
