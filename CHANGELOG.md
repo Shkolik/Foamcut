@@ -2,6 +2,14 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 2025-06-13
+   
+### Added
+
+### Fixed 
+- Postprocessor pause handling.
+
+
 ## [0.1.6] - 2024-12-15
    
 ### Added

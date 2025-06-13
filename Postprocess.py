@@ -232,13 +232,13 @@ class Postprocess():
                         TASK += self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
                         point_l.y, point_l.z, point_r.y, point_r.z, )
 
-                        if addPause and duration > 0:
-                            if config.TimeUnits == 1: #["Seconds", "Milliseconds"]
-                                duration = duration * 1000
-                            TASK += self.generatePause(config.PauseCommand, duration)
-                        
                         # - Increase point index
                         point_index += 1
+                    
+                    if addPause and duration > 0:
+                        if config.TimeUnits == 1: #["Seconds", "Milliseconds"]
+                            duration = duration * 1000
+                        TASK += self.generatePause(config.PauseCommand, duration)
                
 
             TASK += ["; --- Route end [%s] ---\r\n" % route.Label, ";\r\n"]
