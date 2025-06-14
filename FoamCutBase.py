@@ -134,7 +134,9 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         wp = getWorkingPlanes(job, doc)
 
         # check if selected vertex laying on any working plane
-        onPlane = wp[0].Shape.isInside(vertex.Point, 0.01, True) or wp[1].Shape.isInside(vertex.Point, 0.01, True)
+        onLeftPlane = wp[0].Shape.isInside(vertex.Point, 0.01, True)
+        onRightPlane = wp[1].Shape.isInside(vertex.Point, 0.01, True)
+        onPlane = onLeftPlane or onRightPlane
 
         isLeft = False
 
@@ -145,31 +147,52 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             if isMovement(parent):
                 
                 point = vertex.Point
+                (distToLeft, _, _) = vertex.distToShape(left)
+                (distToRight, _, _) = vertex.distToShape(right)
+                
                 # - Connect
                 if isCommonPoint(parent.Path_L[START], point):
                     isLeft = True
-                    vertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
-                    oppositeVertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())
+                    if distToLeft < distToRight:
+                        vertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
+                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())            
+                    else:
+                        vertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
+                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.firstVertex() if not parent.EdgesInverted else left.lastVertex())
                 elif isCommonPoint(parent.Path_L[END], point):
                     isLeft = True
-                    vertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
-                    oppositeVertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
-                elif isCommonPoint(parent.Path_R[START], point):                
-                    vertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())
-                    oppositeVertex = left if isinstance(left, Part.Vertex) else left.firstVertex()                    
+                    if distToLeft < distToRight:
+                        vertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
+                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
+                    else:
+                        vertex = right if isinstance(right, Part.Vertex) else right.lastVertex()
+                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.lastVertex() if not parent.EdgesInverted else left.firstVertex())
+                elif isCommonPoint(parent.Path_R[START], point):
+                    if distToRight < distToLeft:
+                        vertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
+                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.firstVertex() if not parent.EdgesInverted else left.lastVertex())                
+                    else:
+                        vertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
+                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())
                 elif isCommonPoint(parent.Path_R[END], point):
-                    vertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
-                    oppositeVertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
-
+                    if distToRight < distToLeft:
+                        vertex = right if isinstance(right, Part.Vertex) else right.lastVertex() 
+                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.lastVertex() if not parent.EdgesInverted else left.firstVertex())
+                    else:
+                        vertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
+                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
             else:
                 App.Console.PrintError("ERROR:\n Not supported parent object type. Only Path, Move and Projection supported.\n")
         else:
-            if isMovement(parent):    
-                if isCommonPoint(left if isinstance(left, Part.Vertex) else left.firstVertex(), vertex):
-                    isLeft = True
+            if isMovement(parent):
+                (distToLeft, _, _) = vertex.distToShape(wp[0].Shape)
+                (distToRight, _, _) = vertex.distToShape(wp[1].Shape)
+
+                isLeft = distToLeft < distToRight
+
+                if isCommonPoint(left if isinstance(left, Part.Vertex) else left.firstVertex(), vertex):                    
                     oppositeVertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
                 elif isCommonPoint(left if isinstance(left, Part.Vertex) else left.lastVertex(), vertex):
-                    isLeft = True
                     oppositeVertex = right if isinstance(right, Part.Vertex) else right.lastVertex()
                 elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.firstVertex(), vertex):
                     oppositeVertex =left if isinstance(left, Part.Vertex) else left.firstVertex()

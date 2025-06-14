@@ -2,13 +2,13 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.6] - 2025-06-13
+## [0.1.6] - 2025-06-14
    
 ### Added
 
 ### Fixed 
 - Postprocessor pause handling.
-
+- join operation fail when edges added not from one side 
 
 ## [0.1.6] - 2024-12-15
    
