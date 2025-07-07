@@ -40,6 +40,10 @@ class FoamCutBaseObject:
 class FoamCutMovementBaseObject(FoamCutBaseObject):
     def __init__(self, obj, jobName):
         super().__init__(obj, jobName)  
+
+        configName = self.getConfigName(obj)
+        config = self.getConfig(obj)
+
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
 
@@ -57,15 +61,13 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.addProperty("App::PropertyDistance",    "RightEdgeLength",     "", "", 5)
 
         obj.addProperty("App::PropertyBool",        "AddPause",             "Task", "Add pause at the end of move").AddPause = False
-        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds")
+        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds").PauseDuration = config.PauseDuration
 
         obj.addProperty("App::PropertyEnumeration", "CompensationDirection", "Kerf Compensation",   "Kerf compensation direction").CompensationDirection = FC_KERF_DIRECTIONS
         obj.CompensationDirection = 0 # Normal compensation by default
 
-
-        config = self.getConfigName(obj)
-        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(config))
-        obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
+        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(configName))
+        # obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
 
         obj.setEditorMode("PauseDuration", 3)
 
