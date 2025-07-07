@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed 
 - Postprocessor pause handling.
 - join operation fail when edges added not from one side 
+- independent pause setting for every part of the route 
 
 ## [0.1.6] - 2024-12-15
    
