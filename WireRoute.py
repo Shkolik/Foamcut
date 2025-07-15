@@ -475,7 +475,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         '''
         edges = []
         for i in range(len(points) - 1):
-            edges.append(Part.LineSegment(points[i], points[i+1]))    
+            edges.append(Part.LineSegment(points[i], points[i+1]))
+
         return Part.Wire([edge.toShape() for edge in edges])
     
     def makeLineOffset(self, wire, offset):
@@ -683,7 +684,7 @@ Check route for any logical errors, try another kerf compensation strategy or re
             
             (topo1, index1, param1, topo2, index2, param2) = infos2[0]
             # intersection is outside. We need to add one more edge to offset
-            if dist1 > 0 and topo2 == "Vertex": 
+            if dist2 > 0 and topo2 == "Vertex": 
                 points = [point] + [v.Point for v in o2_wire.Vertexes]
                 wire2 = self.makeWire(points)
             else:
