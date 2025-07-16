@@ -70,28 +70,31 @@ class MakePath():
                     group.Name)
         PathSectionVP(obj.ViewObject)
         obj.ViewObject.PointSize = 4
-        
-    def FindOppositeEdgeIndex(self, edge, edges_r):
+
+    def FindOppositeEdgeIndex(self, edge, edges_r, skipIndex=None):
         """
         Try to find edge in collection of edges that most close to edge provided
 
         @param edge - edge on a left side
         @param edges_r - edges on a right side
+        @param skipIndex - index of edge to skip in edges_r
 
         @returns index of closest edge on a right side
         """
         v1_l = edge.firstVertex().Point
         v2_l = edge.lastVertex().Point
 
-        minDistance = min(v1_l.distanceToPoint(edges_r[0].firstVertex().Point), v1_l.distanceToPoint(edges_r[0].lastVertex().Point)) + \
-        min(v2_l.distanceToPoint(edges_r[0].firstVertex().Point), v2_l.distanceToPoint(edges_r[0].lastVertex().Point))
+        firstRightEdgeIndex = skipIndex + 1 if skipIndex is not None and skipIndex + 1 < len(edges_r) else 0
 
-        firstRightEdgeIndex = 0
-        for i, edge in enumerate(edges_r):
-            v1_r = edge.firstVertex().Point
-            v2_r = edge.lastVertex().Point
+        minDistance = min(v1_l.distanceToPoint(edges_r[firstRightEdgeIndex].firstVertex().Point), v1_l.distanceToPoint(edges_r[firstRightEdgeIndex].lastVertex().Point)) + \
+        min(v2_l.distanceToPoint(edges_r[firstRightEdgeIndex].firstVertex().Point), v2_l.distanceToPoint(edges_r[firstRightEdgeIndex].lastVertex().Point))
+
+        for i, edge_r in enumerate(edges_r):
+            if( i == skipIndex):
+                continue
+            v1_r = edge_r.firstVertex().Point
+            v2_r = edge_r.lastVertex().Point
             dist = min(v1_l.distanceToPoint(v1_r), v1_l.distanceToPoint(v2_r)) + min(v2_l.distanceToPoint(v1_r), v2_l.distanceToPoint(v2_r))
-            
             if dist < minDistance:
                 minDistance = dist
                 firstRightEdgeIndex = i
@@ -117,9 +120,9 @@ class MakePath():
             edges_r_links = getEdgesLinks(parent_r, edges_r)
             objects.append([edges_l_links[0], edges_r_links[0]])
             return objects
-        
+
         firstRightEdgeIndex = self.FindOppositeEdgeIndex(edges_l[0], edges_r)
-        secondRightEdgeIndex = self.FindOppositeEdgeIndex(edges_l[1], edges_r)
+        secondRightEdgeIndex = self.FindOppositeEdgeIndex(edges_l[1], edges_r, firstRightEdgeIndex)
 
         edges_r_sorted = []
        
@@ -156,6 +159,9 @@ class MakePath():
             
             # - Get selected objects
             objects = utilities.getAllSelectedObjects(True)
+            
+            # left working plane
+            wps = getWorkingPlanes(group, App.ActiveDocument)
 
             baseObjects = []
 
@@ -164,7 +170,12 @@ class MakePath():
 
             edgesPairs = []
 
-            right = False
+            firstSub = objects[0][0].getSubObject(objects[0][1][0])
+            (dist_l, _, _) = firstSub.distToShape(wps[0].Shape) # distance to left working plane
+            (dist_r, _, _) = firstSub.distToShape(wps[1].Shape) # distance to right working plane
+
+            right = dist_l > dist_r
+
             for object in objects:
                 if object[1][0].startswith("Face"):
                     # - prepare base object. 
@@ -176,6 +187,7 @@ class MakePath():
                     
                     if right:
                         edges_r = object[0].getSubObject(object[1][0]).Edges
+                        right = False
                     else:
                         edges_l = object[0].getSubObject(object[1][0]).Edges
                         right = True
@@ -183,10 +195,11 @@ class MakePath():
                     edgesPairs.append(objects)
                     break
 
+            #reset 
+            right = dist_l > dist_r
+
             if len(edges_l) > 1 and len(edges_l) == len(edges_r):
-                #print("Left edges: {}".format(edges_l))
-                #print("Right edges: {}".format(edges_r))
-                edgesPairs = self.SortEdges(objects[0][0], objects[1][0], edges_l, edges_r)
+                edgesPairs = self.SortEdges(objects[0][0] if not right else objects[1][0], objects[1][0] if not right else objects[0][0], edges_l, edges_r)
 
             for pair in edgesPairs:
                 self.CreateFromEdges(pair, group)
@@ -208,7 +221,7 @@ class MakePath():
                 # - Get selected objects
                 objects = getAllSelectedObjects(True)
 
-                # - Number of edges should be two
+                # - Number of edges or faces should be 2
                 if len(objects) != 2:               
                     return False
                 

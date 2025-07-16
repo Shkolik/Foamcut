@@ -2,12 +2,13 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.8] - TBA
+## [0.1.8] - 2025-07-15
    
 ### Added
 
 ### Fixed 
-
+- Error compute a route with kerf compensation - Points are equal
+- Sorting face edges sometimes produce bad result. Another attempt to mitigate it.
 
 ## [0.1.7] - 2025-07-07
    
