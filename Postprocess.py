@@ -44,7 +44,14 @@ class Postprocess():
         position = self.generateTravelPosition(config, X1, Z1, X2, Z2)
 
         # - Create GCODE
-        return command.replace("{Position}", str(position)).replace("{FeedRate}", str(float(feed_rate) * 60)).replace("{WirePower}", str(wire_power)) + "\r\n"
+        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)).replace("{WirePower}", str(wire_power)) + "\r\n"
+
+    '''
+    Generate rapid travel
+    '''
+    def generateRapidTravel(self, config, X1, Z1, X2, Z2):        
+        # - Create GCODE
+        return self.generateTravel(config, config.MoveCommand, config.FeedRateMove, '', X1, Z1, X2, Z2)
 
     '''
     Generate pause
@@ -60,7 +67,7 @@ class Postprocess():
         position = self.generateRotationPosition(config, angle)
 
         # - Create GCODE
-        return command.replace("{Position}", str(position)).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
+        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)) + "\r\n"
 
     '''
     Generate wire enable command
@@ -77,8 +84,7 @@ class Postprocess():
     '''
     Generate command for compensated power
     '''
-    def generateWireCompensatedPower(self, config, wire_length):
-        min_power   = float(config.WireMinPower)
+    def generateWireCompensatedPower(self, config, wire_length, min_power):
         max_power   = float(config.WireMaxPower)
         min_length  = float(config.FieldWidth)
 
@@ -98,7 +104,7 @@ class Postprocess():
         GCODE += ";Length: {}\r\n".format(config.BlockLength)
         GCODE += ";Height: {}\r\n".format(config.BlockHeight)
 
-        GCODE += ";Position - Left-Bottom-Front corner\r\n"
+        GCODE += ";Position - Left-Bottom-Front corner in relation to the origin\r\n"
         GCODE += ";Position.X: {}\r\n".format(config.BlockPosition.x)
         GCODE += ";Position.Y: {}\r\n".format(config.BlockPosition.y)
         GCODE += ";Position.Z: {}\r\n".format(config.BlockPosition.z)
@@ -121,8 +127,7 @@ class Postprocess():
 
         if config.EnableParking:
             # - Park
-            GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-               config.ParkX, config.ParkZ, config.ParkX, config.ParkZ )
+            GCODE += self.generateRapidTravel(config, config.ParkX, config.ParkZ, config.ParkX, config.ParkZ )
             if config.FiveAxisMachine:
                 GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
 
@@ -130,8 +135,7 @@ class Postprocess():
         if start_point is not None:
             start_L, start_R = start_point
             if config.EnableParking:
-                GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-                start_L.y, config.ParkZ, start_R.y, config.ParkZ)
+                GCODE += self.generateRapidTravel(config, start_L.y, config.ParkZ, start_R.y, config.ParkZ)
 
         wirePower = config.WireMinPower
         # - generate compensated wire power
@@ -179,13 +183,13 @@ class Postprocess():
     '''
     Calculate dynamic power if needed and return gcode for command
     '''
-    def getDynamicWirePowerCommand(self, point1, point2, config):
+    def getDynamicWirePowerCommand(self, point1, point2, power, config):
         wirePowerCommand = ""
         # - generate compensated wire power
         if config.DynamicWirePower:
             # - Calculate wire length
             wire_length = point1.distanceToPoint(point2);
-            wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length))
+            wirePowerCommand = "S%.2f" % (self.generateWireCompensatedPower(config, wire_length, power))
         return wirePowerCommand
     
     '''
@@ -206,6 +210,9 @@ class Postprocess():
             if start_point is None: 
                 start_point = (route.Offset_L[0], route.Offset_R[0])
 
+            # - Generate rapid travel command
+            TASK += self.generateRapidTravel(config, route.Offset_L[0].y, route.Offset_L[0].z, route.Offset_R[0].y, route.Offset_R[0].z)
+            
             for i in range(len(route.Data)):                                
                 # - Access item
                 object_index = route.Data[i]
@@ -217,7 +224,8 @@ class Postprocess():
                 else:
                     addPause = object.AddPause if hasattr(object, "AddPause") else False
                     duration = object.PauseDuration if hasattr(object, "PauseDuration") else 0
-
+                    feed = object.FeedRate if hasattr(object, "FeedRate") and object.FeedRate > 0 else config.FeedRateCut
+                    power = float(object.WirePower) if hasattr(object, "WirePower") and object.WirePower > 0 else float(config.WireMinPower)
                     TASK += ["; - %s [%s]\r\n" % (object.Type, object.Label)]
 
                     points_count = object.PointsCount if i == 0 else object.PointsCount - 1
@@ -226,11 +234,11 @@ class Postprocess():
                         point_l = route.Offset_L[point_index]
                         point_r = route.Offset_R[point_index]
 
-                        wirePowerCommand = self.getDynamicWirePowerCommand(point_l, point_r, config)
-                        
+                        wirePowerCommand = self.getDynamicWirePowerCommand(point_l, point_r, power, config)
+
                         # - Generate CUT travel command
-                        TASK += self.generateTravel(config, config.CutCommand, config.FeedRateCut, wirePowerCommand,
-                        point_l.y, point_l.z, point_r.y, point_r.z, )
+                        TASK += self.generateTravel(config, config.CutCommand, feed, wirePowerCommand,
+                                                    point_l.y, point_l.z, point_r.y, point_r.z, )
 
                         # - Increase point index
                         point_index += 1
@@ -240,7 +248,6 @@ class Postprocess():
                             duration = duration * 1000
                         TASK += self.generatePause(config.PauseCommand, duration)
                
-
             TASK += ["; --- Route end [%s] ---\r\n" % route.Label, ";\r\n"]
 
         # ---- Generate startup block

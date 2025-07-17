@@ -8,7 +8,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed 
 - route generation with kerf compensation producing incorrect intersections
-
+- postprocessor selecting wrong speed and doesn't use rapid movements
+ 
 ## [0.1.8] - 2025-07-15
    
 ### Added
