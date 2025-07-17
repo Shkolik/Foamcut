@@ -316,8 +316,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 
                 dir = -1 * (idx - 1) if obj.CompensationDirection in FC_ROUTE_KERF_DIRECTIONS and FC_ROUTE_KERF_DIRECTIONS.index(obj.CompensationDirection) == 1 else idx - 1;
                 
-                #print("Offset dir: {}".format(dir))
-
                 path_l = object.Path_L[::-1] if route_data_dir[i] else object.Path_L
                 path_r = object.Path_R[::-1] if route_data_dir[i] else object.Path_R
 
@@ -372,8 +370,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     ileft = self.intersectWires(offsets_L[i], offsets_L[i + 1])
                     iright = self.intersectWires(offsets_R[i], offsets_R[i + 1])
                     intersections_L.append(ileft)
-                    intersections_R.append(iright)
-                                
+                    intersections_R.append(iright)   
+
                 firstWire = None
                 for i in range(len(offsets_L) - 1):
                     if firstWire == None:
@@ -605,8 +603,12 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 # wires not intersect, so calculate intersection by using first wire last edge and second wire first edge
                 #print("Closest distance between wires {}; {}".format(dist, infos))
 
-                L1_end = wire1.Edges[-1]
-                L2_start = wire2.Edges[0]
+                L1_end_idx = index1 if topo1 == "Edge" else (-1 if topo1 == "Vertex" and index1 > 0 else 0)
+                L2_start_idx = index2 if topo2 == "Edge" else (-1 if topo2 == "Vertex" and index2 > 0 else 0)
+
+                L1_end = wire1.Edges[L1_end_idx]
+                L2_start = wire2.Edges[L2_start_idx]
+
                 res = L1_end.Curve.intersectCC(L2_start.Curve)
 
                 if len(res) == 0:
@@ -617,35 +619,31 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                         message = "Wires not intersect. Check offset direction. Distance between edges = {}".format(dist)
                         raise Exception(message)
                 else:
-                    intPoint = App.Vector(res[0].X, res[0].Y, res[0].Z)
-
-                    int_L1_start = intPoint.distanceToPoint(wire1.Edges[0].Vertexes[0].Point)
-                    int_L1_end = intPoint.distanceToPoint(L1_end.Vertexes[-1].Point)
-                    int_L2_start = intPoint.distanceToPoint(L2_start.Vertexes[0].Point)
-                    int_L2_end = intPoint.distanceToPoint(L2_start.Vertexes[0].Point)
-
-                    # check where intersection located. If it's on other end of any wire then we have almost parallel lines
-                    # and proper offset intersection will not work. 
-                    # We assyme that it's better to place inersection point somewhere close to the end of one of the wires 
-                    # than throw an error
-                    # TODO: Think about better solution for this situation
-                    if dist > 0 and (int_L1_end > int_L1_start or int_L2_start > int_L2_end): 
-                        wire = wire1 if int_L1_end > int_L1_start else wire2
-                        end = int_L1_end > int_L1_start 
-
-                        if len(wire.Edges) == 1:
-                            dir = wire.Edges[0].Vertexes[-1].Point.sub(wire.Edges[0].Vertexes[0].Point) if end else wire.Edges[0].Vertexes[0].Point.sub(wire.Edges[0].Vertexes[-1].Point)
-                            dir.normalize()
-                            intPoint = wire.Edges[0].Vertexes[-1].Point - dir*dist if end else wire.Edges[0].Vertexes[0].Point + dir*dist#wire.Edges[0].CenterOfMass
+                    int_type = 2
+                    if topo1 == "Vertex" and topo2 == "Vertex":
+                        intPoint = App.Vector(res[0].X, res[0].Y, res[0].Z)
+                        int_type = 1
+                    else:
+                        vertex = Part.Vertex(res[0].X, res[0].Y, res[0].Z)
+                        if topo1 == "Vertex" and topo2 == "Edge":
+                            edge = wire2.Edges[index2]
+                            param = param2
                         else:
-                            intPoint = wire.Vertexes[1].Point
-                        if not SUPPRESS_WARNINGS:
-                            App.Console.PrintWarning(
-"Intersection point too far from ideal position or not exists. \r\n \
-It happens when 2 connected paths has too different compensation. \r\n \
-Check route for any logical errors, try another kerf compensation strategy or rethink paths set if result not pleasant. \r\n")    
-                
-                return (intPoint, 1)
+                            edge = wire1.Edges[index1]
+                            param = param1
+
+                        (distance, _, _) = vertex.distToShape(edge)
+                        if math.isclose(0.0, distance, abs_tol=tolerance):
+                            intPoint = vertex.Point
+                        else:
+                            lastParam = edge.LastParameter if edge.FirstParameter < edge.LastParameter else edge.FirstParameter
+                            
+                            newParam = edge.Curve.parameterAtDistance(dist, param)
+                            if newParam > lastParam:
+                                newParam = edge.Curve.parameterAtDistance(dist*-1, param)
+                            intPoint = edge.Curve.value(newParam)
+
+                return (intPoint, int_type)
     
     def fixOffsets(self, o1_wire, o2_wire, intersection):
         '''

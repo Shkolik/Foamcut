@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 ### Fixed 
+- route generation with kerf compensation producing incorrect intersections
 
 ## [0.1.8] - 2025-07-15
    
