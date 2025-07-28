@@ -2,14 +2,21 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.8] - TBA
+## [0.1.10] - TBA
+   
+### Added
+
+### Fixed 
+
+## [0.1.9] - 2025-07-28
    
 ### Added
 
 ### Fixed 
 - route generation with kerf compensation producing incorrect intersections
 - postprocessor selecting wrong speed and doesn't use rapid movements
- 
+- handling of route parts smaller than step size
+
 ## [0.1.8] - 2025-07-15
    
 ### Added

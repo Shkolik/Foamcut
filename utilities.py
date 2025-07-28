@@ -384,6 +384,8 @@ def makePathPointsByEdge(first, planes, step = 0.5, isStraitLine = False):
 
     # - Calculate number of discretization points
     points_count = int(float(first.Length) / float(step))
+    if points_count < 2: #looks like edge too short and we can treat it as strait line
+        points_count = 2
         
     # - Discretize first edge
     first_set = first.discretize(Number=points_count) if points_count > 2 and not isStraitLine else [first.firstVertex().Point, first.lastVertex().Point]
