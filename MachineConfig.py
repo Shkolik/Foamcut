@@ -115,10 +115,6 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         if hasattr(obj, "KerfCompensation") and obj.getGroupOfProperty("KerfCompensation") != "Kerf Compensation":
             obj.setGroupOfProperty("KerfCompensation", "Kerf Compensation")
         
-        if hasattr(obj, "CompensationDegree") and obj.getEditorMode("CompensationDegree")[0] != 'Hidden':
-            print("{} - Migrating from 0.1.3 to 0.1.4 - hiding CompensationDegree property.".format(obj.Label))
-            obj.setEditorMode("CompensationDegree", 2)
-
         # Migrating from 0.1.4 to 0.1.5 - this properties needed for wire stretch verification
         if not hasattr(obj, "WireStretchVerification"):
             obj.addProperty("App::PropertyBool",       "WireStretchVerification",    "Wire",             "Verify wire ellongation. " + 
@@ -130,6 +126,10 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
             obj.addProperty("App::PropertyLength",     "WireStretchLength",      "Wire",    "Wire ellongation specify how much wire can stretch before breaking. " +
                         "Set value greater than 0mm to enable verification.").WireStretchLength = utilities.getParameterFloat("WireStretchLength", 0.0)
             print("{} - Migrating from 0.1.4 to 0.1.5 - adding WireStretchLength property.".format(obj.Label))
+        
+        if hasattr(obj, "CompensationDegree") and obj.getEditorMode("CompensationDegree") and len(obj.getEditorMode("CompensationDegree")) > 0:
+            print("{} - Migrating from post 0.1.3 to 0.1.10 - show CompensationDegree property.".format(obj.Label))
+            obj.setEditorMode("CompensationDegree", 0)
 
     def execute(self, obj):
         

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 ### Fixed 
+- index out of range in the Config.py migration code #10
 
 ## [0.1.9] - 2025-07-28
    
