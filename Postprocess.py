@@ -18,6 +18,17 @@ class Postprocess():
     """Make Gcode"""
 
     '''
+    Makes commented line 
+    '''
+    def makeCommentedLine(self, config, inputString):
+        if config.CommentStyle == utilities.FC_COMMENT_STYLES[0]: # inline comments started with ;
+            return "; {}".format(inputString)
+        elif config.CommentStyle == utilities.FC_COMMENT_STYLES[1]: # inline or multiline comment inside ()
+            return "({})".format(inputString)
+        else:
+            return ""
+
+    '''
     Generate position string for travel
     '''
     def generateTravelPosition(self, config, X1, Z1, X2, Z2):
@@ -104,19 +115,19 @@ class Postprocess():
             GCODE += "{}\n".format(config.StartProgramCode)
             GCODE += "\n"
 
-        GCODE += ";*** FOAM BLOCK ***\n"
+        GCODE += self.makeCommentedLine(config, "*** FOAM BLOCK ***") + "\n"
 
-        GCODE += ";Width: {}\n".format(config.BlockWidth)
-        GCODE += ";Length: {}\n".format(config.BlockLength)
-        GCODE += ";Height: {}\n".format(config.BlockHeight)
+        GCODE += self.makeCommentedLine(config, "Width: {}".format(config.BlockWidth)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Length: {}".format(config.BlockLength)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Height: {}".format(config.BlockHeight)) + "\n"
 
-        GCODE += ";Position - Left-Bottom-Front corner in relation to the origin\n"
-        GCODE += ";Position.X: {}\n".format(config.BlockPosition.x)
-        GCODE += ";Position.Y: {}\n".format(config.BlockPosition.y)
-        GCODE += ";Position.Z: {}\n".format(config.BlockPosition.z)
+        GCODE += self.makeCommentedLine(config, "Position - Left-Bottom-Front corner in relation to the origin") + "\n"
+        GCODE += self.makeCommentedLine(config, "Position.X: {}".format(config.BlockPosition.x)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Position.Y: {}".format(config.BlockPosition.y)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Position.Z: {}".format(config.BlockPosition.z)) + "\n"
         
         GCODE += "\n"
-        GCODE += "; *** START BLOCK ***\n"
+        GCODE += self.makeCommentedLine(config, "*** START BLOCK ***") + "\n"
 
         if config.EnableHoming:
             # - Homing
@@ -158,7 +169,7 @@ class Postprocess():
 
     def generateEndBlock(self, config):
         GCODE = "\n"
-        GCODE += "; *** END BLOCK ***\n"
+        GCODE += self.makeCommentedLine(config, "*** END BLOCK ***") + "\n"
 
         # - Disable wire
         GCODE += self.generateWireDisable(config)
@@ -187,7 +198,7 @@ class Postprocess():
     '''
     def makeGCODEFromRotation(self, rt, config):
         GCODE += "\n"
-        GCODE = ["; - Rotation [%s] -\n" % rt.Label]
+        GCODE = self.makeCommentedLine(config, "- Rotation [{}] -".format(rt.Label)) + "\n"
 
         # - Generate rotation command
         GCODE.append(self.generateRotation(config, config.MoveCommand, rt.Angle, config.FeedRateRotate))
@@ -211,12 +222,12 @@ class Postprocess():
     def makeGCODE(self, route_list, config):
         TASK = "\n"
         # - Task GCODE buffer
-        TASK += "; *** TASK BLOCK ***\n"
+        TASK += self.makeCommentedLine(config, "*** TASK BLOCK ***") + "\n"
         start_point = None
         # - Wal all routes
         for route in route_list:
             TASK += "\n"
-            TASK += "; --- Route begin [{}] ---\n".format(route.Label)
+            TASK += self.makeCommentedLine(config, "--- Route begin [{}] ---".format(route.Label)) + "\n"
 
             point_index = 0
 
@@ -241,7 +252,7 @@ class Postprocess():
                     feed = object.FeedRate if hasattr(object, "FeedRate") and object.FeedRate > 0 else config.FeedRateCut
                     power = float(object.WirePower) if hasattr(object, "WirePower") and object.WirePower > 0 else float(config.WireMinPower)
                     TASK += "\n"
-                    TASK += "; - {} [{}]\n".format(object.Type, object.Label)
+                    TASK += self.makeCommentedLine(config, "- {} [{}]".format(object.Type, object.Label)) + "\n"
 
                     points_count = object.PointsCount if i == 0 else object.PointsCount - 1
                     # - Step over each point
@@ -259,11 +270,11 @@ class Postprocess():
                         point_index += 1
                     
                     if addPause and duration > 0:
-                        if config.TimeUnits == 1: #["Seconds", "Milliseconds"]
+                        if config.TimeUnits == utilities.FC_TIME_UNITS[1]: #["Seconds", "Milliseconds"]
                             duration = duration * 1000
                         TASK += self.generatePause(config.PauseCommand, duration)
                
-            TASK += "; --- Route end [{}] ---\n".format(route.Label)
+            TASK += self.makeCommentedLine(config, "--- Route end [{}] ---".format(route.Label)) + "\n"
             TASK += "\n"
 
         # ---- Generate startup block

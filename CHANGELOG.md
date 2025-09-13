@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [0.1.10] - TBA
    
 ### Added
+- Add an option to change comment style. #8
 
 ### Fixed 
 - index out of range in the Config.py migration code #10
+- LinuxCNC expect to see % as the first character and the last of the program #11
 
 ## [0.1.9] - 2025-07-28
    

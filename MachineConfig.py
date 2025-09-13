@@ -77,6 +77,9 @@ Normally it should be 1.0, but for denser foam it could be bigger.").Compensatio
 For example LinuxCNC expect to see % character as the first command.").StartProgramCode = utilities.getParameterString("StartProgramCode", "")
         obj.addProperty("App::PropertyString",     "EndProgramCode",       "GCODE",         "Code that will be put on the last line of the program. \r\n\
 For example LinuxCNC expect to see % character as the last command.").EndProgramCode = utilities.getParameterString("EndProgramCode", "")
+        obj.addProperty("App::PropertyEnumeration","CommentStyle",          "GCODE",         "Style of commented lines \r\n\
+Could be inline comments started with ; or multiline inside () or ignored alltogether.").CommentStyle = utilities.FC_COMMENT_STYLES
+        obj.CommentStyle = utilities.FC_COMMENT_STYLES.index(utilities.getParameterString("CommentStyle", "; Comment"))
         obj.addProperty("App::PropertyEnumeration","TimeUnits",            "GCODE",         "Units for time in Gcode. " + 
 "GRBL and LinuxCNC usually use seconds, other controllers may use milliseconds").TimeUnits = utilities.FC_TIME_UNITS
         obj.TimeUnits = utilities.FC_TIME_UNITS.index(utilities.getParameterString("TimeUnits", "Seconds"))
@@ -150,7 +153,12 @@ For example LinuxCNC expect to see % character as the first command.").StartProg
             print("{} - Migrating from 0.1.9 to 0.1.10 - add EndProgramCode property.".format(obj.Label))
             obj.addProperty("App::PropertyString",     "EndProgramCode",       "GCODE",         "Code that will be put on the last line of the program. \r\n\
 For example LinuxCNC expect to see % character as the last command.").EndProgramCode = utilities.getParameterString("EndProgramCode", "")
-    
+        
+        if not hasattr(obj, "CommentStyle"):
+            print("{} - Migrating from 0.1.9 to 0.1.10 - add CommentStyle property.".format(obj.Label))
+            obj.addProperty("App::PropertyEnumeration","CommentStyle",          "GCODE",         "Style of commented lines. \r\n\
+Could be inline comments started with ; or multiline inside () or ignored alltogether.").CommentStyle = utilities.FC_COMMENT_STYLES
+            obj.CommentStyle = utilities.FC_COMMENT_STYLES.index(utilities.getParameterString("CommentStyle", "; Comment"))
     def execute(self, obj):
         
         pass 
