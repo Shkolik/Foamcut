@@ -18,6 +18,17 @@ class Postprocess():
     """Make Gcode"""
 
     '''
+    Makes commented line 
+    '''
+    def makeCommentedLine(self, config, inputString):
+        if config.CommentStyle == utilities.FC_COMMENT_STYLES[0]: # inline comments started with ;
+            return "; {}".format(inputString)
+        elif config.CommentStyle == utilities.FC_COMMENT_STYLES[1]: # inline or multiline comment inside ()
+            return "({})".format(inputString)
+        else:
+            return ""
+
+    '''
     Generate position string for travel
     '''
     def generateTravelPosition(self, config, X1, Z1, X2, Z2):
@@ -44,7 +55,7 @@ class Postprocess():
         position = self.generateTravelPosition(config, X1, Z1, X2, Z2)
 
         # - Create GCODE
-        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)).replace("{WirePower}", str(wire_power)) + "\r\n"
+        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)).replace("{WirePower}", str(wire_power)) + "\n"
 
     '''
     Generate rapid travel
@@ -57,7 +68,7 @@ class Postprocess():
     Generate pause
     '''
     def generatePause(self, command, duration):
-        return command.replace("{Duration}", "%.2f" %  float(duration)) + "\r\n"
+        return command.replace("{Duration}", "%.2f" %  float(duration)) + "\n"
 
     '''
     Generate rotation
@@ -67,19 +78,19 @@ class Postprocess():
         position = self.generateRotationPosition(config, angle)
 
         # - Create GCODE
-        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)) + "\r\n"
+        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)) + "\n"
 
     '''
     Generate wire enable command
     '''
     def generateWireEnable(self, config, power):
-        return config.WireOnCommand.replace("{WirePower}", "%.2f" % float(power)) + "\r\n"
+        return config.WireOnCommand.replace("{WirePower}", "%.2f" % float(power)) + "\n"
 
     '''
     Generate wire disable command
     '''
     def generateWireDisable(self, config):
-        return config.WireOffCommand + "\r\n"
+        return config.WireOffCommand + "\n"
 
     '''
     Generate command for compensated power
@@ -98,22 +109,29 @@ class Postprocess():
         return power
         
     def generateStartBlock(self, config, start_point):
-        GCODE = ";*** FOAM BLOCK ***\r\n"
+        GCODE = ""
 
-        GCODE += ";Width: {}\r\n".format(config.BlockWidth)
-        GCODE += ";Length: {}\r\n".format(config.BlockLength)
-        GCODE += ";Height: {}\r\n".format(config.BlockHeight)
+        if config.StartProgramCode:
+            GCODE += "{}\n".format(config.StartProgramCode)
+            GCODE += "\n"
 
-        GCODE += ";Position - Left-Bottom-Front corner in relation to the origin\r\n"
-        GCODE += ";Position.X: {}\r\n".format(config.BlockPosition.x)
-        GCODE += ";Position.Y: {}\r\n".format(config.BlockPosition.y)
-        GCODE += ";Position.Z: {}\r\n".format(config.BlockPosition.z)
+        GCODE += self.makeCommentedLine(config, "*** FOAM BLOCK ***") + "\n"
+
+        GCODE += self.makeCommentedLine(config, "Width: {}".format(config.BlockWidth)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Length: {}".format(config.BlockLength)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Height: {}".format(config.BlockHeight)) + "\n"
+
+        GCODE += self.makeCommentedLine(config, "Position - Left-Bottom-Front corner in relation to the origin") + "\n"
+        GCODE += self.makeCommentedLine(config, "Position.X: {}".format(config.BlockPosition.x)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Position.Y: {}".format(config.BlockPosition.y)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Position.Z: {}".format(config.BlockPosition.z)) + "\n"
         
-        GCODE += "; *** START BLOCK ***\r\n"
+        GCODE += "\n"
+        GCODE += self.makeCommentedLine(config, "*** START BLOCK ***") + "\n"
 
         if config.EnableHoming:
             # - Homing
-            GCODE += config.HomingCommand + "\r\n"
+            GCODE += config.HomingCommand + "\n"
 
             initPosCommand = self.generateTravelPosition(config,
                 config.HomingX1, config.HomingZ1, config.HomingX2, config.HomingZ2
@@ -123,7 +141,7 @@ class Postprocess():
                 initPosCommand += " " + self.generateRotationPosition(config, config.HomingR1 )
 
             # - Initialize position
-            GCODE += config.InitPositionCommand.replace("{Position}", initPosCommand ) + "\r\n"
+            GCODE += config.InitPositionCommand.replace("{Position}", initPosCommand ) + "\n"
 
         if config.EnableParking:
             # - Park
@@ -150,16 +168,17 @@ class Postprocess():
         return GCODE
 
     def generateEndBlock(self, config):
-        GCODE = "; *** END BLOCK ***\r\n"
+        GCODE = "\n"
+        GCODE += self.makeCommentedLine(config, "*** END BLOCK ***") + "\n"
+
+        # - Disable wire
+        GCODE += self.generateWireDisable(config)
 
         # - Up wire at current position to park height
         if config.EnableParking:
             up_posistion  = "%s%.2f %s%.2f" % (config.Z1AxisName, config.ParkZ, config.Z2AxisName, config.ParkZ)
             feed_rate     = config.FeedRateMove
-            GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\r\n"
-
-        # - Disable wire
-        GCODE += self.generateWireDisable(config)
+            GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\n"
 
         # - Park XZ
         if config.EnableParking:
@@ -168,13 +187,18 @@ class Postprocess():
             # - Park R1
             if config.FiveAxisMachine:
                 GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
+        
+        if config.EndProgramCode:
+            GCODE += "{}\n".format(config.EndProgramCode)
+            
         return GCODE
 
     '''
     Make GCODE from rotation element
     '''
     def makeGCODEFromRotation(self, rt, config):
-        GCODE = ["; - Rotation [%s] -\r\n" % rt.Label]
+        GCODE += "\n"
+        GCODE = self.makeCommentedLine(config, "- Rotation [{}] -".format(rt.Label)) + "\n"
 
         # - Generate rotation command
         GCODE.append(self.generateRotation(config, config.MoveCommand, rt.Angle, config.FeedRateRotate))
@@ -196,13 +220,14 @@ class Postprocess():
     Generate GCODE from route
     '''
     def makeGCODE(self, route_list, config):
-        
+        TASK = "\n"
         # - Task GCODE buffer
-        TASK = [";\r\n", "; *** TASK BLOCK ***\r\n"]
+        TASK += self.makeCommentedLine(config, "*** TASK BLOCK ***") + "\n"
         start_point = None
         # - Wal all routes
         for route in route_list:
-            TASK += [";\r\n", "; --- Route begin [%s] ---\r\n" % route.Label]
+            TASK += "\n"
+            TASK += self.makeCommentedLine(config, "--- Route begin [{}] ---".format(route.Label)) + "\n"
 
             point_index = 0
 
@@ -226,7 +251,8 @@ class Postprocess():
                     duration = object.PauseDuration if hasattr(object, "PauseDuration") else 0
                     feed = object.FeedRate if hasattr(object, "FeedRate") and object.FeedRate > 0 else config.FeedRateCut
                     power = float(object.WirePower) if hasattr(object, "WirePower") and object.WirePower > 0 else float(config.WireMinPower)
-                    TASK += ["; - %s [%s]\r\n" % (object.Type, object.Label)]
+                    TASK += "\n"
+                    TASK += self.makeCommentedLine(config, "- {} [{}]".format(object.Type, object.Label)) + "\n"
 
                     points_count = object.PointsCount if i == 0 else object.PointsCount - 1
                     # - Step over each point
@@ -244,11 +270,12 @@ class Postprocess():
                         point_index += 1
                     
                     if addPause and duration > 0:
-                        if config.TimeUnits == 1: #["Seconds", "Milliseconds"]
+                        if config.TimeUnits == utilities.FC_TIME_UNITS[1]: #["Seconds", "Milliseconds"]
                             duration = duration * 1000
                         TASK += self.generatePause(config.PauseCommand, duration)
                
-            TASK += ["; --- Route end [%s] ---\r\n" % route.Label, ";\r\n"]
+            TASK += self.makeCommentedLine(config, "--- Route end [{}] ---".format(route.Label)) + "\n"
+            TASK += "\n"
 
         # ---- Generate startup block
         START = self.generateStartBlock(config, start_point)        

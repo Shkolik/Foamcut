@@ -27,6 +27,7 @@ FC_KERF_DIRECTIONS = ["Normal", "None", "Reversed"]
 FC_ROUTE_KERF_DIRECTIONS = ["Normal", "Reversed"]
 FC_KERF_STRATEGY = ["None", "Uniform", "Dynamic"]
 FC_TIME_UNITS = ["Seconds", "Milliseconds"]
+FC_COMMENT_STYLES = ["; Comment", "(Comment)", "Ignore"]
 
 def get_module_path():
     '''
