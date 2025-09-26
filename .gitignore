@@ -1,3 +1,4 @@
 *.FCBak*
 __pycache__
 .vscode
+copilot-instructions.md

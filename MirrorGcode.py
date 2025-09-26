@@ -40,7 +40,7 @@ class MirrorG():
                     continue
             else:
                 # - Replace rotation
-                rt = re.search('^(G0[01]) B([\-]{0,1}[0-9]+\.[0-9]+) F([0-9]+\.[0-9]+)', line)
+                rt = re.search(r'^(G0[01]) B([\-]{0,1}[0-9]+\.[0-9]+) F([0-9]+\.[0-9]+)', line)
                 if rt is not None:
                     CM = rt.group(1)
                     RT = float(rt.group(2))
