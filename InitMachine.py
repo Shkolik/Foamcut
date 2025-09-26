@@ -41,7 +41,9 @@ def initChildren(config, machine):
     CNCVolume.ViewObject.LineWidth = 1.0
     CNCVolume.ViewObject.PointSize = 1.0
     CNCVolume.ViewObject.ShapeColor = (190, 190, 190)
+    CNCVolume.ViewObject.Selectable = False
     utilities.setPickStyle(CNCVolume.ViewObject, utilities.UNPICKABLE)
+
     
     wpl = machine.newObject("Part::FeaturePython", "WPL")
     FoamCut_WorkingPlane.CreateWorkingPlane(wpl, machine.Name, utilities.LEFT)
@@ -77,6 +79,11 @@ class Machine(FoamCutBase.FoamCutBaseObject):
 
     def execute(self, obj):
         pass
+
+    def onDocumentRestored(self, obj):
+        for child in obj.Group:
+            if hasattr(child, 'Type') and child.Type == "Helper" and child.Name not in [obj.WPLName, obj.WPRName]:
+                utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
 
 class MachineVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     

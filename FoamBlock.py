@@ -35,6 +35,9 @@ class FoamBlock(FoamCutBase.FoamCutBaseObject):
 
         self.execute(obj)
 
+    def onDocumentRestored(self, obj):
+        utilities.setPickStyle(obj.ViewObject, utilities.UNPICKABLE)
+
     def execute(self, obj):
         xdir = App.Vector(0.0, 0.0, 1.0)
         block = Part.makeBox(obj.Width, obj.Length, obj.Height, App.Vector(0.0, 0.0, 0.0), xdir)
@@ -48,6 +51,7 @@ class FoamBlockVP(FoamCutViewProviders.FoamCutBaseViewProvider):
         obj.PointSize  = 1
         obj.Proxy = self
         obj.Transparency = 80
+        obj.Selectable = False
 
     def attach(self, obj):
         self.ViewObject = obj

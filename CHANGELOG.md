@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - index out of range in the Config.py migration code #10
 - LinuxCNC expect to see % as the first character and the last of the program #11
 - MirrorGcode.py:43: SyntaxWarning: invalid escape sequence '\-' #13
+- After file reopening it's possible to select helper objects #14
 
 ## [0.1.9] - 2025-07-28
    
