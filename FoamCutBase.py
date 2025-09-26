@@ -62,6 +62,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         obj.addProperty("App::PropertyBool",        "AddPause",             "Task", "Add pause at the end of move").AddPause = False
         obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds").PauseDuration = config.PauseDuration
+        obj.addProperty("App::PropertyBool",        "RapidMove",            "Task", "Move trough this segment with rapid movement speed").RapidMove = False
 
         obj.addProperty("App::PropertyEnumeration", "CompensationDirection", "Kerf Compensation",   "Kerf compensation direction").CompensationDirection = FC_KERF_DIRECTIONS
         obj.CompensationDirection = 0 # Normal compensation by default
@@ -92,7 +93,10 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             obj.CompensationDirection = dir
             print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.".format(obj.Label))  
             touched = True
-
+        if not hasattr(obj, "RapidMove"):
+            obj.addProperty("App::PropertyBool",        "RapidMove",            "Task", "Move trough this segment with rapid movement speed").RapidMove = False
+            print("{} - Migrating from 0.1.9 to 0.1.10 - adding RapidMove property.".format(obj.Label))  
+            touched = True
         if touched:
             obj.recompute()
 

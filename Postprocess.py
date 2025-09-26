@@ -251,6 +251,7 @@ class Postprocess():
                     duration = object.PauseDuration if hasattr(object, "PauseDuration") else 0
                     feed = object.FeedRate if hasattr(object, "FeedRate") and object.FeedRate > 0 else config.FeedRateCut
                     power = float(object.WirePower) if hasattr(object, "WirePower") and object.WirePower > 0 else float(config.WireMinPower)
+                    isRapid = object.RapidMove if hasattr(object, "RapidMove") else False
                     TASK += "\n"
                     TASK += self.makeCommentedLine(config, "- {} [{}]".format(object.Type, object.Label)) + "\n"
 
@@ -262,9 +263,12 @@ class Postprocess():
 
                         wirePowerCommand = self.getDynamicWirePowerCommand(point_l, point_r, power, config)
 
-                        # - Generate CUT travel command
-                        TASK += self.generateTravel(config, config.CutCommand, feed, wirePowerCommand,
-                                                    point_l.y, point_l.z, point_r.y, point_r.z, )
+                        if isRapid:
+                            # - Generate rapid travel command
+                            TASK += self.generateRapidTravel(config, point_l.y, point_l.z, point_r.y, point_r.z)
+                        else:
+                            # - Generate CUT travel command
+                            TASK += self.generateTravel(config, config.CutCommand, feed, wirePowerCommand, point_l.y, point_l.z, point_r.y, point_r.z)
 
                         # - Increase point index
                         point_index += 1
