@@ -115,6 +115,13 @@ class Postprocess():
             GCODE += "{}\n".format(config.StartProgramCode)
             GCODE += "\n"
 
+        GCODE += self.makeCommentedLine(config, "*** MACHINE ***") + "\n"
+        GCODE += self.makeCommentedLine(config, "Machine type: {}".format("5-Axis" if config.FiveAxisMachine else "4-Axis")) + "\n"
+        GCODE += self.makeCommentedLine(config, "Width: {}".format(config.FieldWidth)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Length: {}".format(config.HorizontalTravel)) + "\n"
+        GCODE += self.makeCommentedLine(config, "Height: {}".format(config.VerticalTravel)) + "\n"
+        GCODE += "\n"
+
         GCODE += self.makeCommentedLine(config, "*** FOAM BLOCK ***") + "\n"
 
         GCODE += self.makeCommentedLine(config, "Width: {}".format(config.BlockWidth)) + "\n"
@@ -129,8 +136,14 @@ class Postprocess():
         GCODE += "\n"
         GCODE += self.makeCommentedLine(config, "*** START BLOCK ***") + "\n"
 
+        GCODE += self.makeCommentedLine(config, "Set units to millimeters") + "\n"
+        GCODE += "G21\n"
+        GCODE += self.makeCommentedLine(config, "Set absolute positioning") + "\n"
+        GCODE += "G90\n"
+
         if config.EnableHoming:
             # - Homing
+            GCODE += self.makeCommentedLine(config, "- Homing -") + "\n"
             GCODE += config.HomingCommand + "\n"
 
             initPosCommand = self.generateTravelPosition(config,
@@ -145,6 +158,7 @@ class Postprocess():
 
         if config.EnableParking:
             # - Park
+            GCODE += self.makeCommentedLine(config, "- Parking -") + "\n"
             GCODE += self.generateRapidTravel(config, config.ParkX, config.ParkZ, config.ParkX, config.ParkZ )
             if config.FiveAxisMachine:
                 GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)
@@ -176,14 +190,14 @@ class Postprocess():
 
         # - Up wire at current position to park height
         if config.EnableParking:
+            GCODE += self.makeCommentedLine(config, "- Parking -") + "\n"
             up_posistion  = "%s%.2f %s%.2f" % (config.Z1AxisName, config.ParkZ, config.Z2AxisName, config.ParkZ)
             feed_rate     = config.FeedRateMove
             GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\n"
 
         # - Park XZ
         if config.EnableParking:
-            GCODE += self.generateTravel(config, config.MoveCommand, config.FeedRateMove, "",
-                config.ParkX, config.ParkZ, config.ParkX, config.ParkZ )
+            GCODE += self.generateRapidTravel(config, config.ParkX, config.ParkZ, config.ParkX, config.ParkZ )
             # - Park R1
             if config.FiveAxisMachine:
                 GCODE += self.generateRotation(config, config.MoveCommand, config.ParkR1, config.FeedRateRotate)

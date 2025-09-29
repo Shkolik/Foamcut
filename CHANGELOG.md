@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Add an option to change comment style. #8
 - Add ability to rapid move for any move object. #15
+- Add preamble to the output gcode #17
 
 ### Fixed 
 - index out of range in the Config.py migration code #10
