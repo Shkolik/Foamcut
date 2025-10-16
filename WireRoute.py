@@ -367,8 +367,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 intersections_R = []
                 
                 for i in range(len(offsets_L) - 1):                
-                    ileft = self.intersectWires(offsets_L[i], offsets_L[i + 1])
-                    iright = self.intersectWires(offsets_R[i], offsets_R[i + 1])
+                    ileft = self.intersectWires(offsets_L[i], offsets_L[i + 1], tolerance=5e-2)
+                    iright = self.intersectWires(offsets_R[i], offsets_R[i + 1], tolerance=5e-2)
                     intersections_L.append(ileft)
                     intersections_R.append(iright)   
 
