@@ -12,7 +12,7 @@ import Part
 import FoamCutBase
 import FoamCutViewProviders
 import utilities
-from utilities import isMovement, isStraitLine, FC_KERF_DIRECTIONS, FC_KERF_STRATEGY, FC_ROUTE_KERF_DIRECTIONS
+from utilities import isMovement, isStraitLine, getWorkingPlanes, FC_KERF_DIRECTIONS, FC_KERF_STRATEGY, FC_ROUTE_KERF_DIRECTIONS
 import pivy.coin as coin
 import math
 
@@ -118,6 +118,12 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
     def execute(self, obj):
         obj.Error = ""
+
+        job = obj.Document.getObject(obj.JobName)
+        if job is None or job.Type != "Job":
+            App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
+
+        (wpl, wpr) = getWorkingPlanes(job, obj.Document)
 
         first       = obj.Objects[0]
         reversed    = None        # - Second segment is reversed
@@ -325,8 +331,27 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 leftSegmentLen = float(object.LeftSegmentLength) if object.LeftSegmentLength > 0 else 0.1
                 rightSegmentLen = float(object.RightSegmentLength) if object.RightSegmentLength > 0 else 0.1
 
-                len_l = float(obj.KerfCompensation) * dir
-                len_r = float(obj.KerfCompensation) * dir
+                # Check if we need to reverse compensation direction for this segment
+                projections = [self.makeWire([path_l[0], path_r[0]]), self.makeWire([path_l[-1], path_r[-1]])]
+                (dist, vectors, infos) = projections[0].distToShape(projections[1])
+                (topo1, index1, param1, topo2, index2, param2) = infos[0]
+                (v1, v2) = vectors[0]
+
+                l_compensation_dir = 1
+                r_compensation_dir = 1
+
+                if math.isclose(0.0, dist, abs_tol=1e-7) and topo1 == topo2 == "Edge":
+                    #projections intersect. Check if intersection point close to the left or right plane
+                    projections_intersection = Part.Vertex(v1.x, v1.y, v1.z) 
+                    (distL, _, _) = projections_intersection.distToShape(wpl.Shape)
+                    (distR, _, _) = projections_intersection.distToShape(wpr.Shape)
+                    if distL < distR:
+                        l_compensation_dir = -1
+                    else:
+                        r_compensation_dir = -1
+
+                len_l = float(obj.KerfCompensation) * dir * l_compensation_dir
+                len_r = float(obj.KerfCompensation) * dir * r_compensation_dir
 
                 if dir != 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) == FC_KERF_STRATEGY_DYN:
                     #calculate compensation for edges
@@ -363,6 +388,11 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 offsets_L = self.makeOffsets(offset_len_L, edges_L)
                 offsets_R = self.makeOffsets(offset_len_R, edges_R)
 
+                for off in offsets_L:
+                    Part.show(off)
+                for off in offsets_R:
+                    Part.show(off)
+                    
                 intersections_L = []
                 intersections_R = []
                 
