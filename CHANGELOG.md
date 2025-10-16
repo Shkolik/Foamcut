@@ -2,7 +2,13 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.10] - TBA
+## [0.1.11] - TBA
+   
+### Added
+
+### Fixed
+
+## [0.1.10] - 2025-10-16
    
 ### Added
 - Add an option to change comment style. #8
