@@ -36,6 +36,26 @@ class FoamCutBaseObject:
             App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
                 
         return job.getObject(job.ConfigName)
+    
+    def getEdges(self, obj):
+        left = None
+        right = None
+
+        if hasattr(obj, "LeftEdge") and obj.LeftEdge is not None:
+            left = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
+        elif hasattr(obj, "Source") and obj.Source is not None:
+            left = obj.Source[0].getSubObject(obj.Source[1][0])
+        elif hasattr(obj, "LeftEdgeName") and obj.LeftEdgeName:
+            left = obj.getSubObject(obj.LeftEdgeName)
+
+        if hasattr(obj, "RightEdge") and obj.RightEdge is not None:
+            right = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
+        elif hasattr(obj, "Source") and obj.Source is not None:
+            right = obj.Source[0].getSubObject(obj.Source[1][0])
+        elif hasattr(obj, "RightEdgeName") and obj.RightEdgeName:
+            right = obj.getSubObject(obj.RightEdgeName)
+
+        return (left, right if right is not None else left)
 
 class FoamCutMovementBaseObject(FoamCutBaseObject):
     def __init__(self, obj, jobName):
@@ -107,26 +127,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             else:
                 obj.setEditorMode("PauseDuration", 3)
         return
-
-    def getEdges(self, obj):
-        left = None
-        right = None
-
-        if hasattr(obj, "LeftEdge") and obj.LeftEdge is not None:
-            left = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
-        elif hasattr(obj, "Source") and obj.Source is not None:
-            left = obj.Source[0].getSubObject(obj.Source[1][0])
-        elif hasattr(obj, "LeftEdgeName") and obj.LeftEdgeName:
-            left = obj.getSubObject(obj.LeftEdgeName)
-
-        if hasattr(obj, "RightEdge") and obj.RightEdge is not None:
-            right = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
-        elif hasattr(obj, "Source") and obj.Source is not None:
-            right = obj.Source[0].getSubObject(obj.Source[1][0])
-        elif hasattr(obj, "RightEdgeName") and obj.RightEdgeName:
-            right = obj.getSubObject(obj.RightEdgeName)
-
-        return (left, right if right is not None else left)
 
     def findOppositeVertexes(self, obj, parent, vertex):
         oppositeVertex = None
