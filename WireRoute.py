@@ -11,8 +11,7 @@ Gui=FreeCADGui
 import Part
 import FoamCutBase
 import FoamCutViewProviders
-import utilities
-from utilities import isMovement, isStraitLine, getWorkingPlanes, FC_KERF_DIRECTIONS, FC_KERF_STRATEGY, FC_ROUTE_KERF_DIRECTIONS
+from utilities import *
 import pivy.coin as coin
 import math
 import time
@@ -21,7 +20,7 @@ FC_KERF_STRATEGY_NONE = 0
 FC_KERF_STRATEGY_UNI = 1
 FC_KERF_STRATEGY_DYN = 2
 
-SUPPRESS_WARNINGS = utilities.getParameterBool("SuppressWarnings", True)
+SUPPRESS_WARNINGS = getParameterBool("SuppressWarnings", True)
 
 class FoamCut_RouteSegment():
     def __init__(self):
@@ -49,15 +48,20 @@ class FoamCut_RouteEdge():
         self.RightSegmentLength = None
         self.PauseDuration = None
 
+        self.DataIdx = 0
         self.ObjectType = None
 
     def projectToPlanes(self, leftPlane, rightPlane):
+        if self.PointsCount <= 1 or self.LeftEdgeLength <= 1e-2 or self.RightEdgeLength <= 1e-2:
+            # edge is too short or a single point - no need to make offset
+            return
+        
         projectedLeft = []
         projectedRight = []
 
         for i in range(len(self.PointsLeft)):
-            projectedLeft.append(utilities.intersectLineAndPlane(self.PointsLeft[i], self.PointsRight[i], leftPlane))
-            projectedRight.append(utilities.intersectLineAndPlane(self.PointsLeft[i], self.PointsRight[i], rightPlane))
+            projectedLeft.append(intersectLineAndPlane(self.PointsLeft[i], self.PointsRight[i], leftPlane))
+            projectedRight.append(intersectLineAndPlane(self.PointsLeft[i], self.PointsRight[i], rightPlane))
 
         self.PointsLeft = projectedLeft
         self.PointsRight = projectedRight
@@ -73,56 +77,48 @@ class FoamCut_RouteEdge():
         self.RightEdgeLength = float(path_R.length())
 
     def makeOffset(self, dynamic = False, degree=1.0):
-        feed_override = 1.0
+        if self.PointsCount <= 1 or self.LeftEdgeLength <= 1e-2 or self.RightEdgeLength <= 1e-2:
+            # edge is too short or a single point - no need to make offset
+            return
+        
         if dynamic:
             #calculate compensation for the sides
-            dEdges = self.LeftEdgeLength/self.RightEdgeLength # if dEdges > 1 then left longer
+            ratio = max(self.LeftEdgeLength, self.RightEdgeLength) / min(self.LeftEdgeLength, self.RightEdgeLength)
 
-            left_c = 1.0 if dEdges > 1 else self.RightEdgeLength/self.LeftEdgeLength # if > 1 -> left edge gets nominal kerf, else more
-            right_c = 1.0 if dEdges < 1 else self.LeftEdgeLength/self.RightEdgeLength # if > 1 -> right edge gets nominal kerf, else more
+            # # debug - edges lenth ratio
+            # print(f"Offset_{self.ObjectType} edge length ratio: {ratio}")
 
-            if degree > 0 and not math.isclose(self.LeftEdgeLength, self.RightEdgeLength, rel_tol=1e-1): #if degree is specified and edges length difference more that 10%  
-                 left_c = left_c / degree if dEdges < 1 else left_c
-                 right_c = right_c / degree if dEdges > 1 else right_c
+            # if edge is slower than nominal speed - increase compensation.
+            # degree is a dampening factor
+            compensation = ratio ** degree if degree > 1 else ratio
 
-            self.OffsetLenLeft = self.OffsetLenLeft * left_c
-            self.OffsetLenRight = self.OffsetLenRight * right_c
+            if self.LeftEdgeLength > self.RightEdgeLength:
+                self.OffsetLenRight *= compensation
+            else:
+                self.OffsetLenLeft *= compensation
+                
+        # debug - show original wires
+        # print(f"Offset_L_{self.ObjectType} compensated offset: {self.OffsetLenLeft}")
+        # print(f"Offset_R_{self.ObjectType} compensated offset: {self.OffsetLenRight}")
 
-            feed_override = self.LeftSegmentLength/self.LeftEdgeLength if dEdges > 1 else self.RightSegmentLength/self.RightEdgeLength 
-            print("Feed override: {}".format(feed_override))
-            # print("Left offset: {}, Right offset: {}".format(self.OffsetLenLeft, self.OffsetLenRight))
-            # dLeft =  self.LeftEdgeLength/self.LeftSegmentLength if dEdges > 1 else self.LeftEdgeLength/self.RightSegmentLength # if > 1 -> left segment longer than edge
-            # dRight = self.RightEdgeLength/self.LeftSegmentLength if dEdges > 1 else self.RightEdgeLength/self.RightSegmentLength # if > 1 -> right segment longer than edge
-            
-            # left_c = 1.0 
-            # right_c = 1.0
-
-            # if degree > 0 and not math.isclose(self.LeftEdgeLength, self.RightEdgeLength, rel_tol=5e-2): #if degree is specified and edges length difference more that 5%  
-            #     left_c = degree if dEdges < 1 else left_c
-            #     right_c = right_c if dEdges < 1 else degree
-
-            # self.OffsetLenLeft = self.OffsetLenLeft/(float(dLeft) * left_c)
-            # self.OffsetLenRight = self.OffsetLenRight/(float(dRight) * right_c)
-
-        lWire = utilities.makeWireOffset(utilities.makeWire(self.PointsLeft), self.OffsetLenLeft)
-        rWire = utilities.makeWireOffset(utilities.makeWire(self.PointsRight), self.OffsetLenRight)        
+        lWire = makeWireOffset(makeWire(self.PointsLeft), self.OffsetLenLeft)
+        rWire = makeWireOffset(makeWire(self.PointsRight), self.OffsetLenRight)        
         self.OffsetLeft = [v.Point for v in lWire.Vertexes]
         self.OffsetRight = [v.Point for v in rWire.Vertexes]
 
-        if dynamic:            
-            Part.show(lWire, "Left Offset")
-            Part.show(rWire, "Right Offset")
-
-        return feed_override
+    def getFeedOverride(self):
+        maxEdgeLength = max(self.LeftEdgeLength, self.RightEdgeLength)
+        maxSegmentLength = max(self.LeftSegmentLength, self.RightSegmentLength)
+        if maxEdgeLength == 0:
+            return 1.0
+        
+        return maxSegmentLength/maxEdgeLength
 
 
 class WireRoute(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, objects, jobName):   
         super().__init__(obj, jobName)     
-        obj.Type = "Route"  
-        
-        obj.addProperty("App::PropertyString",      "Error",            "", "", 5) 
-
+        obj.Type = "Route"          
         obj.addProperty("App::PropertyVectorList",  "Offset_L",         "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Offset_R",         "", "", 5)
 
@@ -130,6 +126,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
         obj.addProperty("App::PropertyIntegerList", "Pauses",           "", "", 5) # indexes of a points where should be pause
         obj.addProperty("App::PropertyFloatList",   "PausesDurations",  "", "", 5) 
+
+        obj.addProperty("App::PropertyFloatList",   "FeedOverrides",  "", "", 5) 
 
         obj.addProperty("App::PropertyInteger",     "Redraw",           "", "", 5).Redraw = 0 # property to tgger view provider to update 
 
@@ -207,395 +205,464 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.".format(obj.Label))
             touched = True
 
+        if not hasattr(obj, "FeedOverrides"):
+            obj.addProperty("App::PropertyFloatList",   "FeedOverrides",  "", "", 5) 
+            print("{} - Migrating from 0.1.10 to 0.1.11 - adding FeedOverrides property.".format(obj.Label))
+            touched = True
+            
         if touched:
             obj.recompute()
 
     def execute(self, obj):
-        start_time = time.perf_counter()
+        # start_time = time.perf_counter()
 
-        obj.Error = ""
+        try:
+            config = self.getConfig(obj)
 
-        config = self.getConfig(obj)
+            doc = obj.Document
 
-        doc = obj.Document
+            job = doc.getObject(obj.JobName)
+            if job is None or job.Type != "Job":
+                raise Exception("ERROR: Error updating Enter - active Job not found\n")
 
-        job = doc.getObject(obj.JobName)
-        if job is None or job.Type != "Job":
-            App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
+            (wpl, wpr) = getWorkingPlanes(job, doc)
 
-        (wpl, wpr) = getWorkingPlanes(job, doc)
+            first       = obj.Objects[0]
+            reversed    = None        # - Second segment is reversed
+            route_data  = []
+            route_data_dir  = []
+            feed_overrides = []
+            item_index  = 0
+            feed_overrides  = []
+            pauses = []
+            pausesDuration = []
+            breaks = []
 
-        first       = obj.Objects[0]
-        reversed    = None        # - Second segment is reversed
-        START       = 0           # - Segment start point index
-        END         = -1          # - Segment end point index
-        route_data  = []
-        route_data_dir  = []
-        route_feed_overrides = []
-        item_index  = 0
+            # lastObjectPoint tracks global index in flattened Path_L / Path_R
+            lastObjectPoint = 0
 
-        pauses = []
-        pausesDuration = []
-        breaks = []
-
-        lastObjectPoint = 0
-
-        # - Check is single element
-        if len(obj.Objects) == 1:
-            # - Store element            
-            route_data.append(item_index)
-            route_data_dir.append(False)
-            route_feed_overrides.append(1.0)
-            object = obj.Objects[item_index]
-
-            lastObjectPoint = object.PointsCount - 1
-
-            if hasattr(object, "AddPause") and object.AddPause:
-                pauses.append(lastObjectPoint)
-                pausesDuration.append(float(object.PauseDuration))
-
-        # - Walk through other objects
-        for second in obj.Objects[1:]:
-            item_index += 1
-
-            # - Process skipped element
-            if first is None:
-                first = second
-                if first.Type == "Enter" and reversed is not None:
-                    route_data.append(item_index)
-                    route_data_dir.append(False)
-                    route_feed_overrides.append(1.0)
-                    lastObjectPoint += first.PointsCount - 1
-
-                    if hasattr(first, "AddPause") and first.AddPause:
-                        pauses.append(lastObjectPoint)
-                        pausesDuration.append(float(first.PauseDuration))
-
-                #print("SKIP: %s" % second.Type)               
-                continue
-            
-            if first.Type == "Projection" and first.PointsCount < 2:
-                print("Vertex Projection - skip")
-                first = second
-                continue
-
-            # - Skip rotation object
-            if first.Type == "Rotation":
-                #print("R1")
-                # - Store first element
-                route_data.append(item_index - 1)
+            # - Check is single element
+            if len(obj.Objects) == 1:
+                # - Store element            
+                route_data.append(item_index)
                 route_data_dir.append(False)
-                route_feed_overrides.append(1.0)
-                breaks.append(lastObjectPoint)
+                object = obj.Objects[item_index]
 
-                # - Check is rotation is first element
-                if item_index == 1:
-                    # - Do not skip next element
+                # skip rotation object
+                if hasattr(object, "PointsCount"):
+                    lastObjectPoint = object.PointsCount - 1
+
+            # - Walk through other objects
+            for second in obj.Objects[1:]:
+                item_index += 1
+
+                # - Process skipped element
+                if first is None:
+                    first = second
+                    if first.Type == "Enter" and reversed is not None:
+                        route_data.append(item_index)
+                        route_data_dir.append(False)
+                        lastObjectPoint += first.PointsCount - 1
+
+                    #print("SKIP: %s" % second.Type)               
+                    continue
+                
+                if first.Type == "Projection" and first.PointsCount < 2:
+                    # print("Vertex Projection - skip")
                     first = second
                     continue
-                else:
-                    # - Go to next object
-                    first = None
-                    continue
-            elif second.Type == "Rotation":
-                #print("R1 - 2")
-                # - Store element
-                route_data.append(item_index)
-                route_data_dir.append(False)
-                route_feed_overrides.append(1.0)
-                breaks.append(lastObjectPoint)
 
-                # - Skip element
-                first = None
-                reversed = None
-                continue
-            elif first.Type == "Exit" and second.Type == "Enter":
-                #print("EXIT -> ENTER")
-                #print("reversed: {}".format(reversed))
-                # - Store first item
-                if len(route_data) == 0:
-                    # - Store element
+                # - Skip rotation object
+                if first.Type == "Rotation":
+                    #print("R1")
+                    # - Store first element
                     route_data.append(item_index - 1)
                     route_data_dir.append(False)
-                    route_feed_overrides.append(1.0)
+                    breaks.append(lastObjectPoint)
+
+                    # - Check is rotation is first element
+                    if item_index == 1:
+                        # - Do not skip next element
+                        first = second
+                        continue
+                    else:
+                        # - Go to next object
+                        first = None
+                        continue
+                elif second.Type == "Rotation":
+                    #print("R1 - 2")
+                    # - Store element
+                    route_data.append(item_index)
+                    route_data_dir.append(False)
+                    breaks.append(lastObjectPoint)
+
+                    # - Skip element
+                    first = None
+                    reversed = None
+                    continue
+                elif first.Type == "Exit" and second.Type == "Enter":
+                    #print("EXIT -> ENTER")
+                    #print("reversed: {}".format(reversed))
+                    # - Store first item
+                    if len(route_data) == 0:
+                        # - Store element
+                        route_data.append(item_index - 1)
+                        route_data_dir.append(False)
+
+                        lastObjectPoint += first.PointsCount - 1
+
+
+                    # - Store element
+                    route_data.append(item_index)
+                    route_data_dir.append(False)
+
+                    breaks.append(lastObjectPoint)
+
+                    lastObjectPoint += second.PointsCount - 1
+
+                    first = second
+                    reversed = False # enter always normal
+                    continue
+                
+                # - Get lines on left plane
+                if isMovement(first) or first.Type == "Enter":
+                    first_line  = first.Path_L
+                else:
+                    raise Exception(f"ERROR: {first.Label} - Unsupported first element. Second = {second.Label}")
+                
+                if isMovement(second) or second.Type == "Exit": 
+                    second_line = second.Path_L
+                else:
+                    raise Exception(f"ERROR: {second.Label} - Unsupported second element. First = {first.Label}")
+                
+                if reversed is None:
+                    first_reversed = False
+                    
+                    # - Detect first pair
+                    if isCommonPoint(first_line[END], second_line[START]):
+                        #print ("First connected: FWD - FWD")
+                        reversed = False
+                    elif isCommonPoint(first_line[END], second_line[END]):
+                        #print ("First connected: FWD - REV")
+                        reversed = True
+                    elif isCommonPoint(first_line[START], second_line[START]):
+                        #print ("First connected: REV - FWD")
+                        first_reversed  = True
+                        reversed        = False
+                    elif isCommonPoint(first_line[START], second_line[END]):
+                        #print ("First connected: REV - REV")
+                        first_reversed  = True
+                        reversed        = True
+                    else:
+                        raise Exception(f"ERROR: {first.Label} not connected with {second.Label}")
+                    
+                    # - Store first element
+                    route_data.append(item_index - 1)
+                    route_data_dir.append(first_reversed)
 
                     lastObjectPoint += first.PointsCount - 1
 
-                    if hasattr(first, "AddPause") and first.AddPause:
-                        pauses.append(lastObjectPoint)
-                        pausesDuration.append(float(first.PauseDuration))
 
-                # - Store element
+                else:                
+                    # - Detect next pairs
+                    if isCommonPoint(first_line[START if reversed else END], second_line[START]):
+                        #print ("Connected: FWD - FWD")
+                        reversed = False
+                    elif isCommonPoint(first_line[START if reversed else END], second_line[END]):
+                        #print ("Connected: FWD - REV")
+                        reversed = True
+                    else:
+                        raise Exception(f"ERROR: {first.Label} not connected with {second.Label}")
+
+                # - Store second element
                 route_data.append(item_index)
-                route_data_dir.append(False)
-                route_feed_overrides.append(1.0)
-
-                breaks.append(lastObjectPoint)
+                route_data_dir.append(reversed)
 
                 lastObjectPoint += second.PointsCount - 1
 
-                if hasattr(second, "AddPause") and second.AddPause:
-                    pauses.append(lastObjectPoint)
-                    pausesDuration.append(float(second.PauseDuration))
-
+                # - Go to next object
                 first = second
-                reversed = False # enter always normal
-                continue
             
-            # - Get lines on left plane
-            if isMovement(first) or first.Type == "Enter":
-                first_line  = first.Path_L
-            else:
-                obj.Error = "ERROR: {} - Unsupported first element. Second = {}".format(first.Label, second.Label)
-                App.Console.PrintError(obj.Error)
-                return False
+            if len(route_data) != len(route_data_dir) or len(route_data) == 0:
+                raise Exception("Error: Data calculation error.")
             
-            if isMovement(second) or second.Type == "Exit": 
-                second_line = second.Path_L
-            else:
-                obj.Error = "ERROR: {} - Unsupported second element. First = {}".format(second.Label, first.Label)
-                App.Console.PrintError(obj.Error)
-                return False
-            
-            if reversed is None:
-                first_reversed = False
-                
-                # - Detect first pair
-                if utilities.isCommonPoint(first_line[END], second_line[START]):
-                    #print ("First connected: FWD - FWD")
-                    reversed = False
-                elif utilities.isCommonPoint(first_line[END], second_line[END]):
-                    #print ("First connected: FWD - REV")
-                    reversed = True
-                elif utilities.isCommonPoint(first_line[START], second_line[START]):
-                    #print ("First connected: REV - FWD")
-                    first_reversed  = True
-                    reversed        = False
-                elif utilities.isCommonPoint(first_line[START], second_line[END]):
-                    #print ("First connected: REV - REV")
-                    first_reversed  = True
-                    reversed        = True
-                else:
-                    obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
-                    App.Console.PrintError(obj.Error)
-                    return False
-                
-                # - Store first element
-                route_data.append(item_index - 1)
-                route_data_dir.append(first_reversed)
-                route_feed_overrides.append(1.0)
+            obj.Data = route_data
+            obj.DataDirection = route_data_dir
 
-                lastObjectPoint += first.PointsCount - 1
+            # - try to make a offset       
+            resultPoints_L = []
+            resultPoints_R = []
 
-                if hasattr(first, "AddPause") and first.AddPause:
-                    pauses.append(lastObjectPoint)
-                    pausesDuration.append(float(first.PauseDuration))
-
-            else:                
-                # - Detect next pairs
-                if utilities.isCommonPoint(first_line[START if reversed else END], second_line[START]):
-                    #print ("Connected: FWD - FWD")
-                    reversed = False
-                elif utilities.isCommonPoint(first_line[START if reversed else END], second_line[END]):
-                    #print ("Connected: FWD - REV")
-                    reversed = True
-                else:
-                    obj.Error = "ERROR: {} not connected with {}".format(first.Label, second.Label)
-                    App.Console.PrintError(obj.Error)
-                    return False
-
-            # - Store second element
-            route_data.append(item_index)
-            route_data_dir.append(reversed)
-            route_feed_overrides.append(1.0)
-
-            lastObjectPoint += second.PointsCount - 1
-
-            if hasattr(second, "AddPause") and second.AddPause:
-                pauses.append(lastObjectPoint)
-                pausesDuration.append(float(second.PauseDuration))
-
-            # - Go to next object
-            first = second
-        
-        if len(route_data) != len(route_data_dir) or len(route_data) == 0:
-            obj.Error("Error: Data calculation error.")
-            App.Console.PrintError(obj.Error)
-            return False
-        
-        obj.Data = route_data
-        obj.DataDirection = route_data_dir
-
-        # - try to make a offset       
-        resultPoints_L = []
-        resultPoints_R = []
-
-        # list of route segments
-        segments = []
-        currentSegment = FoamCut_RouteSegment()
-        currentEdge = FoamCut_RouteEdge()
-
-        for i in range(len(route_data)): 
-            if currentEdge.ObjectType == "Rotation" or currentEdge.ObjectType == "Exit":
-                segments.append(currentSegment)
-                currentSegment = FoamCut_RouteSegment()                    
-
+            # list of route segments
+            segments = []
+            currentSegment = FoamCut_RouteSegment()
             currentEdge = FoamCut_RouteEdge()
 
-            # - Access item
-            object = obj.Objects[route_data[i]]
+            for i in range(len(route_data)): 
+                if currentEdge.ObjectType == "Rotation" or currentEdge.ObjectType == "Exit":
+                    segments.append(currentSegment)
+                    currentSegment = FoamCut_RouteSegment()                    
+
+                currentEdge = FoamCut_RouteEdge()
                 
-            # Always skip rotation
-            if object.Type == "Rotation":                                   
-                continue
-
-            currentEdge.ObjectType = object.Type
-            currentEdge.PointsCount = object.PointsCount
-            currentEdge.CompensationDirection = object.CompensationDirection
-
-            currentEdge.LeftEdgeLength = float(object.LeftEdgeLength) if object.LeftEdgeLength > 0 else 0.1
-            currentEdge.RightEdgeLength = float(object.RightEdgeLength) if object.RightEdgeLength > 0 else 0.1
-
-            currentEdge.LeftSegmentLength = float(object.LeftSegmentLength) if object.LeftSegmentLength > 0 else 0.1
-            currentEdge.RightSegmentLength = float(object.RightSegmentLength) if object.RightSegmentLength > 0 else 0.1
-
-            currentEdge.PointsLeft = object.Path_L[::-1] if route_data_dir[i] else object.Path_L
-            currentEdge.PointsRight = object.Path_R[::-1] if route_data_dir[i] else object.Path_R
-            currentSegment.LastPoint += object.PointsCount - 1
-
-            if hasattr(object, "AddPause") and object.AddPause:
-                pauses.append(currentSegment.LastPoint)
-                pausesDuration.append(float(object.PauseDuration)) 
-
-            if not currentSegment.SimpleProjection:
-                if object.Type == "Projection":
-                    currentSegment.SimpleProjection = True
-                else:
-                    (left, right) = self.getEdges(object)
-                    currentSegment.LeftPlaneX = left.BoundBox.XMin if left.BoundBox.XMin < currentSegment.LeftPlaneX else currentSegment.LeftPlaneX
-                    currentSegment.RightPlaneX = right.BoundBox.XMax if right.BoundBox.XMax > currentSegment.RightPlaneX else currentSegment.RightPlaneX
-
-            currentSegment.Edges.append(currentEdge)
-
-        if currentEdge.ObjectType != "Rotation":
-            segments.append(currentSegment)
-
-        applyKerf = obj.KerfCompensation > 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) > FC_KERF_STRATEGY_NONE
-
-        # apply kerf compensation if needed
-        if applyKerf:
-            # build temporary planes for projection
-            for i, segment in enumerate(segments):                
-                norm = App.Vector(1.0, 0.0, 0.0)
-                xdir = App.Vector(0.0, 1.0, 0.0)
-                leftPlane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(segment.LeftPlaneX, float(-config.OriginX), 0), norm, xdir)
-                rightPlane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(segment.RightPlaneX, float(-config.OriginX), 0), norm, xdir)
-
-                for j, edge in enumerate(segment.Edges):
-                    idx = FC_KERF_DIRECTIONS.index(edge.CompensationDirection) if edge.CompensationDirection in FC_KERF_DIRECTIONS else 0                    
-                    dir = -1 * (idx - 1) if obj.CompensationDirection in FC_ROUTE_KERF_DIRECTIONS and FC_ROUTE_KERF_DIRECTIONS.index(obj.CompensationDirection) == 1 else idx - 1
-                
-                    edge.OffsetLenLeft = float(obj.KerfCompensation) * dir
-                    edge.OffsetLenRight = float(obj.KerfCompensation) * dir
-
-                    dynamicOffset = False
-                    if not segment.SimpleProjection:
-                        #project edges from working planes to temp planes
-                        edge.projectToPlanes(leftPlane, rightPlane)
-
-                        dynamicOffset = dir != 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) == FC_KERF_STRATEGY_DYN                       
-
-                    # compute offsets
-                    edge.makeOffset(dynamicOffset, obj.CompensationDegree)
-
-            # intersect offsets and build final route points
-            for i, segment in enumerate(segments):
-                firstWire_L = secondWire_L = None
-                firstWire_R = secondWire_R = None
-                
-                for j in range(len(segment.Edges) - 1):
-                    edge = segment.Edges[j]
-                    if firstWire_L == None and firstWire_R == None:
-                        firstWire_L = utilities.makeWire(edge.OffsetLeft)
-                        firstWire_R = utilities.makeWire(edge.OffsetRight)
+                # - Access item
+                object = obj.Objects[route_data[i]]
                     
-                    if secondWire_L == None and secondWire_R == None:
-                        secondWire_L = utilities.makeWire(segment.Edges[j + 1].OffsetLeft)
-                        secondWire_R = utilities.makeWire(segment.Edges[j + 1].OffsetRight)
+                # Always skip rotation
+                if object.Type == "Rotation":                                   
+                    continue
 
-                    ileft = utilities.intersectWires(firstWire_L, secondWire_L, tolerance=5e-2)
-                    iright = utilities.intersectWires(firstWire_R, secondWire_R, tolerance=5e-2)
+                pointsCount = object.PointsCount
 
-                    off = utilities.connectWires(firstWire_L, secondWire_L, ileft)
+                if object.Type == "Enter" and object.LeadInEnabled:
+                    pointsCount += 1
+
+                if object.Type == "Exit" and object.LeadOutEnabled:
+                    pointsCount += 1
+
+                currentEdge.DataIdx = i
+                currentEdge.ObjectType = object.Type
+                currentEdge.PointsCount = pointsCount
+                currentEdge.CompensationDirection = object.CompensationDirection
+
+                currentEdge.LeftEdgeLength = float(object.LeftEdgeLength) if object.LeftEdgeLength > 0 else 0.1
+                currentEdge.RightEdgeLength = float(object.RightEdgeLength) if object.RightEdgeLength > 0 else 0.1
+
+                currentEdge.LeftSegmentLength = float(object.LeftSegmentLength) if object.LeftSegmentLength > 0 else 0.1
+                currentEdge.RightSegmentLength = float(object.RightSegmentLength) if object.RightSegmentLength > 0 else 0.1
+
+                currentEdge.PointsLeft = currentEdge.OffsetLeft = object.Path_L[::-1] if route_data_dir[i] else object.Path_L
+                currentEdge.PointsRight = currentEdge.OffsetRight = object.Path_R[::-1] if route_data_dir[i] else object.Path_R
+
+                currentSegment.LastPoint += pointsCount - 1
+
+                if hasattr(object, "AddPause") and object.AddPause:
+                    pauses.append(currentSegment.LastPoint)
+                    pausesDuration.append(float(object.PauseDuration)) 
+
+                if not currentSegment.SimpleProjection:
+                    if object.Type == "Projection":
+                        currentSegment.SimpleProjection = True
+                    else:
+                        (left, right) = self.getEdges(object)
+                        if left is not None and right is not None:
+                            currentSegment.LeftPlaneX = left.BoundBox.XMin if left.BoundBox.XMin < currentSegment.LeftPlaneX else currentSegment.LeftPlaneX
+                            currentSegment.RightPlaneX = right.BoundBox.XMax if right.BoundBox.XMax > currentSegment.RightPlaneX else currentSegment.RightPlaneX
+                        else:
+                            currentSegment.SimpleProjection = True
+
+                currentSegment.Edges.append(currentEdge)
+
+            if currentEdge.ObjectType != "Rotation":
+                segments.append(currentSegment)
+
+            applyKerf = obj.KerfCompensation > 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) > FC_KERF_STRATEGY_NONE
+
+            # apply kerf compensation if needed
+            if applyKerf:
+                # build temporary planes for projection
+                # and make offsets from resulted projections
+                for i, segment in enumerate(segments):                
+                    norm = App.Vector(1.0, 0.0, 0.0)
+                    xdir = App.Vector(0.0, 1.0, 0.0)
+                    leftPlane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(segment.LeftPlaneX, float(-config.OriginX), 0), norm, xdir)
+                    rightPlane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(segment.RightPlaneX, float(-config.OriginX), 0), norm, xdir)
+
+                    for j, edge in enumerate(segment.Edges):
+                        idx = FC_KERF_DIRECTIONS.index(edge.CompensationDirection) if edge.CompensationDirection in FC_KERF_DIRECTIONS else 0                    
+                        dir = -1 * (idx - 1) if obj.CompensationDirection in FC_ROUTE_KERF_DIRECTIONS and FC_ROUTE_KERF_DIRECTIONS.index(obj.CompensationDirection) == 1 else idx - 1
                     
-                    if off == None:
-                        App.Console.PrintError("ERROR: LEFT OFFSET Something wrong near point: {}; idx: {}".format(ileft, j))
-                    
-                    # - discretize wire so it will have same count of vertices as source wire
-                    edge.OffsetLeft = self.getWirepoints(off[0], edge.PointsCount)
+                        edge.OffsetLenLeft = float(obj.KerfCompensation) * dir
+                        edge.OffsetLenRight = float(obj.KerfCompensation) * dir
 
-                    firstWire_L = off[1]
-                    secondWire_L = None
+                        dynamicOffset = False
+                        if not segment.SimpleProjection:
+                            #project edges from working planes to temp planes
+                            edge.projectToPlanes(leftPlane, rightPlane)
 
-                    off = utilities.connectWires(firstWire_R, secondWire_R, iright)
-                    
-                    if off == None:
-                        App.Console.PrintError("ERROR: RIGHT OFFSET Something wrong near point: {}; idx: {}".format(iright, j))
-                    
-                    # - discretize wire so it will have same count of vertices as source wire
-                    edge.OffsetRight = self.getWirepoints(off[0], edge.PointsCount)
+                            dynamicOffset = dir != 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) == FC_KERF_STRATEGY_DYN                       
 
-                    firstWire_R = off[1]
-                    secondWire_R = None
+                        # compute offsets
+                        edge.makeOffset(dynamicOffset, obj.CompensationDegree)
+
+                # intersect offsets and build final route points
+                for i, segment in enumerate(segments):
+                    firstWire_L = secondWire_L = None
+                    firstWire_R = secondWire_R = None
+                    
+                    last_point_L = None
+                    last_point_R = None
+
+                    for j in range(len(segment.Edges) - 1):
+                        edge = segment.Edges[j]
+                        if firstWire_L == None and firstWire_R == None:
+                            firstWire_L = makeWire(edge.OffsetLeft)
+                            firstWire_R = makeWire(edge.OffsetRight)
+                        
+                        if secondWire_L == None and secondWire_R == None:
+                            secondWire_L = makeWire(segment.Edges[j + 1].OffsetLeft)
+                            secondWire_R = makeWire(segment.Edges[j + 1].OffsetRight)
+
+                        try:
+                            ileft = intersectWires(firstWire_L, secondWire_L, tolerance=5e-3)
+                        except Exception as e:
+                            # p = Part.show(Part.Vertex(ileft[0]), "Trim point")
+                            # p.ViewObject.PointSize = 6
+                            # Part.show(firstWire_L, "first wire")
+                            # Part.show(secondWire_L, "second wire")
+                            # print(f"Failed to trim wire. Info: {ileft}")
+                            raise Exception(f"ERROR: {e}")
+                        
+                        try:
+                            iright = intersectWires(firstWire_R, secondWire_R, tolerance=5e-3)
+                        except Exception as e:
+                            raise Exception(f"ERROR: {e}")
+                        
+                        try:
+                            off = connectWires(firstWire_L, secondWire_L, ileft)
+                        except Exception as e:
+                            # p = Part.show(Part.Vertex(ileft[0]), "Trim point")
+                            # p.ViewObject.PointSize = 6
+                            # Part.show(firstWire_L, "first wire")
+                            # Part.show(secondWire_L, "second wire")
+                            # print(f"Failed to trim wire. Info: {ileft}")
+                            raise Exception(f"ERROR: LEFT OFFSET Something wrong near point: {ileft}; idx: {j}. Exception: {e}")
+                            
+                        if off == None:
+                            raise Exception(f"ERROR: LEFT OFFSET Something wrong near point: {ileft}; idx: {j}")
+                        
+                        # - discretize wire so it will have same count of vertices as source wire
+                        edge.OffsetLeft = self.getWirepoints(off[0], edge.PointsCount) if edge.PointsCount > 1 else [ileft[0]]
+
+                        firstWire_L = off[1]
+                        secondWire_L = None
+
+                        # save last offset point
+                        last_point_L = edge.OffsetLeft[-1]
+
+                        try:
+                            off = connectWires(firstWire_R, secondWire_R, iright)
+                        except Exception as e:
+                            # p = Part.show(Part.Vertex(iright[0]), "Trim point")
+                            # p.ViewObject.PointSize = 6
+                            # Part.show(firstWire_R, "first wire")
+                            # Part.show(secondWire_R, "second wire")
+                            # print(f"Failed to trim wire. Info: {iright}")
+                            raise Exception(f"ERROR: RIGHT OFFSET Something wrong near point: {iright}; idx: {j}. Exception: {e}")
+                        
+                        if off == None:
+                            raise Exception(f"ERROR: RIGHT OFFSET Something wrong near point: {iright}; idx: {j}")
+                        
+                        # - discretize wire so it will have same count of vertices as source wire
+                        edge.OffsetRight = self.getWirepoints(off[0], edge.PointsCount) if edge.PointsCount > 1 else [iright[0]]
+
+                        firstWire_R = off[1]
+                        secondWire_R = None
+
+                        # save last offset point
+                        last_point_R = edge.OffsetRight[-1]
+
+                        if not segment.SimpleProjection:
+                            left_Off = []
+                            right_off = []
+                            for p in range(edge.PointsCount):
+                                left_Off.append(intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpl))
+                                right_off.append(intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpr))
+                            edge.OffsetLeft = left_Off
+                            edge.OffsetRight = right_off
+
+                    # add last edge points
+                    edge = segment.Edges[-1]
+                    if firstWire_L is not None and firstWire_R is not None:                  
+                        edge.OffsetLeft = self.getWirepoints(firstWire_L, edge.PointsCount)
+                        edge.OffsetRight = self.getWirepoints(firstWire_R, edge.PointsCount)
+                    elif edge.PointsCount == 1 and last_point_L is not None and last_point_R is not None:
+                        edge.OffsetLeft = [last_point_L]
+                        edge.OffsetRight = [last_point_R]
 
                     if not segment.SimpleProjection:
                         left_Off = []
                         right_off = []
-                        for p in range(edge.PointsCount):
-                            left_Off.append(utilities.intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpl))
-                            right_off.append(utilities.intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpr))
+                        for p in range(edge.PointsCount):                            
+                            left_Off.append(intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpl))
+                            right_off.append(intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpr))
                         edge.OffsetLeft = left_Off
                         edge.OffsetRight = right_off
 
-                # add last edge points
-                edge = segment.Edges[-1]
-                if firstWire_L is not None and firstWire_R is not None:                  
-                    edge.OffsetLeft = self.getWirepoints(firstWire_L, edge.PointsCount)
-                    edge.OffsetRight = self.getWirepoints(firstWire_R, edge.PointsCount)
+            # build route from segments and edges
+            for i, segment in enumerate(segments):
+                if len(segment.Edges) > 0:
+                    for j, edge in enumerate(segment.Edges):
+                        pointsCount = edge.PointsCount
+                        # check for enter/exit case and add plunge-down or plunge-up lines
+                        if edge.ObjectType == "Enter":
+                            object = obj.Objects[route_data[edge.DataIdx]]
+                            # add plunge down line
+                            plunge_L = App.Vector(edge.OffsetLeft[0].x, edge.OffsetLeft[0].y, float(object.SafeHeight))
+                            plunge_R = App.Vector(edge.OffsetRight[0].x, edge.OffsetRight[0].y, float(object.SafeHeight))
 
-                if not segment.SimpleProjection:
-                    left_Off = []
-                    right_off = []
-                    for p in range(edge.PointsCount):                            
-                        left_Off.append(utilities.intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpl))
-                        right_off.append(utilities.intersectLineAndPlane(edge.OffsetLeft[p], edge.OffsetRight[p], wpr))
-                    edge.OffsetLeft = left_Off
-                    edge.OffsetRight = right_off
+                            resultPoints_L.append(plunge_L)
+                            resultPoints_R.append(plunge_R)
 
-        # build route from segments and edges
-        for i, segment in enumerate(segments):
-            for j, edge in enumerate(segment.Edges):
-                for idx in range(edge.PointsCount - 1):
-                    resultPoints_L.append(edge.OffsetLeft[idx] if applyKerf else edge.PointsLeft[idx])
-                    resultPoints_R.append(edge.OffsetRight[idx] if applyKerf else edge.PointsRight[idx])
-                
-                # add last point of the last edge
-                if j == len(segment.Edges) - 1:
-                    resultPoints_L.append(edge.OffsetLeft[-1] if applyKerf else edge.PointsLeft[-1])
-                    resultPoints_R.append(edge.OffsetRight[-1] if applyKerf else edge.PointsRight[-1])
+                            # plunge-down start point not included in offset points, but reflected in points count
+                            pointsCount -= 1
 
-        obj.Offset_L = resultPoints_L
-        obj.Offset_R = resultPoints_R
-        obj.Pauses = pauses
-        obj.PausesDurations = pausesDuration
-        obj.RouteBreaks = breaks
+                        for idx in range(pointsCount - 1):
+                            resultPoints_L.append(edge.OffsetLeft[idx])
+                            resultPoints_R.append(edge.OffsetRight[idx])
+                        
+                        if edge.ObjectType == "Exit":
+                            object = obj.Objects[route_data[edge.DataIdx]]
+                            # add last point of the edge as plunge down line start point.
+                            resultPoints_L.append(edge.OffsetLeft[-1])
+                            resultPoints_R.append(edge.OffsetRight[-1])
 
-        end_time = time.perf_counter()
-        elapsed_time = end_time - start_time
-        print("Elapsed time: {} seconds".format(elapsed_time))
+                            # add plunge up line
+                            plunge_L = App.Vector(edge.OffsetLeft[-1].x, edge.OffsetLeft[-1].y, float(object.SafeHeight))
+                            plunge_R = App.Vector(edge.OffsetRight[-1].x, edge.OffsetRight[-1].y, float(object.SafeHeight))
 
-        obj.Redraw += 1 #change of this property will trigger VP to redraw
+                            resultPoints_L.append(plunge_L)
+                            resultPoints_R.append(plunge_R)
 
+                        # add last point of the last edge. except for exit - it's last point already added as plunge-up line
+                        if j == len(segment.Edges) - 1 and edge.ObjectType != "Exit":
+                            resultPoints_L.append(edge.OffsetLeft[-1])
+                            resultPoints_R.append(edge.OffsetRight[-1])
+                        
+                        feed_overrides.append(edge.getFeedOverride())
+                else:
+                    feed_overrides.append(1.0)
+
+            if len(feed_overrides) != len(obj.Data):
+                raise Exception("ERROR: Feed overrides calculation error.")
+            
+            obj.Offset_L = resultPoints_L
+            obj.Offset_R = resultPoints_R
+            obj.Pauses = pauses
+            obj.PausesDurations = pausesDuration
+            obj.RouteBreaks = breaks
+            obj.FeedOverrides = feed_overrides
+
+            obj.Redraw += 1 #change of this property will trigger VP to redraw
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"Route {obj.Label} {e}\n")
+            raise
+
+    def getEdges(self, obj):
+        '''
+        Get left and right edges for object
+        @param obj - object to get edges for
+        @return tuple of (left edge, right edge)
+        '''
+        if hasattr(obj, "LeftEdgeName") and hasattr(obj, "RightEdgeName") \
+            and obj.LeftEdgeName != "" and obj.RightEdgeName != "":
+
+            left = obj.getSubObject(obj.LeftEdgeName)
+            right = obj.getSubObject(obj.RightEdgeName)
+            return (left, right)
+        else:
+            return (None, None)
+        
     def getWirepoints(self, wire, num_points):
         '''
         Make a Bspline from wire, discretize it with specified number of points
@@ -603,7 +670,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         @param num_points - number of points
         @return list of points 
         '''
-        if num_points <= 2: # short strait line - no need to convert
+        if num_points == 2: # short strait line - no need to convert
             return [wire.Vertexes[0].Point, wire.Vertexes[-1].Point]
         
         bs = Part.BSplineCurve()
@@ -612,6 +679,15 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         
         return res
     
+    def detect_connection(first_line, second_line, first_reversed):
+        f_end = first_line[START if first_reversed else END]
+
+        if isCommonPoint(f_end, second_line[START]):
+            return False
+        if isCommonPoint(f_end, second_line[END]):
+            return True
+
+        return None
 
 class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     
@@ -623,7 +699,7 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 
         self.drawRoute()
         obj.addDisplayMode(self.node, "Flat Lines")
-        utilities.setPickStyle(obj, utilities.UNPICKABLE)
+        setPickStyle(obj, UNPICKABLE)
 
     def drawRoute(self):        
         if self.Object.Offset_L is not None and self.Object.Offset_R is not None and len(self.Object.Offset_L) > 0 and len(self.Object.Offset_R) > 0:
@@ -746,7 +822,7 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
         return sep 
     
     def getIcon(self):
-        return utilities.getIconPath("route.svg")
+        return getIconPath("route.svg")
 
     def getDisplayModes(self, obj):
         """Return the display modes that this viewprovider supports."""
@@ -771,37 +847,46 @@ class MakeRoute():
     """Make Route"""
 
     def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("route.svg"),
+        return {"Pixmap"  : getIconPath("route.svg"),
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Create a route",
                 "ToolTip" : "Create a route from selected objects."}
 
-    def Activated(self): 
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+    def Activated(self):
+        view = Gui.ActiveDocument.ActiveView
+        doc = App.ActiveDocument
+        group = view.getActiveObject("group")
         setActive = False
+
         # - if machine is not active, try to select first one in a document
         if group is None or group.Type != "Job":
-            group = App.ActiveDocument.getObject("Job")
+            group = doc.getObject("Job")
             setActive = True
 
         if group is not None and group.Type == "Job":
             if setActive:
-                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+                view.setActiveObject("group", group)
             
             # - Get selecttion
             objects = [item.Object for item in Gui.Selection.getSelectionEx()]
             
-            # - Create object
-            route = group.newObject("App::FeaturePython", "Route")
-            WireRoute(route, objects, group.Name)
-            WireRouteVP(route.ViewObject)
+            route = None
+            try:
+                # - Create object
+                route = group.newObject("App::FeaturePython", "Route")
+                WireRoute(route, objects, group.Name)
+                WireRouteVP(route.ViewObject)
 
-            for obj in objects:
-                #obj.ViewObject.Visibility = False
-                group.removeObject(obj)
+                for obj in objects:
+                    #obj.ViewObject.Visibility = False
+                    group.removeObject(obj)
 
-            App.ActiveDocument.recompute()
-            Gui.Selection.clearSelection()
+                doc.recompute()
+                Gui.Selection.clearSelection()
+            except Exception as e:
+                App.Console.PrintError(f"Failed to create route.\n")
+                if route:
+                    doc.removeObject(route.Name)
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
@@ -822,7 +907,7 @@ class MakeRoute():
                     return False
                 
                 for obj in objects:
-                    if not hasattr(obj, "Type") or obj.Type not in utilities.FC_TYPES_TO_ROUTE:
+                    if not hasattr(obj, "Type") or obj.Type not in FC_TYPES_TO_ROUTE:
                         return False                    
                 return True
             return False

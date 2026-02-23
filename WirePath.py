@@ -12,8 +12,7 @@ import FreeCADGui
 Gui=FreeCADGui
 import FoamCutViewProviders
 import FoamCutBase
-import utilities
-from utilities import getWorkingPlanes, getAllSelectedObjects, getEdgesLinks
+from utilities import *
 
 class PathSection(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, edge_l, edge_r, jobName):
@@ -29,22 +28,25 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj): 
+        try:
+            job = obj.Document.getObject(obj.JobName)
+            if job is None or job.Type != "Job":
+                raise Exception(f"ERROR: Active Job not found\n")
 
-        job = obj.Document.getObject(obj.JobName)
-        if job is None or job.Type != "Job":
-            App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
-
-        wp = getWorkingPlanes(job, obj.Document)
-      
-        leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
-        rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
+            wp = getWorkingPlanes(job, obj.Document)
         
-        self.createShape(obj, [leftEdge, rightEdge], wp, (0, 0, 0))
+            leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
+            rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
+            
+            self.createShape(obj, [leftEdge, rightEdge], wp, (0, 0, 0))
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"Path {obj.Label} {e}\n")
+            raise
 
 class PathSectionVP(FoamCutViewProviders.FoamCutMovementViewProvider): 
     
     def getIcon(self):
-        return utilities.getIconPath("path.svg")
+        return getIconPath("path.svg")
 
     def claimChildren(self):
         if (self.Object.LeftEdge is not None and len(self.Object.LeftEdge) > 0 
@@ -56,20 +58,27 @@ class MakePath():
     """Make Path"""
 
     def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("path.svg"), # the name of a svg file available in the resources
+        return {"Pixmap"  : getIconPath("path.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Create path",
                 "ToolTip" : "Create path object from 2 selected opposite edges or faces. If 2 faces selected, separate path will be created for each edge pair."}
 
     def CreateFromEdges(self, edges, group):
-        obj = group.newObject("Part::FeaturePython","Path")
-            
-        PathSection(obj, 
-                    (FreeCAD.ActiveDocument.getObject((edges[0])[0].Name), (edges[0])[1][0]), 
-                    (FreeCAD.ActiveDocument.getObject((edges[1])[0].Name),(edges[1])[1][0]),
-                    group.Name)
-        PathSectionVP(obj.ViewObject)
-        obj.ViewObject.PointSize = 4
+        doc = FreeCAD.ActiveDocument
+        path = None
+        try:
+            path = group.newObject("Part::FeaturePython","Path")
+                
+            PathSection(path, 
+                        (doc.getObject((edges[0])[0].Name), (edges[0])[1][0]), 
+                        (doc.getObject((edges[1])[0].Name),(edges[1])[1][0]),
+                        group.Name)
+            PathSectionVP(path.ViewObject)
+            path.ViewObject.PointSize = 4
+        except Exception as e:                
+            FreeCAD.Console.PrintError(f"Failed to create path.\n")
+            if path is not None:
+                doc.removeObject(path.Name) 
 
     def FindOppositeEdgeIndex(self, edge, edges_r, skipIndex=None):
         """
@@ -146,19 +155,22 @@ class MakePath():
         return objects
 
     def Activated(self):
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        doc = App.ActiveDocument
+        view = Gui.ActiveDocument.ActiveView
+
+        group = view.getActiveObject("group")
         setActive = False
         # - if machine is not active, try to select first one in a document
         if group is None or group.Type != "Job":
-            group = App.ActiveDocument.getObject("Job")
+            group = doc.getObject("Job")
             setActive = True
 
         if group is not None and group.Type == "Job":
             if setActive:
-                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+                view.setActiveObject("group", group)
             
             # - Get selected objects
-            objects = utilities.getAllSelectedObjects(True)
+            objects = getAllSelectedObjects(True)
             
             # left working plane
             wps = getWorkingPlanes(group, App.ActiveDocument)
@@ -204,7 +216,7 @@ class MakePath():
             for pair in edgesPairs:
                 self.CreateFromEdges(pair, group)
             
-            App.ActiveDocument.recompute()
+            doc.recompute()
             Gui.Selection.clearSelection()
     
     def IsActive(self):

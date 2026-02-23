@@ -32,18 +32,22 @@ class Rotation(FoamCutBase.FoamCutBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
-        if obj.Source is None:
-            return
+        try:
+            if obj.Source is None:
+                return
 
-        obj.Source.ViewObject.Visibility = False
+            obj.Source.ViewObject.Visibility = False
 
-        # - Copy and rotate object
-        shape = obj.Source.Shape.copy()
-        shape.rotate(App.Vector(0.0, obj.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
-        
-        # - Assign new shape
-        obj.Shape     = shape
-        obj.Placement = shape.Placement
+            # - Copy and rotate object
+            shape = obj.Source.Shape.copy()
+            shape.rotate(App.Vector(0.0, obj.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
+            
+            # - Assign new shape
+            obj.Shape     = shape
+            obj.Placement = shape.Placement
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"Rotation {obj.Label} {e}\n")
+            raise
 
 class RotationVP(FoamCutViewProviders.FoamCutBaseViewProvider):   
     def getIcon(self):
@@ -69,27 +73,37 @@ class AddRotation():
                 "ToolTip" : "Rotate target object by given angle around rotation axis"}
 
     def Activated(self):   
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        doc = App.ActiveDocument
+        view = Gui.ActiveDocument.ActiveView
+
+        group = view.getActiveObject("group")
         setActive = False
         # - if machine is not active, try to select first one in a document
         if group is None or group.Type != "Job":
-            group = App.ActiveDocument.getObject("Job")
+            group = doc.getObject("Job")
             setActive = True
 
         if group is not None and group.Type == "Job":
             if setActive:
-                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+                view.setActiveObject("group", group)
             
             source = Gui.Selection.getSelectionEx()[0].Object      
-            # - Create rotation object
-            rt = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Rotation")
-            
-            Rotation(rt, source, group.Name)
-            RotationVP(rt.ViewObject)
+            rt = None
+            try:
+                # - Create rotation object
+                rt = doc.addObject("Part::FeaturePython", "Rotation")
+                
+                Rotation(rt, source, group.Name)
+                RotationVP(rt.ViewObject)
 
-            group.addObject(rt)
-            Gui.Selection.clearSelection()
-            FreeCAD.ActiveDocument.recompute()            
+                group.addObject(rt)
+                Gui.Selection.clearSelection()
+                doc.recompute()
+                Gui.Selection.addSelection(doc.Name, rt.Name)
+            except Exception as e:
+                FreeCAD.Console.PrintError(f"Failed to create Rotation.\n")
+                if rt is not None:
+                    doc.removeObject(rt.Name)    
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

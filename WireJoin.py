@@ -38,28 +38,31 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
-        
-        (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
-        (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], obj.EndPoint[0].getSubObject(obj.EndPoint[1][0]))
+        try:
+            (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
+            (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], obj.EndPoint[0].getSubObject(obj.EndPoint[1][0]))
 
-        if oppositeVertexA is None:
-            App.Console.PrintError("ERROR:\n Unable to locate opposite vertex for the start point.\n")
+            if oppositeVertexA is None:
+                raise Exception(f"ERROR: Unable to locate opposite vertex for the start point.\n")
 
-        if oppositeVertexB is None:
-            App.Console.PrintError("ERROR:\n Unable to locate opposite vertex for the end point.\n")
+            if oppositeVertexB is None:
+                raise Exception(f"ERROR: Unable to locate opposite vertex for the end point.\n")
 
-        if isLeftA != isLeftB:
-            App.Console.PrintError("ERROR:\n Start and End points should be on one side.\n")
+            if isLeftA != isLeftB:
+                raise Exception(f"ERROR: Start and End points should be on one side.\n")
 
-        edges = []
+            edges = []
 
-        if isCommonPoint(vertexA, oppositeVertexA):
-            edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
-        else:
-            edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
-            edges.append(Part.makeLine(oppositeVertexA.Point, oppositeVertexB.Point))
-        
-        self.createShape(obj, edges, wp, (35, 0, 205))
+            if isCommonPoint(vertexA, oppositeVertexA):
+                edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
+            else:
+                edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
+                edges.append(Part.makeLine(oppositeVertexA.Point, oppositeVertexB.Point))
+            
+            self.createShape(obj, edges, wp, (35, 0, 205))
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"Join {obj.Label} {e}\n")
+            raise
 
 class WireJoinVP(FoamCutViewProviders.FoamCutMovementViewProvider):
     def getIcon(self):
@@ -71,7 +74,6 @@ class WireJoinVP(FoamCutViewProviders.FoamCutMovementViewProvider):
             return [self.Object.StartPoint[0], self.Object.EndPoint[0]]
         return None
 
-
 class MakeJoin():
     """Make Join"""
 
@@ -81,30 +83,39 @@ class MakeJoin():
                 "MenuText": "Join 2 points",
                 "ToolTip" : "Join 2 selected points"}
 
-    def Activated(self):         
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+    def Activated(self):    
+        doc = App.ActiveDocument
+        view = Gui.ActiveDocument.ActiveView
+
+        group = view.getActiveObject("group")
         setActive = False
         # - if machine is not active, try to select first one in a document
         if group is None or group.Type != "Job":
-            group = App.ActiveDocument.getObject("Job")
+            group = doc.getObject("Job")
             setActive = True
 
         if group is not None and group.Type == "Job":
             if setActive:
-                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+                view.setActiveObject("group", group)
             
             # - Get selecttion
             objects = getAllSelectedObjects()
             
-            # - Create object
-            join = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Join")
-            WireJoin(join, objects[0], objects[1], group.Name)
-            WireJoinVP(join.ViewObject)
-            join.ViewObject.PointSize = 4
-    
-            group.addObject(join)
-            Gui.Selection.clearSelection()
-            FreeCAD.ActiveDocument.recompute()
+            join = None
+            try:
+                # - Create object
+                join = doc.addObject("Part::FeaturePython", "Join")
+                WireJoin(join, objects[0], objects[1], group.Name)
+                WireJoinVP(join.ViewObject)
+                join.ViewObject.PointSize = 4
+        
+                group.addObject(join)
+                Gui.Selection.clearSelection()
+                doc.recompute()
+            except Exception as e:                
+                FreeCAD.Console.PrintError(f"Failed to create entry.\n")
+                if join is not None:
+                    doc.removeObject(join.Name)   
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

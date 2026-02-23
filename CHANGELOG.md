@@ -2,7 +2,19 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.10] - TBA
+## [0.1.11] - 2026-02-28
+
+### Notes
+- This release has a breaking change in how wire speed is handled. Before this change user was specifying actual machine speed and kerf compensation was scaled to this speed. now user should specify max speed in a foam, and machine speed will be scaled to keep this speed constant. There's very slight difference if piece has not much taper, but for small tapered objects/pathes there might be significant difference. Please review your legacy files and do ajustments needed.
+
+### Added
+- Proper error handling added to all objects
+
+### Fixed 
+- Kerf compensation on flipped edges goes wrong direction #19
+- Dynamic kerf compensation depends on sequence of adding edges #7
+
+## [0.1.10] - 2025-10-16
    
 ### Added
 - Add an option to change comment style. #8

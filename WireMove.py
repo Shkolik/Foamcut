@@ -13,8 +13,7 @@ Gui=FreeCADGui
 import Part
 import FoamCutViewProviders
 import FoamCutBase
-import utilities
-from utilities import getWorkingPlanes, getAllSelectedObjects, isCommonPoint
+from utilities import *
 
 class WireMove(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, jobName):     
@@ -36,28 +35,31 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):        
-        # print("Parent object {}".format(obj.StartPoint[0]))
+        try:
 
-        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
-        
-        if oppositeVertex is None:
-            App.Console.PrintError("ERROR:\n Unable to locate opposite vertex.\n")
+            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
             
-        edges = []
+            if oppositeVertex is None:
+                raise Exception(f"ERROR:\n Unable to locate opposite vertex.\n")
+                
+            edges = []
 
-        if isCommonPoint(vertex, oppositeVertex):
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point))
-        else:
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if isLeft                      \
-                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
-            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if not isLeft                  \
-                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
-        
-        self.createShape(obj, edges, wp, (35, 169, 205))
+            if isCommonPoint(vertex, oppositeVertex):
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point))
+            else:
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if isLeft                      \
+                    else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
+                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if not isLeft                  \
+                    else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
+            
+            self.createShape(obj, edges, wp, (35, 169, 205))
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"Move {obj.Label} {e}\n")
+            raise
 
 class WireMoveVP(FoamCutViewProviders.FoamCutMovementViewProvider):     
     def getIcon(self):
-        return utilities.getIconPath("move.svg")
+        return getIconPath("move.svg")
 
     def claimChildren(self):
         return [self.Object.StartPoint[0]] if self.Object.StartPoint is not None and len(self.Object.StartPoint) > 0 else None
@@ -66,38 +68,47 @@ class MakeMove():
     """Make Move"""
 
     def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("move.svg"), # the name of a svg file available in the resources
+        return {"Pixmap"  : getIconPath("move.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Create move path",
                 "ToolTip" : "Create move path object from selected point in specified direction"}
 
     def Activated(self):    
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
+        doc = App.ActiveDocument
+        view = Gui.ActiveDocument.ActiveView
+
+        group = view.getActiveObject("group")
         setActive = False
         # - if machine is not active, try to select first one in a document
         if group is None or group.Type != "Job":
-            group = App.ActiveDocument.getObject("Job")
+            group = doc.getObject("Job")
             setActive = True
 
         if group is not None and group.Type == "Job":
             if setActive:
-                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+                view.setActiveObject("group", group)
             
             # - Get selecttion
             objects = getAllSelectedObjects()
             
-            # - Create object
-            move = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", "Move")
-            WireMove(move, objects[0], group.Name)
-            WireMoveVP(move.ViewObject)
-            move.ViewObject.PointSize = 4
+            move = None
+            try:
+                # - Create object
+                move = doc.addObject("Part::FeaturePython", "Move")
+                WireMove(move, objects[0], group.Name)
+                WireMoveVP(move.ViewObject)
+                move.ViewObject.PointSize = 4
 
-            group.addObject(move)
+                group.addObject(move)
 
-            Gui.Selection.clearSelection()
-            Gui.Selection.addSelection(App.ActiveDocument.Name,move.Name)
-            
-            App.ActiveDocument.recompute()
+                Gui.Selection.clearSelection()
+                doc.recompute()
+                Gui.Selection.addSelection(doc.Name, move.Name)
+                
+            except Exception as e:                
+                FreeCAD.Console.PrintError(f"Failed to create Move.\n")
+                if move is not None:
+                    doc.removeObject(move.Name) 
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
