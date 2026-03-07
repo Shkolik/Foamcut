@@ -46,7 +46,7 @@ class FoamCutMovementViewProvider(FoamCutBaseViewProvider):
         while self.projection.getNumChildren() > 0:
             self.projection.removeChild(0)
 
-        if self.ViewObject.ShowProjectionLines:
+        if self.ViewObject.ShowProjectionLines and self.ViewObject.Visibility:
             style=coin.SoDrawStyle()
             style.style = coin.SoDrawStyle.LINES
 
@@ -77,5 +77,5 @@ class FoamCutMovementViewProvider(FoamCutBaseViewProvider):
             self.drawProjections()
         
     def onChanged(self, _, prop):
-        if prop == "ShowProjectionLines":
+        if prop == "ShowProjectionLines" or prop == "Visibility":
             self.drawProjections()

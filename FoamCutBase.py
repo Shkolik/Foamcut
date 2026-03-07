@@ -36,6 +36,26 @@ class FoamCutBaseObject:
             App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
                 
         return job.getObject(job.ConfigName)
+    
+    def getEdges(self, obj):
+        left = None
+        right = None
+
+        if hasattr(obj, "LeftEdge") and obj.LeftEdge is not None:
+            left = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
+        elif hasattr(obj, "Source") and obj.Source is not None:
+            left = obj.Source[0].getSubObject(obj.Source[1][0])
+        elif hasattr(obj, "LeftEdgeName") and obj.LeftEdgeName:
+            left = obj.getSubObject(obj.LeftEdgeName)
+
+        if hasattr(obj, "RightEdge") and obj.RightEdge is not None:
+            right = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
+        elif hasattr(obj, "Source") and obj.Source is not None:
+            right = obj.Source[0].getSubObject(obj.Source[1][0])
+        elif hasattr(obj, "RightEdgeName") and obj.RightEdgeName:
+            right = obj.getSubObject(obj.RightEdgeName)
+
+        return (left, right if right is not None else left)
 
 class FoamCutMovementBaseObject(FoamCutBaseObject):
     def __init__(self, obj, jobName):
@@ -68,7 +88,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.CompensationDirection = 0 # Normal compensation by default
 
         obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(configName))
-        # obj.setExpression(".PauseDuration", u"<<{}>>.PauseDuration".format(config))
 
         obj.setEditorMode("PauseDuration", 3)
 
@@ -106,27 +125,6 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
                 obj.setEditorMode("PauseDuration", 0)
             else:
                 obj.setEditorMode("PauseDuration", 3)
-        return
-
-    def getEdges(self, obj):
-        left = None
-        right = None
-
-        if hasattr(obj, "LeftEdge") and obj.LeftEdge is not None:
-            left = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
-        elif hasattr(obj, "Source") and obj.Source is not None:
-            left = obj.Source[0].getSubObject(obj.Source[1][0])
-        elif hasattr(obj, "LeftEdgeName") and obj.LeftEdgeName:
-            left = obj.getSubObject(obj.LeftEdgeName)
-
-        if hasattr(obj, "RightEdge") and obj.RightEdge is not None:
-            right = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
-        elif hasattr(obj, "Source") and obj.Source is not None:
-            right = obj.Source[0].getSubObject(obj.Source[1][0])
-        elif hasattr(obj, "RightEdgeName") and obj.RightEdgeName:
-            right = obj.getSubObject(obj.RightEdgeName)
-
-        return (left, right if right is not None else left)
 
     def findOppositeVertexes(self, obj, parent, vertex):
         oppositeVertex = None
@@ -135,7 +133,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         job = doc.getObject(obj.JobName)
         if job is None or job.Type != "Job":
-            App.Console.PrintError("ERROR:\n Error updating Enter - active Job not found\n")
+            raise Exception(f"ERROR: Active Job not found\n")
 
         wp = getWorkingPlanes(job, doc)
 
@@ -188,7 +186,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
                         vertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
                         oppositeVertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
             else:
-                App.Console.PrintError("ERROR:\n Not supported parent object type. Only Path, Move and Projection supported.\n")
+                raise Exception(f"ERROR: Not supported parent object type. Only Path, Move and Projection supported.\n")
         else:
             if isMovement(parent):
                 (distToLeft, _, _) = vertex.distToShape(wp[0].Shape)
@@ -222,17 +220,30 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         return (isLeft, vertex, oppositeVertex, wp)
 
-    def createShape(self, obj, edges, planes, lineColor):
+    def getAdditionalShapes(self, obj):
+        '''
+        Some objects (like Enter) may have additional shapes to display in 3D view (like plunge-down lines). 
+        This method should be overridden in such cases to provide those shapes.
+        
+        :param self: Movement object
+        :returns: List of additional shapes to display in 3D view
+        '''
+        return []
+
+    def createShape(self, obj, edges, planes, color):
         # - Make path between objects on working planes
         discretizationStep = obj.DiscretizationStep if obj.DiscretizationStep > 0 else 0.5
         if len(edges) == 2:
             isLine = isStraitLine(edges[0]) and isStraitLine(edges[1])
-            (path_points, inverted, points_count) = makePathPointsByEdgesPair(edges[0], edges[1], planes, discretizationStep, isLine)
+            (path_points, inverted, points_count) = makePathPointsByEdgesOrVerticesPair(edges[0], edges[1], planes, discretizationStep, isLine)
         elif len(edges) == 1:
-            (path_points, inverted, points_count) = makePathPointsByEdge(edges[0], planes, discretizationStep, isStraitLine(edges[0]))
+            (path_points, inverted, points_count) = makePathPointsByEdgeOrVertex(edges[0], planes, discretizationStep, isStraitLine(edges[0]))
         else:
-            App.Console.PrintError("ERROR:\n Not supported number of edges.\n")
+            raise Exception(f"ERROR: Not supported number of edges: {len(edges)}.\n")
 
+        if path_points is None:
+            raise Exception(f"ERROR: Can't create path for movement - path points are empty.\n")
+        
         # - Set data
         obj.Path_L       = [item for item in path_points[START]]
         obj.Path_R       = [item for item in path_points[END]]        
@@ -283,8 +294,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             obj.RightSegmentLength = float(path_R.length())
 
             if len(edges) == 1:
-                obj.LeftEdgeLength = edges[0].Length
-                obj.RightEdgeLength = obj.LeftEdgeLength
+                obj.LeftEdgeLength = obj.RightEdgeLength = edges[0].Length
             else:
                 obj.LeftEdgeLength = edges[0].Length
                 obj.RightEdgeLength = edges[1].Length
@@ -295,14 +305,19 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         
         for edge in edges:
             shapes.append(edge)
+
+        # show additional shapes if needeed (like plunge down lines for Enter)
+        for shape in self.getAdditionalShapes(obj):
+            shapes.append(shape)
         
         obj.Shape = Part.makeCompound(shapes)
-        obj.ViewObject.LineColor = lineColor
+        obj.ViewObject.LineColor = color
+        obj.ViewObject.PointColor = color
 
         if hasattr(obj, "LeftEdgeName"):
-            obj.LeftEdgeName = "Edge%d" % (shapes.index(edges[0]) + 1)
+            obj.LeftEdgeName = "%s%d" % (edges[0].ShapeType, shapes.index(edges[0]) + 1)
         if hasattr(obj, "RightEdgeName") and len(edges) > 1:
-            obj.RightEdgeName = "Edge%d" % (shapes.index(edges[1]) + 1)
+            obj.RightEdgeName = "%s%d" % (edges[1].ShapeType, shapes.index(edges[1]) + 1)
 
     def validateWireStretch(self, obj):
         config = self.getConfig(obj)
@@ -311,17 +326,16 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             return True
 
         if len(obj.Path_L) != len(obj.Path_R):
-            App.Console.PrintError("ERROR:\n Number of point doesn't match.\n Object - {}".format(obj.Label))
-            return False
+            raise Exception(f"ERROR: Number of points doesn't match. Object - {obj.Label}")
         
         delta = float(config.WireStretchLength)
         wireLength = float(config.FieldWidth)
 
-        for i in range(len(obj.Path_L)):
-            stretch = obj.Path_L[i].distanceToPoint(obj.Path_R[i]) - wireLength
+        for pL, pR in zip(obj.Path_L, obj.Path_R):
+            stretch = pL.distanceToPoint(pR) - wireLength
 
             if stretch > delta:
-                App.Console.PrintWarning("Warning:\n Wire about to break cutting {}. Wire stretch is {:.2f}mm that is greater than allowed {:.2f}mm \n".format(obj.Label, stretch, delta))
+                App.Console.PrintWarning(f"Warning:\n Wire about to break cutting {obj.Label}. Wire stretch is {stretch:.2f}mm that is greater than allowed {delta:.2f}mm \n")
                 return False
 
         return True

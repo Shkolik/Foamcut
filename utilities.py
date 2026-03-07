@@ -83,6 +83,8 @@ def getParameterString(name, default):
     
     return parameters.GetString(name)
 
+SUPPRESS_WARNINGS = getParameterBool("SuppressWarnings", True)
+
 def isNewStateHandling():
     '''
     Checks if we need handle object state in a new fashion
@@ -91,14 +93,14 @@ def isNewStateHandling():
     version = FreeCAD.Version()[0]+'.'+FreeCAD.Version()[1]+FreeCAD.Version()[2]
     return (version >= '0.212' and version < '2024.1130') or version >= '2024.1130'
 
-def isStraitLine(edge):
+def isStraitLine(wire):
     '''
     Checks if edge is strait line
-    @param edge - edge to inspect
+    @param wire - wire to inspect
     '''
-    if len(edge.Vertexes) == 2:
-        len1 = (edge.Vertexes[0].Point - edge.Vertexes[1].Point).Length
-        return isclose(abs(len1), edge.Length, rel_tol=1e-7)    
+    if len(wire.Vertexes) == 2:
+        len1 = (wire.Vertexes[0].Point - wire.Vertexes[1].Point).Length
+        return isclose(abs(len1), wire.Length, rel_tol=1e-7)    
     else:
         return False
 
@@ -192,6 +194,7 @@ def intersectLineAndPlane(v0, v1, plane):
     Find point of intersection of line and plane
     @param v0 - Fist line point
     @param v1 - Second line point
+    @param plane - Plane
     @returns App.Vector Point of intersection
     '''
     # - Check is same points and move one of them along X axis to make able to make a line
@@ -201,10 +204,42 @@ def intersectLineAndPlane(v0, v1, plane):
     # - Make line
     edge  = Part.makeLine(v0, v1)
 
+    surface = plane.Shape.Surface if hasattr(plane, 'Shape') else plane.Surface
+    
     # - Find point of intersection
-    point = plane.Shape.Surface.intersect(edge.Curve)[0][0]
+    point = surface.intersect(edge.Curve)[0][0]
     
     return App.Vector(point.X, point.Y, point.Z)
+
+def getParallelEdgeLength(obj, planeX):
+    '''
+    Get length of edge projected to the parallel to working plane on specified X.
+    
+    Args:
+        obj: Object containing the path and configuration
+        planeX: X coordinate of the plane to project onto
+    '''
+    if not hasattr(obj.Proxy, "getConfig") or not hasattr(obj, "Path_L") or not hasattr(obj, "Path_R") or not hasattr(obj, "EdgesInverted"):
+        raise Exception(f"Unsupported object type {obj.Label}")
+
+    config = obj.Proxy.getConfig(obj)
+    left_points = obj.Path_L
+    right_points = list(reversed(obj.Path_R)) if obj.EdgesInverted else obj.Path_R
+
+    norm = App.Vector(1.0, 0.0, 0.0)
+    xdir = App.Vector(0.0, 1.0, 0.0)
+    plane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(planeX, float(-config.OriginX), 0), norm, xdir)
+
+    projected = []
+
+    for l, r in zip(left_points, right_points):
+        projected.append(intersectLineAndPlane(l, r, plane))
+
+    # recalculate edges length
+    path = Part.BSplineCurve()
+    path.approximate(Points = projected, Continuity="C0")
+    
+    return float(path.length())
 
 def getConfigByName(config, doc):
     '''
@@ -324,9 +359,9 @@ def makePathByPointSets(first, second, planes, projection = False):
             return (resultInverted if invert else result, invert)
     return (result, False)
 
-def makePathPointsByEdgesPair(first, second, planes, step = 0.5, isStraitLine = False):    
+def makePathPointsByEdgesOrVerticesPair(first, second, planes, step = 0.5, isStraitLine = False):    
     '''
-    Make path on working planes by two edges, vertices, or their combination
+    Make path on working planes by two edges or vertices
 
     @param first - First edge / vertex
     @param second - Second edge / vertex
@@ -335,38 +370,42 @@ def makePathPointsByEdgesPair(first, second, planes, step = 0.5, isStraitLine = 
     @returns tuple (result, inverted, points_count), where:
         result - set of resulted points; 
         inverted - indicate that edge was inverted;
-        points_count - cout of vertices after descretization with set step
+        points_count - count of vertices after descretization with set step
     '''
-    # - Find longest edge
-    maxlen = first.Length if first.Length >= second.Length else second.Length
+    if first.ShapeType != second.ShapeType:
+        raise Exception(f"Invalid path: cannot combine {first.ShapeType} with {second.ShapeType}. "
+            "Select two edges or two vertices."
+        )
+    
+    if first.ShapeType == "Vertex" and second.ShapeType == "Vertex":
+        (result, inverted) = makePathByPointSets([first.Point], [second.Point], planes)
+        return (result, False, 1)
+    
+    step = max(float(step), 1e-2) # avoid too much points for short edges
 
     # - Calculate number of discretization points
-    points_count = int(float(maxlen) / float(step))
+    points_count = int(math.ceil(float(max(first.Length, second.Length)) / float(step)))
 
     if points_count < 2: #looks like edge too short and we can treat it as strait line
-        points_count = 2
         isStraitLine = True
 
     first_set   = []
     second_set  = []
 
-    # - Discretize first edge
-    if first.ShapeType == "Vertex":
-        for i in range(points_count): first_set.append(first.Point)
-    else:
-        first_set = first.discretize(Number=points_count) if points_count > 2 and not isStraitLine else [first.firstVertex().Point, first.lastVertex().Point]
-
-    # - Discretize second edge
-    if second.ShapeType == "Vertex":
-        for i in range(points_count): second_set.append(second.Point)
-    else:
-        second_set = second.discretize(Number=points_count) if points_count > 2 and not isStraitLine else [second.firstVertex().Point, second.lastVertex().Point]
+    if isStraitLine:
+        first_set = [first.firstVertex().Point, first.lastVertex().Point]
+        second_set = [second.firstVertex().Point, second.lastVertex().Point]
+        points_count = 2
+    else:        
+        # - Discretize edges
+        first_set = first.discretize(Number=points_count)
+        second_set = second.discretize(Number=points_count)
 
     # - Make path
     (result, inverted) = makePathByPointSets(first_set, second_set, planes)
-    return None if result is None else (result, inverted, points_count)
+    return (result, inverted, points_count)
 
-def makePathPointsByEdge(first, planes, step = 0.5, isStraitLine = False):    
+def makePathPointsByEdgeOrVertex(first, planes, step = 0.5, isStraitLine = False):    
     '''
     Make projected path on working planes by one edge or vertex
 
@@ -377,23 +416,377 @@ def makePathPointsByEdge(first, planes, step = 0.5, isStraitLine = False):
     @returns tuple (result, inverted, points_count), where:
         result - set of resulted points; 
         inverted - indicate that edge was inverted;
-        points_count - cout of vertices after descretization with set step
+        points_count - count of vertices after descretization with set step
     '''
     # - Detect vertex and vertex
     if first.ShapeType == "Vertex":
-        return makePathByPointSets([first.Point], None, planes, True)
+        (result, _) = makePathByPointSets([first.Point], None, planes, True)
+        return (result, False, 1)
+
+    step = max(float(step), 1e-2) # avoid too much points for short edges
 
     # - Calculate number of discretization points
-    points_count = int(float(first.Length) / float(step))
+    points_count = int(math.ceil(float(first.Length) / float(step)))
     if points_count < 2: #looks like edge too short and we can treat it as strait line
+        isStraitLine = True
+
+    if isStraitLine:
+        first_set = [first.firstVertex().Point, first.lastVertex().Point]
         points_count = 2
-        
-    # - Discretize first edge
-    first_set = first.discretize(Number=points_count) if points_count > 2 and not isStraitLine else [first.firstVertex().Point, first.lastVertex().Point]
+    else:        
+        # - Discretize edge
+        first_set = first.discretize(Number=points_count)
 
     # - Make path
-    (result, inverted) = makePathByPointSets(first_set, None,  planes, True)
-    return None if result is None else (result, inverted, points_count)
+    (result, _) = makePathByPointSets(first_set, None,  planes, True)
+    return (result, False, points_count)
+
+def makeWire(points):
+    ''' 
+    Create wire from list of points
+
+    @param points - list of points
+    '''
+    if len(points) < 2:
+        return None
+    
+    edges = []
+    for i in range(len(points) - 1):
+        edges.append(Part.LineSegment(points[i], points[i+1]))
+
+    return Part.Wire([edge.toShape() for edge in edges])
+
+def makeLineOffsetByPoints(startPoint, endPoint, offset):
+    '''
+    Create offset wire
+    
+    @param startPoint - start point of the line
+    @param endPoint - end point of the line
+    @param offset - distance to offset, where: negative - offset to the left; 0 - no offset; positive - offset to the right.
+    
+    @return offset wire
+    '''
+    
+    direction = endPoint - startPoint
+    direction.normalize()
+    
+    perpendicular = direction.cross(App.Vector(1,0,0))
+    perpendicular.normalize()
+    
+    res_start = startPoint + float(offset) * perpendicular
+    res_end = endPoint + float(offset) * perpendicular
+    
+    return Part.Wire(Part.LineSegment(res_start, res_end).toShape())
+
+def makeLineOffset(wire, offset):
+    '''
+    Create offset wire
+    
+    @param wire - source wire (should be strait line, only start and end vertices will be used)
+    @param offset - distance to offset, where: negative - offset to the left; 0 - no offset; positive - offset to the right.
+    
+    @return offset wire
+    '''
+    start = wire.Vertexes[0].Point
+    end = wire.Vertexes[-1].Point
+
+    return makeLineOffsetByPoints(start, end, offset)
+
+
+def intersectWires(wire1, wire2, tolerance = 1e-4):
+    '''
+    Check how wires intersect on a plane
+    
+    @param wire1 - first wire
+    @param wire2 - second wire
+
+    @returns intersection of 2 wires as (intersection, wire1 mode, wire2 mode) where:
+        - intersection is App.Vector() with coordinates of intersection
+        - wire1 mode - mode of intersection for wire1: "none" | "trim" | "extend" | "replace"
+        - wire2 mode - mode of intersection for wire2: "none" | "trim" | "extend" | "replace"
+    '''
+    if wire1 is None and wire2 is None:
+        raise Exception("At least one wire should be present")
+
+    # first wire is missing or single point
+    if wire1 is None and wire2 is not None:
+        return (wire2.Vertexes[0].Point, "none", "none")
+    # second wire is missing or single point
+    if wire2 is None and wire1 is not None:
+        return (wire1.Vertexes[-1].Point, "none", "none")
+    
+    # check if wires already intersect or close enough to be treated as intersected    
+    (dist, vectors, infos) = wire1.distToShape(wire2)
+    
+    (topo1, index1, param1, topo2, index2, param2) = infos[0]
+    (v1, v2) = vectors[0]
+    
+    
+    # wires are intersecting or close enough to be treated as intersecting
+    # we can just use point of intersection as result
+    if math.isclose(0.0, dist, abs_tol=tolerance): 
+        # wires already connected in intersection point or close enough to be treated as connected
+        if topo1 == topo2 == "Vertex":       
+            return (v1, "none", "none")
+        #wires intersect, so just use first point of intersection as result. 
+        #If one wire has high curvature (is arc or circle, or even spline) we can get 2 or more points of intersection.
+        if topo1 == topo2 == "Edge":           
+            return (v1, "trim", "trim")
+        elif topo1 == "Vertex" and topo2 == "Edge":
+            # one wire edge is connected to another wire vertex. 
+            # need to trim edge to the vertex
+            return (v1, "none", "trim")
+        elif topo1 == "Edge" and topo2 == "Vertex":
+            # one wire edge is connected to another wire vertex. 
+            # need to trim edge to the vertex
+            return (v1, "trim", "none")
+        
+    # wire are not intersecting directly
+    # need to check if it's possible to connect them safely
+    else:          
+        # wires not intersect, so calculate intersection by using first wire last edge and second wire first edge
+        
+        # edge cases when intersection point on a wrong side of the edge
+        # we only can extend first edge forward and thim second edge backward
+        if topo1 == "Vertex" and topo2 == "Edge" and index1 == 0:
+            raise Exception(f"Intersection is outside of the acceptable range. {dist}, {vectors}, {infos}")
+        if topo2 == "Vertex" and topo1 == "Edge" and index2 != 0:
+            raise Exception(f"Intersection is outside of the acceptable range. {dist}, {vectors}, {infos}")
+
+        # find a wire to examine
+        if topo1 == "Vertex":
+            wire = wire2
+            idx = 0
+            isFirst = False
+        else:
+            wire = wire1
+            idx = len(wire1.Vertexes) - 1
+            isFirst = True
+
+        # get edges indices to calculate intersection point
+        L1_end_idx = index1 if topo1 == "Edge" else (-1 if topo1 == "Vertex" and index1 > 0 else 0)
+        L2_start_idx = index2 if topo2 == "Edge" else (-1 if topo2 == "Vertex" and index2 > 0 else 0)
+
+        # get edges to calculate intersection point
+        L1_end = wire1.Edges[L1_end_idx]
+        L2_start = wire2.Edges[L2_start_idx]
+
+        # the max distance between end points we can safelly split to introduce virtual intersection point
+        maxDistanceToSplit = (L1_end.Length + L2_start.Length)
+
+        # direction from start to end
+        dir1 = L1_end.lastVertex().Point.sub(L1_end.firstVertex().Point)
+        dir2 = L2_start.lastVertex().Point.sub(L2_start.firstVertex().Point)
+
+        angle = math.degrees(dir1.getAngle(dir2))
+        angle_tolerance = 2.0 # if angle between edges less than this value, we can treat lines as they are parallel
+        # print(f"Angle between edges: {math.degrees(dir1.getAngle(dir2))}")
+
+        # calculate intersection point of 2 edges
+        res = L1_end.Curve.intersectCC(L2_start.Curve)
+
+        if len(res) == 0:
+            # wires are parallel
+            # but if endpoints are in a right order and close enough we can add point between them
+            if topo1 == "Vertex" and topo2 == "Vertex" and index1 > index2 and dist <= maxDistanceToSplit:
+                intPoint = v1.add(v2).multiply(0.5) # use middle point between 2 vertices as intersection
+                return (intPoint, "replace", "replace") # special case when both wires are nearly parallel -> endpoints will be replaced with a virtual intersection
+            else:
+                raise Exception(f"Wires not intersect. Check offset direction. {dist}, {vectors}, {infos}")
+        else:
+            intPoint = App.Vector(res[0].X, res[0].Y, res[0].Z)
+            vertex = Part.Vertex(intPoint)
+
+            (distance, _, infos) = vertex.distToShape(wire)
+            (_, _, _, topo, index, _) = infos[0]
+
+            # intersection point is on wire, so we can just trim edge to this point
+            # or it's close to the vertex, but still outside of the wire - then we need to extend edge to this point
+            if math.isclose(0.0, distance, abs_tol=tolerance):
+                if topo == "Vertex":
+                    return (intPoint, "extend", "extend")
+                else:
+                    return (intPoint, "trim", "extend") if isFirst else (intPoint, "extend", "trim")
+            # intersection point is outside of wire
+            # we can decide on adding virtual intersection when angle between edges is small and distance is small too
+            elif (angle < angle_tolerance or angle > 360 - angle_tolerance) and dist <= maxDistanceToSplit:                
+                intPoint = v1.add(v2).multiply(0.5) # use middle point between 2 vertices as intersection
+                return (intPoint, "replace", "replace") # special case when both wires are nearly parallel
+            # intersection point is outside of wire
+            # we probably can extend edge to this point or wire may be consumed
+            else:                
+                if topo == "Vertex" and index != idx:
+                    # wires are nearly parallel and intersection point is outside of wire
+                    # so we cannot connect them without consuming one of wires
+                    # but if endpoints are in a right order and close enough we can add point between them
+                    if topo1 == "Vertex" and topo2 == "Vertex" and index >= idx and dist <= maxDistanceToSplit:
+                        intPoint = v1.add(v2).multiply(0.5) # use middle point between 2 vertices as intersection
+                        return (intPoint, "replace", "replace") # special case when both wires are nearly parallel
+                    
+                    else:
+                        v = Part.show(vertex, "Wrong Intersection Point") # debug point of wrong intersection
+                        v.ViewObject.PointSize = 6
+                        Part.show(L1_end, "Wrong Intersection Edge") # debug edge to which wrong intersection point belongs
+                        Part.show(L2_start, "Wrong Intersection Edge") # debug edge to which wrong intersection
+
+                        raise Exception(f"Intersection is outside of the acceptable range.\n Initial distance check: {dist}, {vectors}, {infos}\n  {distance}, {infos[0]}")
+                else:
+                    return (intPoint, "extend", "extend")
+
+def trimOrExtendWire(wire, point, mode, side):
+    '''
+    Extend/Trim wire to the point of intersection
+    
+    :param wire: Wire to fix
+    :param point: Intersection point
+    :param mode: Mode of operation ("none" | "trim" | "extend" | "replace")
+    :param side: Side of the wire to operate on ("start" | "end")
+    '''
+
+    if mode == "none":
+        return wire
+    elif mode == "trim":
+        vertex = Part.Vertex(point)
+        (_, _, infos) = vertex.distToShape(wire)
+        (_, _, _, topo2, index2, _) = infos[0]
+
+        if topo2 != "Edge":            
+            raise Exception("Trim expected intersection on edge.")
+    
+        if side == "start":
+            return trimWireStart(wire, index2, point)
+        else:
+            return trimWireEnd(wire, index2, point)
+        
+    elif mode == "extend":
+        if side == "start":
+            if not isCommonPoint(point, wire.Vertexes[0], tolerance=1e-6):
+                points = [point] + [v.Point for v in wire.Vertexes]
+                return makeWire(points)
+        else:
+            if not isCommonPoint(point, wire.Vertexes[-1], tolerance=1e-6):
+                points = [v.Point for v in wire.Vertexes] + [point]
+                return makeWire(points)
+        return wire
+        
+    elif mode == "replace":
+        points = [v.Point for v in wire.Vertexes]
+        if side == "start":
+            points[0] = point
+        else:
+            points[-1] = point
+        return makeWire(points)
+
+def connectWires(o1_wire, o2_wire, intersection):
+    '''
+    Extend/Trim offsets wires to the point of intersection
+    @param o1_wire - first offset wire
+    @param o2_wire - second offset wire
+    @param intersection - (point, wire1_mode, wire2_mode) - intersection point of 2 wires and what to do with it ->
+    ("none" | "trim" | "extend" | "replace")
+    
+    @returns pair of wires
+    '''
+    
+    (point, wire1_mode, wire2_mode) = intersection
+    
+    # Part.show(Part.Vertex(point), "Intersection Point") # debug point of intersection
+    return [trimOrExtendWire(o1_wire, point, wire1_mode, "end"), trimOrExtendWire(o2_wire, point, wire2_mode, "start")]
+
+def trimWireEnd(wire, index, point):
+    '''
+    trim wire at specified point from the end
+    @param wire - wire to trim
+    @param index - index of the edge where point lay
+    @param point - coordinates of trim point
+    @return new wire, where point is it's last vertex
+    '''
+    # no edges to trim - create new one from wire start point and point of intersection
+    if index == 0:
+        return Part.Wire(Part.LineSegment(wire.Edges[0].firstVertex().Point, point).toShape())
+    
+    edges = [wire.Edges[edge] for edge in range(0, index)]
+    if wire.Edges[index - 1].lastVertex().Point != point:
+        edges.append(Part.LineSegment(wire.Edges[index - 1].lastVertex().Point, point).toShape())
+    return Part.Wire(edges)
+    
+def trimWireStart(wire, index, point):
+    '''
+    trim wire at specified point from the start
+    @param wire - wire to trim
+    @param index - index of the edge where point lay
+    @param point - coordinates of trim point
+    @return new wire, where point is it's first vertex
+    '''
+    # last segment, create new one        
+    if index == len(wire.Edges) - 1:
+        return Part.Wire(Part.LineSegment(point, wire.Edges[-1].lastVertex().Point).toShape())
+
+    edges = [wire.Edges[edge] for edge in range(index + 1, len(wire.Edges))]
+    if point != wire.Edges[index].lastVertex().Point:
+        edges.insert(0, Part.LineSegment(point, wire.Edges[index].lastVertex().Point).toShape())
+    return Part.Wire(edges)
+
+
+def makeWireOffset(source, offset):
+        '''
+        Create offset wire
+        @param source - source wire
+        @param offset - distance to offset, where: negative - offset to the left; 0 - no offset; positive - offset to the right.
+        
+        @returns offset wire
+        '''
+
+        if offset == 0:
+            return source
+        
+        if isStraitLine(source): # strait line     
+            wire = makeLineOffset(source, offset)                
+            return wire
+        else:
+            try:
+                offset1 = source.makeOffset2D(offset,2, False, True, True)
+                
+                wire = Part.Wire(offset1.Edges) # we need it to have sorted edges, it will help to operate with edges in a future
+
+                (_, _, infos)  = source.Vertexes[0].distToShape(wire)
+                (_, idx1, _, _, idx2, _) = infos[0]
+                if idx1 != idx2: #offset wire reversed, reverse edges
+                    wire = Part.Wire(offset1.Edges[::-1])
+            except Exception as ex:
+                #print("Source points: {}".format([v.Point for v in source.Vertexes]))
+                if not SUPPRESS_WARNINGS:
+                    App.Console.PrintWarning("Unable to create offset using makeOffset2D. Fallback to my calculation.\n {}".format(ex))
+
+                wires = []
+                for edge in source.Edges:
+                    wires.append(makeLineOffset(edge, offset))
+                
+                intersections = []
+                for i in range(len(wires) - 1):                
+                    intersections.append(intersectWires(wires[i], wires[i + 1]))
+
+                points = []
+                firstWire = None
+                for i in range(len(wires) - 1):
+                    if firstWire == None:
+                        firstWire = wires[i]
+                        
+                    (first, second) = connectWires(firstWire, wires[i + 1], intersections[i])
+                    
+                    for vi in range(len(first.Vertexes) - 1):
+                        points.append(first.Vertexes[vi].Point)
+                        
+                    firstWire = second
+
+                if firstWire is None:
+                    firstWire = wires[-1]
+                
+                for v in firstWire.Vertexes:
+                        points.append(v.Point)
+                wire = makeWire(points)
+
+        return wire
 
 '''
   Enumeration for the pick style

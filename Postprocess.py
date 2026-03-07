@@ -43,8 +43,10 @@ class Postprocess():
     Generate rotation position
     '''
     def generateRotationPosition(self, config, angle):
+        self.rotation_position += float(angle)
+
         return "%s%.2f" % (
-            config.R1AxisName, float(angle)
+            config.R1AxisName, self.rotation_position
         )
 
     '''
@@ -110,6 +112,7 @@ class Postprocess():
         
     def generateStartBlock(self, config, start_point):
         GCODE = ""
+        self.rotation_position = 0.0
 
         if config.StartProgramCode:
             GCODE += "{}\n".format(config.StartProgramCode)
@@ -151,7 +154,7 @@ class Postprocess():
                 )
             
             if config.FiveAxisMachine:
-                initPosCommand += " " + self.generateRotationPosition(config, config.HomingR1 )
+                initPosCommand += " " + self.generateRotationPosition(config, config.HomingR1)
 
             # - Initialize position
             GCODE += config.InitPositionCommand.replace("{Position}", initPosCommand ) + "\n"
@@ -211,11 +214,11 @@ class Postprocess():
     Make GCODE from rotation element
     '''
     def makeGCODEFromRotation(self, rt, config):
-        GCODE += "\n"
-        GCODE = self.makeCommentedLine(config, "- Rotation [{}] -".format(rt.Label)) + "\n"
+        GCODE = "\n"
+        GCODE += self.makeCommentedLine(config, "- Rotation [{}] -".format(rt.Label)) + "\n"
 
         # - Generate rotation command
-        GCODE.append(self.generateRotation(config, config.MoveCommand, rt.Angle, config.FeedRateRotate))
+        GCODE += self.generateRotation(config, config.MoveCommand, rt.Angle, config.FeedRateRotate)
         return GCODE
 
     '''
@@ -238,6 +241,16 @@ class Postprocess():
         # - Task GCODE buffer
         TASK += self.makeCommentedLine(config, "*** TASK BLOCK ***") + "\n"
         start_point = None
+
+        # find first point for start block
+        for route in route_list:
+            if len(route.Offset_L) > 0 and len(route.Offset_R) > 0:
+                start_point = (route.Offset_L[0], route.Offset_R[0])
+                break
+
+        # ---- Generate startup block
+        START = self.generateStartBlock(config, start_point)
+
         # - Wal all routes
         for route in route_list:
             TASK += "\n"
@@ -245,39 +258,59 @@ class Postprocess():
 
             point_index = 0
 
-            # - Store first point as start point
-            if start_point is None: 
-                start_point = (route.Offset_L[0], route.Offset_R[0])
-
-            # - Generate rapid travel command
-            TASK += self.generateRapidTravel(config, route.Offset_L[0].y, route.Offset_L[0].z, route.Offset_R[0].y, route.Offset_R[0].z)
+            if len(route.Offset_L) > 0 or len(route.Offset_R) > 0:                
+                # - Generate rapid travel command
+                TASK += self.generateRapidTravel(config, route.Offset_L[0].y, route.Offset_L[0].z, route.Offset_R[0].y, route.Offset_R[0].z)
             
             for i in range(len(route.Data)):                                
                 # - Access item
                 object_index = route.Data[i]
-
                 object = route.Objects[object_index]
 
                 if object.Type == "Rotation": # - Make GCODE from rotation
                     TASK += self.makeGCODEFromRotation(object, config)
                 else:
+                    feed_override = route.FeedOverrides[i]
+
+                    
                     addPause = object.AddPause if hasattr(object, "AddPause") else False
                     duration = object.PauseDuration if hasattr(object, "PauseDuration") else 0
                     feed = object.FeedRate if hasattr(object, "FeedRate") and object.FeedRate > 0 else config.FeedRateCut
+                    if feed_override > 1.0:
+                        feed = feed * feed_override
+                        
                     power = float(object.WirePower) if hasattr(object, "WirePower") and object.WirePower > 0 else float(config.WireMinPower)
                     isRapid = object.RapidMove if hasattr(object, "RapidMove") else False
                     TASK += "\n"
                     TASK += self.makeCommentedLine(config, "- {} [{}]".format(object.Type, object.Label)) + "\n"
 
-                    points_count = object.PointsCount if i == 0 else object.PointsCount - 1
+                    points_count = object.PointsCount if ( i == 0 or i == len(route.Data) - 1 or object.Type == "Exit" ) \
+                        else object.PointsCount - 1
+                    
+                    if object.Type == "Enter" and object.LeadInEnabled:
+                        points_count += 1
+
+                    if object.Type == "Exit" and object.LeadOutEnabled:
+                        points_count += 1
+
                     # - Step over each point
-                    for _ in range(points_count):
+                    for p_idx in range(points_count):
+                        allowRapid = True
+
+                        # for enter and exit allow rapid move only for the last segment
+                        # lead-in and lead-out should be normal move to keep wire powered and prevent breakage
+                        if p_idx != points_count - 1 and object.Type == "Exit" and object.LeadOutEnabled:
+                            allowRapid = False
+
+                        if p_idx > 1 and object.Type == "Enter" and object.LeadInEnabled:
+                            allowRapid = False
+
                         point_l = route.Offset_L[point_index]
                         point_r = route.Offset_R[point_index]
 
                         wirePowerCommand = self.getDynamicWirePowerCommand(point_l, point_r, power, config)
 
-                        if isRapid:
+                        if isRapid and allowRapid:
                             # - Generate rapid travel command
                             TASK += self.generateRapidTravel(config, point_l.y, point_l.z, point_r.y, point_r.z)
                         else:
@@ -291,12 +324,11 @@ class Postprocess():
                         if config.TimeUnits == utilities.FC_TIME_UNITS[1]: #["Seconds", "Milliseconds"]
                             duration = duration * 1000
                         TASK += self.generatePause(config.PauseCommand, duration)
-               
+            
             TASK += self.makeCommentedLine(config, "--- Route end [{}] ---".format(route.Label)) + "\n"
             TASK += "\n"
 
-        # ---- Generate startup block
-        START = self.generateStartBlock(config, start_point)        
+        #generate end block        
         END   = self.generateEndBlock(config)
 
         program = START + ''.join(TASK) + END
@@ -344,18 +376,7 @@ class Postprocess():
             if not hasattr(route, "Type") or (route.Type != "Route"):
                 QtGui.QMessageBox.critical(None, "Error generating Gcode", "Object type not supported. Check Selected objects.")
         
-        hasError = False
-        for route in routes:
-            if route.Error is not None and len(route.Error) > 0:
-                print(route.Error)
-                hasError = True
-                break
-
-        if hasError:
-            QtGui.QMessageBox.critical(None, "Error generating Gcode", "Route data is incorrect. Check Selected routes.")
-        else:
-            self.makeGCODE(routes, config)
-
+        self.makeGCODE(routes, config)
         App.ActiveDocument.recompute()
     
     def IsActive(self):

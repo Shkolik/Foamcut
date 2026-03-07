@@ -3,9 +3,9 @@
 - kerf settings - DONE
 - unpicable helper geometry in one group - Done
 - configuration setup panel
-- projection produced by selecting face - DONE but needs refining in corner cases
-- paths produced by selecting face - DONE but needs refining in corner cases
-- G93 mode - nothing to do here
+- projection produced by selecting face - DONE
+- paths produced by selecting face - DONE
+- G93 mode - nothing to do here (well... maybe...)
 - mirroring gcode tool - DONE
 - path by vertex and edge - Done
 - projection to the working plane - DONE

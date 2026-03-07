@@ -21,7 +21,7 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, source, jobName):
         super().__init__(obj, jobName)
         obj.Type = "Projection"
-        obj.addProperty("App::PropertyLinkSub",     "Source",               "Data",         "Source object to project").Source = source
+        obj.addProperty("App::PropertyLinkSub", "Source", "Data", "Source object to project").Source = source
 
         obj.setEditorMode("CompensationDirection", 3)
         
@@ -29,21 +29,23 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
-       
-        job = obj.Document.getObject(obj.JobName)
-        if job is None or job.Type != "Job":
-            FreeCAD.Console.PrintError("ERROR:\n Error updating Projection - active Job not found\n")
+        try:
+            job = obj.Document.getObject(obj.JobName)
+            if job is None or job.Type != "Job":
+                raise Exception(f"ERROR: Active Job not found\n")
 
-        # - Get working planes
-        wp = getWorkingPlanes(job, obj.Document)
-        
-        if wp is None or len(wp) != 2:
-            FreeCAD.Console.PrintError("ERROR:\n Error updating Path - working planes not found in Parent object '{}'\n".format(job.Label if job is not None else "None"))
+            # - Get working planes
+            wp = getWorkingPlanes(job, obj.Document)
+            
+            if wp is None or len(wp) != 2:
+                raise Exception(f"ERROR: Working planes not found in Parent object '{job.Label if job is not None else "None"}'\n")
 
-        source = obj.Source[0].getSubObject(obj.Source[1])[0]
+            source = obj.Source[0].getSubObject(obj.Source[1])[0]
 
-        self.createShape(obj, [source], wp, (0, 0, 0))
-                
+            self.createShape(obj, [source], wp, (0, 0, 0))
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"Projection {obj.Label} {e}\n")
+            raise   
 
 class ProjectionSectionVP(FoamCutViewProviders.FoamCutMovementViewProvider):     
     def getIcon(self):
@@ -64,13 +66,18 @@ class MakeProjection():
                 "ToolTip" : "Create projection object from selected face, edge or vertex. Separate projection will be created for each edge or vertex."}
 
     def CreateFromEdge(self, edge, group):
-        obj = group.newObject("Part::FeaturePython","Projection")
-            
-        ProjectionSection(obj, 
-                    (FreeCAD.ActiveDocument.getObject((edge)[0].Name), (edge)[1][0]), 
-                    group.Name)
-        ProjectionSectionVP(obj.ViewObject)
-        obj.ViewObject.PointSize = 4
+        doc = App.ActiveDocument
+        projection = None
+        try:
+            projection = group.newObject("Part::FeaturePython","Projection")
+                
+            ProjectionSection(projection, (doc.getObject((edge)[0].Name), (edge)[1][0]), group.Name)
+            ProjectionSectionVP(projection.ViewObject)
+            projection.ViewObject.PointSize = 4
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"Failed to create projection from edge {edge[0].Name}\n")
+            if projection is not None:
+                doc.removeObject(projection.Name)    
 
     def Activated(self):
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
