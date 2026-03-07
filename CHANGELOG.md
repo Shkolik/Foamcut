@@ -2,7 +2,7 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.11] - 2026-02-28
+## [0.1.11] - 2026-03-07
 
 ### Notes
 - This release has a breaking change in how wire speed is handled. Before this change user was specifying actual machine speed and kerf compensation was scaled to this speed. now user should specify max speed in a foam, and machine speed will be scaled to keep this speed constant. There's very slight difference if piece has not much taper, but for small tapered objects/pathes there might be significant difference. Please review your legacy files and do ajustments needed.
