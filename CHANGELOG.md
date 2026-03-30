@@ -2,11 +2,10 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
-## [0.1.10] - TBA
+## [0.1.12] - 2026-03-30
    
-### Added
-
 ### Fixed 
+- error message in a projection fixed
 
 ## [0.1.11] - 2026-03-07
 
