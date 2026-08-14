@@ -333,7 +333,7 @@ class Postprocess():
 
         program = START + ''.join(TASK) + END
 
-        print ("GCODE generated")
+        App.Console.PrintMessage("GCODE generated\n")
 
         dialog = QtGui.QFileDialog()
         lastDir = dialog.directory().absolutePath()
@@ -342,12 +342,12 @@ class Postprocess():
 
         # - Check path
         if save_path == "":
-            print ("GCODE saving aborted (no output file path specified)")
+            App.Console.PrintWarning("GCODE saving aborted (no output file path specified)\n")
         else:
             try:
                 with open(save_path, "w") as f:
                     f.write(program)
-                print ("GCODE saved into [%s]" % save_path)
+                App.Console.PrintMessage("GCODE saved into [%s]\n" % save_path)
             except Exception:
                 App.Console.PrintError("Unable to save GCODE in [" + save_path + "]\n")
 
@@ -375,6 +375,7 @@ class Postprocess():
         for route in routes:
             if not hasattr(route, "Type") or (route.Type != "Route"):
                 QtGui.QMessageBox.critical(None, "Error generating Gcode", "Object type not supported. Check Selected objects.")
+                return
         
         self.makeGCODE(routes, config)
         App.ActiveDocument.recompute()

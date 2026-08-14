@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__title__ = "Create Rotation"
+__title__ = "Rotation Axis"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
 __doc__ = "Rotation axis helper object."

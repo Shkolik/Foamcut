@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
-__title__ = "Make Path"
+__title__ = "Create Projection"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
-__doc__ = "Make Path from 2 selected opposite edges."
-__usage__ = """Select 2 opposite edges and activate tool."""
+__doc__ = "Create projection from selected face, edge or vertex."
+__usage__ = """Select face, edge or vertex and activate tool."""
 
 import FreeCAD
 App=FreeCAD

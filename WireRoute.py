@@ -14,7 +14,6 @@ import FoamCutViewProviders
 from utilities import *
 import pivy.coin as coin
 import math
-import time
 
 FC_KERF_STRATEGY_NONE = 0
 FC_KERF_STRATEGY_UNI = 1
@@ -85,9 +84,6 @@ class FoamCut_RouteEdge():
             #calculate compensation for the sides
             ratio = max(self.LeftEdgeLength, self.RightEdgeLength) / min(self.LeftEdgeLength, self.RightEdgeLength)
 
-            # # debug - edges lenth ratio
-            # print(f"Offset_{self.ObjectType} edge length ratio: {ratio}")
-
             # if edge is slower than nominal speed - increase compensation.
             # degree is a dampening factor
             compensation = ratio ** degree if degree > 1 else ratio
@@ -96,10 +92,6 @@ class FoamCut_RouteEdge():
                 self.OffsetLenRight *= compensation
             else:
                 self.OffsetLenLeft *= compensation
-                
-        # debug - show original wires
-        # print(f"Offset_L_{self.ObjectType} compensated offset: {self.OffsetLenLeft}")
-        # print(f"Offset_R_{self.ObjectType} compensated offset: {self.OffsetLenRight}")
 
         lWire = makeWireOffset(makeWire(self.PointsLeft), self.OffsetLenLeft)
         rWire = makeWireOffset(makeWire(self.PointsRight), self.OffsetLenRight)        
@@ -233,7 +225,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             route_data_dir  = []
             feed_overrides = []
             item_index  = 0
-            feed_overrides  = []
             pauses = []
             pausesDuration = []
             breaks = []
@@ -506,11 +497,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                         try:
                             ileft = intersectWires(firstWire_L, secondWire_L, tolerance=5e-3)
                         except Exception as e:
-                            # p = Part.show(Part.Vertex(ileft[0]), "Trim point")
-                            # p.ViewObject.PointSize = 6
-                            # Part.show(firstWire_L, "first wire")
-                            # Part.show(secondWire_L, "second wire")
-                            # print(f"Failed to trim wire. Info: {ileft}")
                             raise Exception(f"ERROR: {e}")
                         
                         try:
@@ -521,11 +507,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                         try:
                             off = connectWires(firstWire_L, secondWire_L, ileft)
                         except Exception as e:
-                            # p = Part.show(Part.Vertex(ileft[0]), "Trim point")
-                            # p.ViewObject.PointSize = 6
-                            # Part.show(firstWire_L, "first wire")
-                            # Part.show(secondWire_L, "second wire")
-                            # print(f"Failed to trim wire. Info: {ileft}")
                             raise Exception(f"ERROR: LEFT OFFSET Something wrong near point: {ileft}; idx: {j}. Exception: {e}")
                             
                         if off == None:
@@ -543,11 +524,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                         try:
                             off = connectWires(firstWire_R, secondWire_R, iright)
                         except Exception as e:
-                            # p = Part.show(Part.Vertex(iright[0]), "Trim point")
-                            # p.ViewObject.PointSize = 6
-                            # Part.show(firstWire_R, "first wire")
-                            # Part.show(secondWire_R, "second wire")
-                            # print(f"Failed to trim wire. Info: {iright}")
                             raise Exception(f"ERROR: RIGHT OFFSET Something wrong near point: {iright}; idx: {j}. Exception: {e}")
                         
                         if off == None:
@@ -786,23 +762,6 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
                 group.addChild(self.drawRouteLine(pg))
         return group
     
-    """ def drawRouteLine(self, points):
-        sep = coin.SoSeparator()
-        if len(points) > 0:            
-            p = coin.SoPointSet()
-            coords = coin.SoCoordinate3()
-            coords.point.setValues(0, [[p.x, p.y, p.z] for p in points])
-            color = coin.SoBaseColor()
-            color.rgb.setValue(1, 0, 0)
-            draw_style = coin.SoDrawStyle()
-            draw_style.style = coin.SoDrawStyle.FILLED
-            draw_style.pointSize = 2
-            sep.addChild(draw_style)
-            sep.addChild(color)
-            sep.addChild(coords)
-            sep.addChild(p)
-        return sep """
-    
     def drawRouteLine(self, points):
         sep = coin.SoSeparator()
         if len(points) > 0:            
@@ -832,10 +791,14 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
         return [object for object in self.Object.Objects]
     
     def onDelete(self, obj, subelements):
-        group = App.ActiveDocument.getObject(self.Object.JobName)
-        if group is not None and group.Type == "Job":
-            for object in self.Object.Objects:
-                group.addObject(object)
+        doc = self.Object.Document if self.Object is not None else None
+        if doc is None:
+            doc = App.ActiveDocument
+        if doc is not None:
+            group = doc.getObject(self.Object.JobName)
+            if group is not None and group.Type == "Job":
+                for object in self.Object.Objects:
+                    group.addObject(object)
         return True
     
     def updateData(self, obj, prop):

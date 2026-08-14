@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-__title__ = "Create Rotation"
+__title__ = "Foam Block"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
-__doc__ = "Working plane."
+__doc__ = "Foam block representation."
 
 import FreeCAD
 App=FreeCAD

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__title__ = "Create Rotation"
+__title__ = "Working Plane"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
 __doc__ = "Working plane."

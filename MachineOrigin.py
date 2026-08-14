@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__title__ = "Create Move path"
+__title__ = "Machine origin"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
 __doc__ = "Origin arrors and labels."

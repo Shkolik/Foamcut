@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__title__ = "Create Move path"
+__title__ = "Create and initialize Job"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Create and initialize Job."

@@ -706,7 +706,7 @@ def trimWireEnd(wire, index, point):
         return Part.Wire(Part.LineSegment(wire.Edges[0].firstVertex().Point, point).toShape())
     
     edges = [wire.Edges[edge] for edge in range(0, index)]
-    if wire.Edges[index - 1].lastVertex().Point != point:
+    if not wire.Edges[index - 1].lastVertex().Point.isEqual(point, 1e-7):
         edges.append(Part.LineSegment(wire.Edges[index - 1].lastVertex().Point, point).toShape())
     return Part.Wire(edges)
     
@@ -723,7 +723,7 @@ def trimWireStart(wire, index, point):
         return Part.Wire(Part.LineSegment(point, wire.Edges[-1].lastVertex().Point).toShape())
 
     edges = [wire.Edges[edge] for edge in range(index + 1, len(wire.Edges))]
-    if point != wire.Edges[index].lastVertex().Point:
+    if not point.isEqual(wire.Edges[index].lastVertex().Point, 1e-7):
         edges.insert(0, Part.LineSegment(point, wire.Edges[index].lastVertex().Point).toShape())
     return Part.Wire(edges)
 

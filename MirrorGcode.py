@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
-__title__ = "Generate Gcode"
+__title__ = "Mirror Gcode"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
-__doc__ = "Generate Gcode."
-__usage__ = """Select route(s) and activate tool."""
+__doc__ = "Mirror Gcode file around YZ plane."
+__usage__ = """Select GCODE file to mirror."""
 
 import FreeCAD
 App=FreeCAD
@@ -19,7 +19,7 @@ class MirrorG():
 
     def mirrorGcode(self, file: str):
 
-        print ("> Reading source file {}]".format(file))
+        App.Console.PrintMessage("> Reading source file {}\n".format(file))
 
         # - Read source file
         src_data = []
@@ -85,12 +85,12 @@ class MirrorG():
 
         # - Check path
         if save_path == "":
-            print ("GCODE saving aborted (no output file path specified)")
+            App.Console.PrintWarning("GCODE saving aborted (no output file path specified)\n")
         else:
             try:
                 with open(save_path, "w") as f:
                     f.writelines(out_data)
-                print ("GCODE saved into [%s]" % save_path)
+                App.Console.PrintMessage("GCODE saved into [%s]\n" % save_path)
             except Exception:
                 App.Console.PrintError("Unable to save GCODE in [" + save_path + "]\n")
 
@@ -106,11 +106,11 @@ class MirrorG():
         # - Open save file dialog
         open_path, filter = dialog.getOpenFileName(None, "Open GCODE", lastDir, "*.gcode") # PySide
 
-        print("Open file path: {}".format(open_path))
+        App.Console.PrintMessage("Open file path: {}\n".format(open_path))
 
         # - Check path
         if open_path == "":
-            print ("Aborted (no file path specified)")
+            App.Console.PrintWarning("Aborted (no file path specified)\n")
         else:
             self.mirrorGcode(open_path)
 
