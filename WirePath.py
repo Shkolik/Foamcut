@@ -207,14 +207,22 @@ class MakePath():
                     edgesPairs.append(objects)
                     break
 
+        # - Face selection: create paths for each edge pair
+        if objects[0][1][0].startswith("Face"):
             #reset 
             right = dist_l > dist_r
 
-            if len(edges_l) > 1 and len(edges_l) == len(edges_r):
-                edgesPairs = self.SortEdges(objects[0][0] if not right else objects[1][0], objects[1][0] if not right else objects[0][0], edges_l, edges_r)
+            if len(edges_l) == 0 or len(edges_r) == 0:
+                FreeCAD.Console.PrintError("ERROR: Cannot create paths. No edges found in the selected faces.\n")
+                return
+            elif len(edges_l) != len(edges_r):
+                FreeCAD.Console.PrintError("ERROR: Cannot create paths. Selected faces have different edge counts ({} vs {}). Select faces with the same number of edges.\n".format(len(edges_l), len(edges_r)))
+                return
 
-            for pair in edgesPairs:
-                self.CreateFromEdges(pair, group)
+            edgesPairs = self.SortEdges(objects[0][0] if not right else objects[1][0], objects[1][0] if not right else objects[0][0], edges_l, edges_r)
+
+        for pair in edgesPairs:
+            self.CreateFromEdges(pair, group)
             
             doc.recompute()
             Gui.Selection.clearSelection()
