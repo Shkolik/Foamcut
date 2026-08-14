@@ -25,15 +25,17 @@ class FoamCutBaseObject:
         job = obj.Document.getObject(obj.JobName)
 
         if job is None:
-            App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
+            App.Console.PrintError("ERROR:\n Job with name '{}' not found in document.\n".format(obj.JobName))
+            return None
                 
         return job.ConfigName
     
     def getConfig(self, obj):
-        job = App.ActiveDocument.getObject(obj.JobName)
+        job = obj.Document.getObject(obj.JobName)
 
         if job is None:
-            App.Console.PrintError("ERROR:\n Job with name '{}' not found in active document.\n".format(obj.JobName))
+            App.Console.PrintError("ERROR:\n Job with name '{}' not found in document.\n".format(obj.JobName))
+            return None
                 
         return job.getObject(job.ConfigName)
     

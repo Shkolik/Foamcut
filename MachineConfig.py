@@ -165,7 +165,7 @@ Could be inline comments started with ; or multiline inside () or ignored alltog
         
     def onChanged(self, obj, prop):
         if prop == "FiveAxisMachine":
-            machine = App.ActiveDocument.getObject(obj.JobName)
+            machine = obj.Document.getObject(obj.JobName)
             if machine is not None:
                 axis = None
                 for child in machine.Group:
@@ -174,7 +174,7 @@ Could be inline comments started with ; or multiline inside () or ignored alltog
                         break
 
                 if axis is not None:
-                    App.ActiveDocument.removeObject(axis.Name)
+                    obj.Document.removeObject(axis.Name)
 
                 if obj.FiveAxisMachine:
                     axis = machine.newObject("App::FeaturePython", "RotationAxis")    
