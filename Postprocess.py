@@ -174,10 +174,10 @@ class Postprocess():
 
         wirePower = config.WireMinPower
         # - generate compensated wire power
-        if config.DynamicWirePower:
+        if config.DynamicWirePower and start_point is not None:
             # - Calculate wire length
             wire_length = start_L.distanceToPoint(start_R)
-            wirePower = self.generateWireCompensatedPower(config, wire_length)
+            wirePower = self.generateWireCompensatedPower(config, wire_length, wirePower)
 
         # - Enable wire
         GCODE += self.generateWireEnable(config, wirePower)
