@@ -134,9 +134,9 @@ class InitMachine():
         if App.ActiveDocument is None:
             return False
         else:
-            setup = App.ActiveDocument.getObject("Machine")
-            if setup:
-                return False
+            for obj in App.ActiveDocument.Objects:
+                if hasattr(obj, "Type") and obj.Type == "Job":
+                    return False
         return True
 
 Gui.addCommand("InitMachine", InitMachine())
