@@ -276,8 +276,7 @@ class Postprocess():
                     addPause = object.AddPause if hasattr(object, "AddPause") else False
                     duration = object.PauseDuration if hasattr(object, "PauseDuration") else 0
                     feed = object.FeedRate if hasattr(object, "FeedRate") and object.FeedRate > 0 else config.FeedRateCut
-                    if feed_override > 1.0:
-                        feed = feed * feed_override
+                    feed = feed * feed_override
                         
                     power = float(object.WirePower) if hasattr(object, "WirePower") and object.WirePower > 0 else float(config.WireMinPower)
                     isRapid = object.RapidMove if hasattr(object, "RapidMove") else False

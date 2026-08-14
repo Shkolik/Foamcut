@@ -17,9 +17,44 @@ import re
 class MirrorG():
     """Mirror Gcode"""
 
+    def getAxisMapping(self):
+        '''
+        Get axis names from active document MachineConfig
+        @returns tuple of (X1AxisName, Z1AxisName, X2AxisName, Z2AxisName, R1AxisName)
+        '''
+        defaults = ("X", "Y", "Z", "A", "B")
+        doc = App.ActiveDocument
+        if doc is None:
+            return defaults
+        job = doc.getObject("Job")
+        if job is None or not hasattr(job, "ConfigName"):
+            return defaults
+        config = doc.getObject(job.ConfigName)
+        if config is None:
+            return defaults
+        return (
+            config.X1AxisName if hasattr(config, "X1AxisName") else "X",
+            config.Z1AxisName if hasattr(config, "Z1AxisName") else "Y",
+            config.X2AxisName if hasattr(config, "X2AxisName") else "Z",
+            config.Z2AxisName if hasattr(config, "Z2AxisName") else "A",
+            config.R1AxisName if hasattr(config, "R1AxisName") else "B",
+        )
+
     def mirrorGcode(self, file: str):
 
         App.Console.PrintMessage("> Reading source file {}\n".format(file))
+
+        # - Read axis mapping from active document config (defaults when not available)
+        x1, z1, x2, z2, r1 = self.getAxisMapping()
+
+        # - Axis regex fragments
+        number = r'([\-]{0,1}[0-9]+\.[0-9]+)'
+        feed = r'F([0-9]+\.[0-9]+)'
+        ax1 = re.escape(x1)
+        az1 = re.escape(z1)
+        ax2 = re.escape(x2)
+        az2 = re.escape(z2)
+        ar1 = re.escape(r1)
 
         # - Read source file
         src_data = []
@@ -39,19 +74,19 @@ class MirrorG():
                     continue
             else:
                 # - Replace rotation
-                rt = re.search(r'^(G0[01]) B([\-]{0,1}[0-9]+\.[0-9]+) F([0-9]+\.[0-9]+)', line)
+                rt = re.search(r'^(G0[01]) %s%s %s' % (ar1, number, feed), line)
                 if rt is not None:
                     CM = rt.group(1)
                     RT = float(rt.group(2))
                     FR = float(rt.group(3))
-                    out_data.append("%s B%.2f F%.1f\n" % (CM, -RT if RT != 0 else 0, FR))
+                    out_data.append("%s %s%.2f F%.1f\n" % (CM, r1, -RT if RT != 0 else 0, FR))
                     continue
 
                 withPowerChange = True
-                mv = re.search(r'^(G0[01]) X([\-]{0,1}[0-9]+\.[0-9]+) Y([\-]{0,1}[0-9]+\.[0-9]+) Z([\-]{0,1}[0-9]+\.[0-9]+) A([\-]{0,1}[0-9]+\.[0-9]+) F([0-9]+\.[0-9]+) S([0-9]+\.[0-9]+)', line)
+                mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s S%s' % (ax1, number, az1, number, ax2, number, az2, number, feed, number), line)
                 if mv is None:
                     withPowerChange = False
-                    mv = re.search(r'^(G0[01]) X([\-]{0,1}[0-9]+\.[0-9]+) Y([\-]{0,1}[0-9]+\.[0-9]+) Z([\-]{0,1}[0-9]+\.[0-9]+) A([\-]{0,1}[0-9]+\.[0-9]+) F([0-9]+\.[0-9]+)', line)
+                    mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s' % (ax1, number, az1, number, ax2, number, az2, number, feed), line)
                      
                 if mv is not None:
                     if withPowerChange:
@@ -62,7 +97,7 @@ class MirrorG():
                         RY = float(mv.group(5))
                         FR = float(mv.group(6))
                         PW = float(mv.group(7))
-                        out_data.append("%s X%.2f Y%.2f Z%.2f A%.2f F%.1f S%.2f\n" % (CM, RX, RY, LX, LY, FR, PW))
+                        out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f S%.2f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR, PW))
                         continue
                     else:
                         CM = mv.group(1)
@@ -71,14 +106,14 @@ class MirrorG():
                         RX = float(mv.group(4))
                         RY = float(mv.group(5))
                         FR = float(mv.group(6))
-                        out_data.append("%s X%.2f Y%.2f Z%.2f A%.2f F%.1f\n" % (CM, RX, RY, LX, LY, FR))
+                        out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR))
                         continue
 
                 # - Direct copy line
                 out_data.append(line + ("" if line.endswith("\n") else "\n"))
 
 
-        fileName = file.replace(".gcode", "-mirror.gcode")
+        fileName = re.sub(r'\.gcode$', '-mirror.gcode', file, flags=re.IGNORECASE)
         # - Open save file dialog
         save_path, save_filter = QtGui.QFileDialog().getSaveFileName(None, "Save GCODE", fileName, "*.gcode") # PySide
 

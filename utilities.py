@@ -207,7 +207,10 @@ def intersectLineAndPlane(v0, v1, plane):
     surface = plane.Shape.Surface if hasattr(plane, 'Shape') else plane.Surface
     
     # - Find point of intersection
-    point = surface.intersect(edge.Curve)[0][0]
+    intersection = surface.intersect(edge.Curve)
+    if len(intersection) == 0 or len(intersection[0]) == 0:
+        raise Exception(f"Line ({v0.x}, {v0.y}, {v0.z}) - ({v1.x}, {v1.y}, {v1.z}) is parallel to the plane; no intersection")
+    point = intersection[0][0]
     
     return App.Vector(point.X, point.Y, point.Z)
 
