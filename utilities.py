@@ -303,11 +303,11 @@ def makePathByPointSets(first, second, planes, projection = False):
     '''
     # - Point sets must contain same number of point
     if not projection and len(first) != len(second):
-        return None
+        return (None, False)
 
     # - Check working planes count
     if len(planes) != 2:
-        return None
+        return (None, False)
 
     # - Initialize result
     result = []
