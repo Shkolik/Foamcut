@@ -227,9 +227,9 @@ class MakePath():
 
         for pair in edgesPairs:
             self.CreateFromEdges(pair, group)
-            
-            doc.recompute()
-            Gui.Selection.clearSelection()
+
+        doc.recompute()
+        Gui.Selection.clearSelection()
     
     def IsActive(self):
         if App.ActiveDocument is None:

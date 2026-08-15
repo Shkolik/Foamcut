@@ -372,6 +372,9 @@ class Postprocess():
         
         # - Get CNC configuration
         config = FreeCAD.ActiveDocument.getObject(group.ConfigName)
+        if config is None:
+            QtGui.QMessageBox.critical(None, "Config not found.", "Config [{}] not found in active document.".format(group.ConfigName))
+            return
 
         # - Check routes type
         for route in routes:
