@@ -27,7 +27,7 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyInteger",   "WirePower", "Options",  "Wire power")
 
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
-        obj.addProperty("App::PropertyLinkSub",      "EndPoint",        "Task",   "Start Point").EndPoint = end
+        obj.addProperty("App::PropertyLinkSub",      "EndPoint",        "Task",   "End Point").EndPoint = end
 
         config = self.getConfigName(obj)
         obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
