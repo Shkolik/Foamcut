@@ -39,8 +39,16 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
 
     def execute(self, obj):
         try:
-            (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
-            (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], obj.EndPoint[0].getSubObject(obj.EndPoint[1][0]))
+            start_vertex = obj.StartPoint[0].getSubObject(obj.StartPoint[1][0])
+            if start_vertex is None:
+                raise Exception(f"ERROR: Unable to locate start point vertex.\n")
+
+            end_vertex = obj.EndPoint[0].getSubObject(obj.EndPoint[1][0])
+            if end_vertex is None:
+                raise Exception(f"ERROR: Unable to locate end point vertex.\n")
+
+            (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
+            (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], end_vertex)
 
             if oppositeVertexA is None:
                 raise Exception(f"ERROR: Unable to locate opposite vertex for the start point.\n")

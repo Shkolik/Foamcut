@@ -37,7 +37,11 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
     def execute(self, obj):        
         try:
 
-            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], obj.StartPoint[0].getSubObject(obj.StartPoint[1][0]))
+            start_vertex = obj.StartPoint[0].getSubObject(obj.StartPoint[1][0])
+            if start_vertex is None:
+                raise Exception(f"ERROR:\n Unable to locate start point vertex.\n")
+
+            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
             
             if oppositeVertex is None:
                 raise Exception(f"ERROR:\n Unable to locate opposite vertex.\n")
