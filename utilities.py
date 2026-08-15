@@ -471,10 +471,14 @@ def makeLineOffsetByPoints(startPoint, endPoint, offset):
     '''
     
     direction = endPoint - startPoint
-    direction.normalize()
+    if direction.Length > 1e-12:
+        direction.normalize()
     
     perpendicular = direction.cross(App.Vector(1,0,0))
-    perpendicular.normalize()
+    if perpendicular.Length <= 1e-12:
+        perpendicular = App.Vector(0,1,0) # direction is parallel to X axis (or degenerate) - offset along Y
+    else:
+        perpendicular.normalize()
     
     res_start = startPoint + float(offset) * perpendicular
     res_end = endPoint + float(offset) * perpendicular
