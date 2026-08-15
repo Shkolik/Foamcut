@@ -107,6 +107,47 @@ class FoamCut_RouteEdge():
         return maxSegmentLength/maxEdgeLength
 
 
+def validateRoute(objects):
+    '''
+    Validates the route structure before the pair loop runs:
+    - the route must not start with an Exit (plunge-up before any cut)
+    - the route must not end with an Enter (plunge-down without a cut)
+    - Rotation objects may only appear at segment boundaries:
+      preceded by an Exit or by nothing (route start),
+      followed by an Enter or by nothing (route end)
+    Single-point Projections (PointsCount < 2) are always skipped - they
+    produce no cut and are transparent to these checks.
+    Raises an Exception (aborting route creation) on any violation.
+    '''
+    prev = None
+    first = None
+    last = None
+
+    for obj in objects:
+        if obj.Type == "Projection" and obj.PointsCount < 2:
+            continue
+
+        if first is None:
+            first = obj
+        last = obj
+
+        if obj.Type == "Rotation":
+            if prev is not None and prev.Type != "Exit":
+                raise Exception(f"ERROR: {obj.Label} - Rotation must be preceded by an Exit (or be the first command). Mid-route rotations are not allowed.")
+            prev = obj
+            continue
+
+        if prev is not None and prev.Type == "Rotation" and obj.Type != "Enter":
+            raise Exception(f"ERROR: {prev.Label} - Rotation must be followed by an Enter (or be the last command). Mid-route rotations are not allowed.")
+
+        prev = obj
+
+    if first is not None and first.Type == "Exit":
+        raise Exception(f"ERROR: {first.Label} - Unsupported first element. Route cannot start with Exit.")
+    if last is not None and last.Type == "Enter":
+        raise Exception(f"ERROR: {last.Label} - Unsupported last element. Route cannot end with Enter.")
+
+
 class WireRoute(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, objects, jobName):   
         super().__init__(obj, jobName)     
@@ -219,11 +260,12 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
             (wpl, wpr) = getWorkingPlanes(job, doc)
 
+            validateRoute(obj.Objects)
+
             first       = obj.Objects[0]
             reversed    = None        # - Second segment is reversed
             route_data  = []
             route_data_dir  = []
-            feed_overrides = []
             item_index  = 0
             pauses = []
             pausesDuration = []
@@ -604,14 +646,17 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                         if j == len(segment.Edges) - 1 and edge.ObjectType != "Exit":
                             resultPoints_L.append(edge.OffsetLeft[-1])
                             resultPoints_R.append(edge.OffsetRight[-1])
-                        
-                        feed_overrides.append(edge.getFeedOverride())
-                else:
-                    feed_overrides.append(1.0)
 
-            if len(feed_overrides) != len(obj.Data):
-                raise Exception("ERROR: Feed overrides calculation error.")
-            
+            # - Build feed overrides aligned with route data entries.
+            # - Rotation objects do not produce edges (they have no feed override),
+            #   so their entries default to 1.0.
+            edgeOverrides = {}
+            for segment in segments:
+                for edge in segment.Edges:
+                    edgeOverrides[edge.DataIdx] = edge.getFeedOverride()
+
+            feed_overrides = [edgeOverrides.get(i, 1.0) for i in range(len(route_data))]
+
             obj.Offset_L = resultPoints_L
             obj.Offset_R = resultPoints_R
             obj.Pauses = pauses
