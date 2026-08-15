@@ -107,6 +107,7 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
             raise
 
     def onDocumentRestored(self, obj):
+        super().onDocumentRestored(obj)
         touched = False
         if not hasattr(obj, "LeadOutEnabled"):
             obj.addProperty("App::PropertyBool",        "LeadOutEnabled",    "Task",     "Add Lead-Out").LeadOutEnabled = False   

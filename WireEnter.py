@@ -44,6 +44,7 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def onDocumentRestored(self, obj):
+        super().onDocumentRestored(obj)
         touched = False
         if not hasattr(obj, "LeadInEnabled"):
             obj.addProperty("App::PropertyBool",        "LeadInEnabled",    "Task",     "Add Lead-In").LeadInEnabled = False   
