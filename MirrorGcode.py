@@ -65,52 +65,52 @@ class MirrorG():
         mirror = False
         for line in src_data:
             if not mirror:
-                # - Direct copy line
-                out_data.append(line + ("" if line.endswith("\n") else "\n"))
- 
-                # - Find first move command
-                if re.match('^(G0[01])', line):
-                    mirror = True
-                    continue
-            else:
-                # - Replace rotation
-                rt = re.search(r'^(G0[01]) %s%s %s' % (ar1, number, feed), line)
-                if rt is not None:
-                    CM = rt.group(1)
-                    RT = float(rt.group(2))
-                    FR = float(rt.group(3))
-                    out_data.append("%s %s%.2f F%.1f\n" % (CM, r1, -RT if RT != 0 else 0, FR))
+                # - Copy everything up to the first move command verbatim
+                if not re.match('^(G0[01])', line):
+                    out_data.append(line + ("" if line.endswith("\n") else "\n"))
                     continue
 
-                withPowerChange = True
-                mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s S%s' % (ax1, number, az1, number, ax2, number, az2, number, feed, number), line)
-                if mv is None:
-                    withPowerChange = False
-                    mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s' % (ax1, number, az1, number, ax2, number, az2, number, feed), line)
-                     
-                if mv is not None:
-                    if withPowerChange:
-                        CM = mv.group(1)
-                        LX = float(mv.group(2))
-                        LY = float(mv.group(3))
-                        RX = float(mv.group(4))
-                        RY = float(mv.group(5))
-                        FR = float(mv.group(6))
-                        PW = float(mv.group(7))
-                        out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f S%.2f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR, PW))
-                        continue
-                    else:
-                        CM = mv.group(1)
-                        LX = float(mv.group(2))
-                        LY = float(mv.group(3))
-                        RX = float(mv.group(4))
-                        RY = float(mv.group(5))
-                        FR = float(mv.group(6))
-                        out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR))
-                        continue
+                # - First move command is mirrored too
+                mirror = True
 
-                # - Direct copy line
-                out_data.append(line + ("" if line.endswith("\n") else "\n"))
+            # - Replace rotation
+            rt = re.search(r'^(G0[01]) %s%s %s' % (ar1, number, feed), line)
+            if rt is not None:
+                CM = rt.group(1)
+                RT = float(rt.group(2))
+                FR = float(rt.group(3))
+                out_data.append("%s %s%.2f F%.1f\n" % (CM, r1, -RT if RT != 0 else 0, FR))
+                continue
+
+            withPowerChange = True
+            mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s S%s' % (ax1, number, az1, number, ax2, number, az2, number, feed, number), line)
+            if mv is None:
+                withPowerChange = False
+                mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s' % (ax1, number, az1, number, ax2, number, az2, number, feed), line)
+
+            if mv is not None:
+                if withPowerChange:
+                    CM = mv.group(1)
+                    LX = float(mv.group(2))
+                    LY = float(mv.group(3))
+                    RX = float(mv.group(4))
+                    RY = float(mv.group(5))
+                    FR = float(mv.group(6))
+                    PW = float(mv.group(7))
+                    out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f S%.2f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR, PW))
+                    continue
+                else:
+                    CM = mv.group(1)
+                    LX = float(mv.group(2))
+                    LY = float(mv.group(3))
+                    RX = float(mv.group(4))
+                    RY = float(mv.group(5))
+                    FR = float(mv.group(6))
+                    out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR))
+                    continue
+
+            # - Direct copy line
+            out_data.append(line + ("" if line.endswith("\n") else "\n"))
 
 
         fileName = re.sub(r'\.gcode$', '-mirror.gcode', file, flags=re.IGNORECASE)
