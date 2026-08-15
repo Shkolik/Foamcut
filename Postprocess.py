@@ -41,6 +41,14 @@ class Postprocess():
 
     '''
     Generate rotation position
+    
+    @param angle - incremental rotation angle to add to the current rotation position.
+    
+    @return absolute rotation position command.
+    
+    Rotation angles are incremental: each rotation turns the axis from its current position.
+    rotation_position accumulates them into the absolute coordinate emitted in the GCODE
+    (the output is in absolute coordinates, see G90 in the start block).
     '''
     def generateRotationPosition(self, config, angle):
         self.rotation_position += float(angle)
