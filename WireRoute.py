@@ -432,6 +432,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             currentEdge = FoamCut_RouteEdge()
 
             for i in range(len(route_data)): 
+                # - dead code: "Rotation" is never set (rotation edges hit `continue`
+                #   before ObjectType is assigned), so the split is driven by "Exit" only.
                 if currentEdge.ObjectType == "Rotation" or currentEdge.ObjectType == "Exit":
                     segments.append(currentSegment)
                     currentSegment = FoamCut_RouteSegment()                    
@@ -486,6 +488,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
                 currentSegment.Edges.append(currentEdge)
 
+            # - dead code: "Rotation" is never set (same reason as the segment-split check above).
+            #   trailing Rotation is always preceded by an Exit
             if currentEdge.ObjectType != "Rotation":
                 segments.append(currentSegment)
 
