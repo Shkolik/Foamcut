@@ -165,6 +165,10 @@ class MakePath():
             group = doc.getObject("Job")
             setActive = True
 
+        if group is None or group.Type != "Job":
+            FreeCAD.Console.PrintError("ERROR: Cannot create paths. No active Job found.\n")
+            return
+
         if group is not None and group.Type == "Job":
             if setActive:
                 view.setActiveObject("group", group)
