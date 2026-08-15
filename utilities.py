@@ -627,11 +627,6 @@ def intersectWires(wire1, wire2, tolerance = 1e-4):
                         return (intPoint, "replace", "replace") # special case when both wires are nearly parallel
                     
                     else:
-                        v = Part.show(vertex, "Wrong Intersection Point") # debug point of wrong intersection
-                        v.ViewObject.PointSize = 6
-                        Part.show(L1_end, "Wrong Intersection Edge") # debug edge to which wrong intersection point belongs
-                        Part.show(L2_start, "Wrong Intersection Edge") # debug edge to which wrong intersection
-
                         raise Exception(f"Intersection is outside of the acceptable range.\n Initial distance check: {dist}, {vectors}, {infos}\n  {distance}, {infos[0]}")
                 else:
                     return (intPoint, "extend", "extend")
