@@ -127,6 +127,9 @@ class MakePath():
         if len(edges_l) == 1 and len(edges_r) == 1:
             edges_l_links = getEdgesLinks(parent_l, edges_l)
             edges_r_links = getEdgesLinks(parent_r, edges_r)
+            if len(edges_l_links) == 0 or len(edges_r_links) == 0:
+                FreeCAD.Console.PrintError("ERROR: Cannot create paths. Selected edges have no matching links in the parent shape.\n")
+                return objects
             objects.append([edges_l_links[0], edges_r_links[0]])
             return objects
 
@@ -148,6 +151,10 @@ class MakePath():
 
         edges_l_links = getEdgesLinks(parent_l, edges_l)
         edges_r_links = getEdgesLinks(parent_r, edges_r_sorted)
+
+        if len(edges_l_links) < len(edges_l) or len(edges_r_links) < len(edges_r_sorted):
+            FreeCAD.Console.PrintError("ERROR: Cannot create paths. Selected edges have no matching links in the parent shape.\n")
+            return objects
 
         for i in range(len(edges_l)):
             objects.append([edges_l_links[i], edges_r_links[i]])
@@ -224,6 +231,9 @@ class MakePath():
                 return
 
             edgesPairs = self.SortEdges(objects[0][0] if not right else objects[1][0], objects[1][0] if not right else objects[0][0], edges_l, edges_r)
+
+            if not edgesPairs:
+                return
 
         for pair in edgesPairs:
             self.CreateFromEdges(pair, group)
