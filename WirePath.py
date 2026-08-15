@@ -261,11 +261,17 @@ class MakePath():
                 # - supported selected objects combinations is:
                 # - Face and Face
                 # - Edge and Edge
-                # - Edge and Vertex
-                # - Vertex and Edge
+                # - Vertex and Vertex
                 object1 = objects[0]
                 object2 = objects[1]
-                if object1[1][0].startswith("Face") != object2[1][0].startswith("Face"):
+
+                def selectionKind(sub):
+                    for kind in ("Face", "Edge", "Vertex"):
+                        if sub.startswith(kind):
+                            return kind
+                    return ""
+
+                if selectionKind(object1[1][0]) != selectionKind(object2[1][0]):
                     return False
 
                 wp = getWorkingPlanes(group, App.ActiveDocument)
