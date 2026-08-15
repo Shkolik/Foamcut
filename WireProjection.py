@@ -107,7 +107,11 @@ class MakeProjection():
                         object[0].recompute(True)
 
                     edges = getEdgesLinks(object[0], object[0].getSubObject(object[1][0]))
-                    
+
+                    if len(edges) == 0:
+                        FreeCAD.Console.PrintError("ERROR: No edges of the selected face [{}] match the object shape. Select edges directly instead.\n".format(object[0].Label))
+                        return
+
                     for edge in edges:
                         self.CreateFromEdge(edge, group)
                 else:
