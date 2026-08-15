@@ -118,7 +118,7 @@ This coefficient help calculate kerf compensation when wire speed is less than n
 Usually kerf thickness is directly related to movement speed. Lesser speed - thicker kerf. \r\n\
 But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
 Normally it should be 1.0, but for denser foam it could be bigger.").CompensationDegree = utilities.getParameterFloat("CompensationDegree", 1.0)
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDegree property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDegree property.\n".format(obj.Label))
 
         if hasattr(obj, "KerfCompensation") and obj.getGroupOfProperty("KerfCompensation") != "Kerf Compensation":
             obj.setGroupOfProperty("KerfCompensation", "Kerf Compensation")
@@ -129,14 +129,14 @@ Normally it should be 1.0, but for denser foam it could be bigger.").Compensatio
 "If wire stretch past machine campatibility it can break. " + 
 "Enabling this setting will give warning if given path will stretch wire too much. " +
 "Working in pair with WireEllongationLength. Will take any effect only if length greater than 0mm.").WireStretchVerification = utilities.getParameterBool("WireStretchVerification", False)
-            print("{} - Migrating from 0.1.4 to 0.1.5 - adding WireStretchVerification property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.4 to 0.1.5 - adding WireStretchVerification property.\n".format(obj.Label))
         if not hasattr(obj, "WireStretchLength"):
             obj.addProperty("App::PropertyLength",     "WireStretchLength",      "Wire",    "Wire ellongation specify how much wire can stretch before breaking. " +
 "Set value greater than 0mm to enable verification.").WireStretchLength = utilities.getParameterFloat("WireStretchLength", 0.0)
-            print("{} - Migrating from 0.1.4 to 0.1.5 - adding WireStretchLength property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.4 to 0.1.5 - adding WireStretchLength property.\n".format(obj.Label))
         
         if hasattr(obj, "CompensationDegree") and obj.getEditorMode("CompensationDegree") and len(obj.getEditorMode("CompensationDegree")) > 0:
-            print("{} - Migrating from post 0.1.3 to 0.1.10 - show CompensationDegree property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from post 0.1.3 to 0.1.10 - show CompensationDegree property.\n".format(obj.Label))
             obj.setEditorMode("CompensationDegree", 0)
 
         if hasattr(obj, "CompensationDegree"):
@@ -147,16 +147,16 @@ But in some foams it will not be that simple, since wire melts foam and it becam
 Normally it should be 1.0, but for denser foam it could be bigger.")
 
         if not hasattr(obj, "StartProgramCode"):
-            print("{} - Migrating from 0.1.9 to 0.1.10 - add StartProgramCode property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.9 to 0.1.10 - add StartProgramCode property.\n".format(obj.Label))
             obj.addProperty("App::PropertyString",     "StartProgramCode",     "GCODE",         "Code that will be put on the very first line of the program. \r\n\
 For example LinuxCNC expect to see % character as the first command.").StartProgramCode = utilities.getParameterString("StartProgramCode", "")
         if not hasattr(obj, "EndProgramCode"):
-            print("{} - Migrating from 0.1.9 to 0.1.10 - add EndProgramCode property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.9 to 0.1.10 - add EndProgramCode property.\n".format(obj.Label))
             obj.addProperty("App::PropertyString",     "EndProgramCode",       "GCODE",         "Code that will be put on the last line of the program. \r\n\
 For example LinuxCNC expect to see % character as the last command.").EndProgramCode = utilities.getParameterString("EndProgramCode", "")
         
         if not hasattr(obj, "CommentStyle"):
-            print("{} - Migrating from 0.1.9 to 0.1.10 - add CommentStyle property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.9 to 0.1.10 - add CommentStyle property.\n".format(obj.Label))
             obj.addProperty("App::PropertyEnumeration","CommentStyle",          "GCODE",         "Style of commented lines. \r\n\
 Could be inline comments started with ; or multiline inside () or ignored alltogether.").CommentStyle = utilities.FC_COMMENT_STYLES
             obj.CommentStyle = utilities.FC_COMMENT_STYLES.index(utilities.getParameterString("CommentStyle", "; Comment"))

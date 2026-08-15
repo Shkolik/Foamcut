@@ -99,25 +99,25 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
         if not hasattr(obj, "LeftEdgeLength"):
             obj.addProperty("App::PropertyDistance",    "LeftEdgeLength",     "", "", 5)   
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding LeftEdgeLength property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding LeftEdgeLength property.\n".format(obj.Label))
             touched = True
         if not hasattr(obj, "RightEdgeLength"):
             obj.addProperty("App::PropertyDistance",    "RightEdgeLength",     "", "", 5)
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding RightEdgeLength property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding RightEdgeLength property.\n".format(obj.Label))  
             touched = True
         if hasattr(obj, "KerfCompensationDirection"):
             dir = FC_KERF_DIRECTIONS.index(obj.KerfCompensationDirection) if obj.KerfCompensationDirection in FC_KERF_DIRECTIONS else 0            
             obj.removeProperty("KerfCompensationDirection")
-            print("{} - Migrating from 0.1.2 to 0.1.3 - removing KerfCompensationDirection property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - removing KerfCompensationDirection property.\n".format(obj.Label))  
             touched = True
         if not hasattr(obj, "CompensationDirection"):
             obj.addProperty("App::PropertyEnumeration", "CompensationDirection", "Kerf Compensation",   "Kerf compensation direction").CompensationDirection = FC_KERF_DIRECTIONS
             obj.CompensationDirection = dir
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.\n".format(obj.Label))  
             touched = True
         if not hasattr(obj, "RapidMove"):
             obj.addProperty("App::PropertyBool",        "RapidMove",            "Task", "Move trough this segment with rapid movement speed").RapidMove = False
-            print("{} - Migrating from 0.1.9 to 0.1.10 - adding RapidMove property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.9 to 0.1.10 - adding RapidMove property.\n".format(obj.Label))  
             touched = True
         if touched:
             obj.recompute()

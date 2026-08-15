@@ -48,23 +48,23 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
         touched = False
         if not hasattr(obj, "LeadInEnabled"):
             obj.addProperty("App::PropertyBool",        "LeadInEnabled",    "Task",     "Add Lead-In").LeadInEnabled = False   
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadInEnabled property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadInEnabled property.\n".format(obj.Label))  
             touched = True
         if not hasattr(obj, "LeadInX"):
             obj.addProperty("App::PropertyDistance",    "LeadInX",          "Task",     "Move along X machine axis" ).LeadInX = 100
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadInX property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadInX property.\n".format(obj.Label))  
             touched = True
         if not hasattr(obj, "LeadInY"):
             obj.addProperty("App::PropertyDistance",    "LeadInY",          "Task",     "Move along Y machine axis" ).LeadInY = 0
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadInY property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadInY property.\n".format(obj.Label))  
             touched = True  
         if not hasattr(obj, "EntryPointL"):
             obj.addProperty("App::PropertyVector",      "EntryPointL",       "", "", 5)
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding EntryPointL property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding EntryPointL property.\n".format(obj.Label))  
             touched = True       
         if not hasattr(obj, "EntryPointR"):
             obj.addProperty("App::PropertyVector",      "EntryPointR",       "", "", 5)
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding EntryPointR property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding EntryPointR property.\n".format(obj.Label))  
             touched = True       
 
         obj.setEditorMode("LeadInX", 0 if obj.LeadInEnabled else 3)     

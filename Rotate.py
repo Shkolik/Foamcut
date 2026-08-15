@@ -137,8 +137,6 @@ class AddRotation():
                 if not hasattr(obj, "Shape"):
                     return False
                 
-                print(obj.TypeId)
-
                 if (hasattr(obj, "Type") and
                     (obj.Type == "Path" or obj.Type == "Enter"  or obj.Type == "Job" or obj.Type == "Helper" or obj.Type == "Config"
                     or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route" or obj.Type == "Projection")):

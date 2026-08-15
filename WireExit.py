@@ -111,23 +111,23 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
         touched = False
         if not hasattr(obj, "LeadOutEnabled"):
             obj.addProperty("App::PropertyBool",        "LeadOutEnabled",    "Task",     "Add Lead-Out").LeadOutEnabled = False   
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadOutEnabled property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadOutEnabled property.\n".format(obj.Label))  
             touched = True
         if not hasattr(obj, "LeadOutX"):
             obj.addProperty("App::PropertyDistance",    "LeadOutX",          "Task",     "Move along X machine axis" ).LeadOutX = 100
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadOutX property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadOutX property.\n".format(obj.Label))  
             touched = True
         if not hasattr(obj, "LeadOutY"):
             obj.addProperty("App::PropertyDistance",    "LeadOutY",          "Task",     "Move along Y machine axis" ).LeadOutY = 0
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadOutY property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding LeadOutY property.\n".format(obj.Label))  
             touched = True  
         if not hasattr(obj, "ExitPointL"):
             obj.addProperty("App::PropertyVector",      "ExitPointL",       "", "", 5)
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding ExitPointL property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding ExitPointL property.\n".format(obj.Label))  
             touched = True       
         if not hasattr(obj, "ExitPointR"):
             obj.addProperty("App::PropertyVector",      "ExitPointR",       "", "", 5)
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding ExitPointR property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding ExitPointR property.\n".format(obj.Label))  
             touched = True       
 
         obj.setEditorMode("LeadOutX", 0 if obj.LeadOutEnabled else 3)     

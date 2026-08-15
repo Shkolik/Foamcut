@@ -197,7 +197,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         if hasattr(obj, "DynamicKerfCompensation"):
             dynamic = obj.DynamicKerfCompensation       
             obj.removeProperty("DynamicKerfCompensation")
-            print("{} - Migrating from 0.1.2 to 0.1.3 - removing DynamicKerfCompensation property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - removing DynamicKerfCompensation property.\n".format(obj.Label))  
             touched = True
 
         # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
@@ -208,7 +208,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                             Dynamic - compensation depends on wire speed (that depends on edge length). Slower speed - more compensation.").CompensationStrategy = FC_KERF_STRATEGY 
             obj.CompensationStrategy = FC_KERF_STRATEGY.index("Dynamic") if dynamic else 0
                                
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationStrategy property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationStrategy property.\n".format(obj.Label))
             touched = True
 
         if not hasattr(obj, "CompensationDegree"):
@@ -220,7 +220,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             obj.setEditorMode("CompensationDegree", 2)
             config = self.getConfigName(obj)            
             obj.setExpression(".CompensationDegree", u"<<{}>>.CompensationDegree".format(config))
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDegree property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDegree property.\n".format(obj.Label))
             touched = True
 
         if hasattr(obj, "KerfCompensation") and obj.getGroupOfProperty("KerfCompensation") != "Kerf Compensation":
@@ -229,18 +229,18 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         if hasattr(obj, "FlipKerfCompensation"):
             dir = 1 if obj.FlipKerfCompensation else 0            
             obj.removeProperty("FlipKerfCompensation")
-            print("{} - Migrating from 0.1.2 to 0.1.3 - removing FlipKerfCompensation property.".format(obj.Label))  
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - removing FlipKerfCompensation property.\n".format(obj.Label))  
             touched = True
 
         if not hasattr(obj, "CompensationDirection"):
             obj.addProperty("App::PropertyEnumeration", "CompensationDirection",   "Kerf Compensation",   "Kerf compensation direction.").CompensationDirection = FC_ROUTE_KERF_DIRECTIONS 
             obj.CompensationDirection = dir
-            print("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.\n".format(obj.Label))
             touched = True
 
         if not hasattr(obj, "FeedOverrides"):
             obj.addProperty("App::PropertyFloatList",   "FeedOverrides",  "", "", 5) 
-            print("{} - Migrating from 0.1.10 to 0.1.11 - adding FeedOverrides property.".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding FeedOverrides property.\n".format(obj.Label))
             touched = True
             
         if touched:
