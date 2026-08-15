@@ -95,6 +95,7 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
     def onDocumentRestored(self, obj):
         touched = False   
+        dir = 0
         # Migrating from 0.1.2 to 0.1.3 - this properties needed for dynamic kerf compensation
         if not hasattr(obj, "LeftEdgeLength"):
             obj.addProperty("App::PropertyDistance",    "LeftEdgeLength",     "", "", 5)   
