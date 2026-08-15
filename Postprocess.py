@@ -97,6 +97,7 @@ class Postprocess():
     '''
     Generate command for compensated power
     '''
+    # pending removal
     def generateWireCompensatedPower(self, config, wire_length, min_power):
         max_power   = float(config.WireMaxPower)
         min_length  = float(config.FieldWidth)
@@ -174,6 +175,7 @@ class Postprocess():
 
         wirePower = config.WireMinPower
         # - generate compensated wire power
+        # pending removal
         if config.DynamicWirePower and start_point is not None:
             # - Calculate wire length
             wire_length = start_L.distanceToPoint(start_R)
@@ -224,6 +226,7 @@ class Postprocess():
     '''
     Calculate dynamic power if needed and return gcode for command
     '''
+    # pending removal
     def getDynamicWirePowerCommand(self, point1, point2, power, config):
         wirePowerCommand = ""
         # - generate compensated wire power

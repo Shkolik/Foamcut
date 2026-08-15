@@ -49,6 +49,7 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
 
         obj.addProperty("App::PropertyInteger",    "WireMinPower",      "Wire",             "Minimum wire power").WireMinPower = utilities.getParameterInt("WireMinPower", 700)
         obj.addProperty("App::PropertyInteger",    "WireMaxPower",      "Wire",             "Maximum wire power").WireMaxPower = utilities.getParameterInt("WireMaxPower", 1000)
+        # pending removal
         obj.addProperty("App::PropertyBool",       "DynamicWirePower",  "Wire",             "Dynamic wire power. " + 
                         "Power will vary depending on wire length. When enabling be sure that your controller set to Laser mode, " + 
                         "otherwise machine will halt for a brif moment after each move.").DynamicWirePower = utilities.getParameterBool("DynamicWirePower", False)
