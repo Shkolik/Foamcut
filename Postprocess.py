@@ -283,10 +283,13 @@ class Postprocess():
                     TASK += "\n"
                     TASK += self.makeCommentedLine(config, "- {} [{}]".format(object.Type, object.Label)) + "\n"
 
-                    points_count = object.PointsCount if ( i == 0 or i == len(route.Data) - 1 or object.Type == "Exit" ) \
+                    # first command of the route: its end point is shared with the next command
+                    # and is appended as part of that command, so consume PointsCount-1 here
+                    # (Enter keeps the full PointsCount - its plunge-down point is appended).
+                    points_count = object.PointsCount if ( i == len(route.Data) - 1 or object.Type == "Exit" or (i == 0 and object.Type == "Enter") ) \
                         else object.PointsCount - 1
                     
-                    if object.Type == "Enter" and object.LeadInEnabled:
+                    if object.Type == "Enter" and object.LeadInEnabled and i != 0:
                         points_count += 1
 
                     if object.Type == "Exit" and object.LeadOutEnabled:
