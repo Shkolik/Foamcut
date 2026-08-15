@@ -130,6 +130,9 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
             print("{} - Migrating from 0.1.10 to 0.1.11 - adding ExitPointR property.".format(obj.Label))  
             touched = True       
 
+        obj.setEditorMode("LeadOutX", 0 if obj.LeadOutEnabled else 3)     
+        obj.setEditorMode("LeadOutY", 0 if obj.LeadOutEnabled else 3)     
+
         if touched:
             obj.recompute()
 

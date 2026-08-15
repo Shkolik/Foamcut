@@ -67,6 +67,9 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
             print("{} - Migrating from 0.1.10 to 0.1.11 - adding EntryPointR property.".format(obj.Label))  
             touched = True       
 
+        obj.setEditorMode("LeadInX", 0 if obj.LeadInEnabled else 3)     
+        obj.setEditorMode("LeadInY", 0 if obj.LeadInEnabled else 3)     
+
         if touched:
             obj.recompute()
 
