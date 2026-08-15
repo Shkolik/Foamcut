@@ -67,18 +67,17 @@ class MakeProjection():
                 "ToolTip" : "Create projection object from selected face, edge or vertex. Separate projection will be created for each edge or vertex."}
 
     def CreateFromEdge(self, edge, group):
-        doc = App.ActiveDocument
         projection = None
         try:
             projection = group.newObject("Part::FeaturePython","Projection")
                 
-            ProjectionSection(projection, (doc.getObject((edge)[0].Name), (edge)[1][0]), group.Name)
+            ProjectionSection(projection, (edge[0], (edge)[1][0]), group.Name)
             ProjectionSectionVP(projection.ViewObject)
             projection.ViewObject.PointSize = 4
         except Exception as e:
             FreeCAD.Console.PrintError(f"Failed to create projection from edge {edge[0].Name}\n")
             if projection is not None:
-                doc.removeObject(projection.Name)    
+                projection.Document.removeObject(projection.Name)    
 
     def Activated(self):
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")

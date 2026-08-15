@@ -64,21 +64,20 @@ class MakePath():
                 "ToolTip" : "Create path object from 2 selected opposite edges or faces. If 2 faces selected, separate path will be created for each edge pair."}
 
     def CreateFromEdges(self, edges, group):
-        doc = FreeCAD.ActiveDocument
         path = None
         try:
             path = group.newObject("Part::FeaturePython","Path")
                 
             PathSection(path, 
-                        (doc.getObject((edges[0])[0].Name), (edges[0])[1][0]), 
-                        (doc.getObject((edges[1])[0].Name),(edges[1])[1][0]),
+                        (edges[0][0], (edges[0])[1][0]), 
+                        (edges[1][0], (edges[1])[1][0]),
                         group.Name)
             PathSectionVP(path.ViewObject)
             path.ViewObject.PointSize = 4
         except Exception as e:                
             FreeCAD.Console.PrintError(f"Failed to create path.\n")
             if path is not None:
-                doc.removeObject(path.Name) 
+                path.Document.removeObject(path.Name) 
 
     def FindOppositeEdgeIndex(self, edge, edges_r, skipIndex=None):
         """
