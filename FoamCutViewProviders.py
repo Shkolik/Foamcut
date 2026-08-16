@@ -19,9 +19,8 @@ class FoamCutBaseViewProvider:
             return {"name": self.Object.Name}
 
         def loads(self, state):
-            doc = self.Object.Document if self.Object is not None else None
-            if doc is None:
-                doc = FreeCAD.ActiveDocument
+            obj = getattr(self, "Object", None)
+            doc = obj.Document if obj is not None else FreeCAD.ActiveDocument
             if doc is not None:
                 self.Object = doc.getObject(state["name"])
             return None
@@ -30,9 +29,8 @@ class FoamCutBaseViewProvider:
             return {"name": self.Object.Name}
 
         def __setstate__(self, state):
-            doc = self.Object.Document if self.Object is not None else None
-            if doc is None:
-                doc = FreeCAD.ActiveDocument
+            obj = getattr(self, "Object", None)
+            doc = obj.Document if obj is not None else FreeCAD.ActiveDocument
             if doc is not None:
                 self.Object = doc.getObject(state["name"])
             return None

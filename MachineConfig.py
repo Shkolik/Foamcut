@@ -168,7 +168,7 @@ For example LinuxCNC expect to see % character as the last command.").EndProgram
 Could be inline comments started with ; or multiline inside () or ignored alltogether.").CommentStyle = utilities.FC_COMMENT_STYLES
             obj.CommentStyle = utilities.FC_COMMENT_STYLES.index(utilities.getParameterString("CommentStyle", "; Comment"))
         if not hasattr(obj, "FeedRateMode"):
-            App.Console.PrintMessage("{} - Migrating to new version - add FeedRateMode property (defaults to G94).\n".format(obj.Label))
+            App.Console.PrintMessage("{} - Migrating to 0.2.0 - add FeedRateMode property (defaults to G94).\n".format(obj.Label))
             obj.addProperty("App::PropertyEnumeration","FeedRateMode",        "GCODE",         "Feed rate mode. \r\n\
 G94 - feed rate in mm/min (millimeters per minute). \r\n\
 G93 - inverse time feed rate mode, where feed rate is in 1/min and the move time is 1/FeedRate. \r\n\
