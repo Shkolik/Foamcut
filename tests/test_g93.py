@@ -103,6 +103,31 @@ class TestMachineConfig(unittest.TestCase):
         self.assertEqual(old.FeedRateMode, "G94")
 
 
+G94_NO_PARK_EXPECTED = (
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
+    "; Position - Left-Bottom-Front corner in relation to the origin\n"
+    "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
+    "; *** START BLOCK ***\n; Set units to millimeters\nG21\n; Set absolute positioning\nG90\n"
+    "; Set G94 feed rate mode\nG94\nM03 S700.00\n\n"
+    "; *** TASK BLOCK ***\n\n; --- Route begin [Route001] ---\n"
+    "G00 X20.00 Y120.00 Z20.00 A120.00 F1800.00\n\n"
+    "; - Projection [Projection001]\n"
+    "G01 X20.00 Y120.00 Z20.00 A120.00 F420.00 \n"
+    "G01 X30.00 Y10.60 Z30.00 A10.60 F420.00 \n"
+    "; --- Route end [Route001] ---\n\n\n; *** END BLOCK ***\nM05\n"
+)
+
+
+class TestG94Mode(unittest.TestCase):
+    def test_g94_no_parking_output_byte_identical_plus_g94_line(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        outpath = os.path.join(tempfile.gettempdir(), "g93_g94_nopark.gcode")
+        content = generate(cfg, [make_route()], outpath)
+        self.assertEqual(content, G94_NO_PARK_EXPECTED)
+
+
 # FreeCADCmd imports the passed script as a module (__name__ is the module
 # basename, never "__main__"), so also run when this file is the entry script.
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):

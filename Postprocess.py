@@ -122,6 +122,9 @@ class Postprocess():
     def generateStartBlock(self, config, start_point):
         GCODE = ""
         self.rotation_position = 0.0
+        self._current_L = None
+        self._current_R = None
+        self._g93_emitted = False
 
         if config.StartProgramCode:
             GCODE += "{}\n".format(config.StartProgramCode)
@@ -152,6 +155,8 @@ class Postprocess():
         GCODE += "G21\n"
         GCODE += self.makeCommentedLine(config, "Set absolute positioning") + "\n"
         GCODE += "G90\n"
+        GCODE += self.makeCommentedLine(config, "Set G94 feed rate mode") + "\n"
+        GCODE += "G94\n"
 
         if config.EnableHoming:
             # - Homing
