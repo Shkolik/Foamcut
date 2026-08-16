@@ -84,6 +84,13 @@ Could be inline comments started with ; or multiline inside () or ignored alltog
         obj.addProperty("App::PropertyEnumeration","TimeUnits",            "GCODE",         "Units for time in Gcode. " + 
 "GRBL and LinuxCNC usually use seconds, other controllers may use milliseconds").TimeUnits = utilities.FC_TIME_UNITS
         obj.TimeUnits = utilities.FC_TIME_UNITS.index(utilities.getParameterString("TimeUnits", "Seconds"))
+
+        obj.addProperty("App::PropertyEnumeration","FeedRateMode",        "GCODE",         "Feed rate mode. \r\n\
+G94 - feed rate in mm/min (millimeters per minute). \r\n\
+G93 - inverse time feed rate mode, where feed rate is in 1/min and the move time is 1/FeedRate. \r\n\
+In G93 the physical cutting speed stays synchronized with the wire temperature-dependent kerf. \r\n\
+New documents default to G93; existing documents are migrated to G94.").FeedRateMode = utilities.FC_FEED_RATE_MODES
+        obj.FeedRateMode = utilities.FC_FEED_RATE_MODES.index(utilities.getParameterString("FeedRateMode", "G93"))
         
         obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = utilities.getParameterFloat("SafeHeight", 200)        
         obj.addProperty("App::PropertyTime",       "PauseDuration",        "Travel",        "Pause duration seconds").PauseDuration = utilities.getParameterFloat("PauseDuration", 1.0)
@@ -160,6 +167,13 @@ For example LinuxCNC expect to see % character as the last command.").EndProgram
             obj.addProperty("App::PropertyEnumeration","CommentStyle",          "GCODE",         "Style of commented lines. \r\n\
 Could be inline comments started with ; or multiline inside () or ignored alltogether.").CommentStyle = utilities.FC_COMMENT_STYLES
             obj.CommentStyle = utilities.FC_COMMENT_STYLES.index(utilities.getParameterString("CommentStyle", "; Comment"))
+        if not hasattr(obj, "FeedRateMode"):
+            App.Console.PrintMessage("{} - Migrating to new version - add FeedRateMode property (defaults to G94).\n".format(obj.Label))
+            obj.addProperty("App::PropertyEnumeration","FeedRateMode",        "GCODE",         "Feed rate mode. \r\n\
+G94 - feed rate in mm/min (millimeters per minute). \r\n\
+G93 - inverse time feed rate mode, where feed rate is in 1/min and the move time is 1/FeedRate. \r\n\
+In G93 the physical cutting speed stays synchronized with the wire temperature-dependent kerf.").FeedRateMode = utilities.FC_FEED_RATE_MODES
+            obj.FeedRateMode = utilities.FC_FEED_RATE_MODES.index("G94")
     def execute(self, obj):
         
         pass 

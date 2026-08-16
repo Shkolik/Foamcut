@@ -8,11 +8,13 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import FreeCAD
+App = FreeCAD
 import FreeCADGui
 FreeCADGui.addCommand = lambda *a, **k: None
 
 import utilities
 import Postprocess
+import MachineConfig
 
 
 def make_config(feed_rate_mode):
@@ -84,6 +86,21 @@ class TestHarness(unittest.TestCase):
         content = generate(cfg, [make_route()], outpath)
         self.assertIn("; *** START BLOCK ***", content)
         self.assertIn("G21", content)
+
+
+class TestMachineConfig(unittest.TestCase):
+    def test_new_config_defaults_to_g93(self):
+        doc = App.newDocument("T_New")
+        cfg = doc.addObject("App::DocumentObjectGroupPython", "Config")
+        MachineConfig.MachineConfig(cfg, "T")
+        self.assertEqual(cfg.FeedRateMode, "G93")
+
+    def test_migration_defaults_to_g94(self):
+        doc = App.newDocument("T_Mig")
+        old = doc.addObject("App::DocumentObjectGroupPython", "OldConfig")
+        mc = MachineConfig.MachineConfig.__new__(MachineConfig.MachineConfig)
+        mc.onDocumentRestored(old)
+        self.assertEqual(old.FeedRateMode, "G94")
 
 
 # FreeCADCmd imports the passed script as a module (__name__ is the module
