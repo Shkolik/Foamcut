@@ -13,6 +13,7 @@ Gui=FreeCADGui
 from PySide import QtGui
 import utilities
 import os
+import math
 
 class Postprocess():
     """Make Gcode"""
@@ -58,14 +59,49 @@ class Postprocess():
         )
 
     '''
+    Update tracked wire position (raw coordinate pairs: (X1,Z1) and (X2,Z2))
+    '''
+    def _setCurrent(self, X1, Z1, X2, Z2):
+        self._current_L = (float(X1), float(Z1))
+        self._current_R = (float(X2), float(Z2))
+
+    '''
+    Calculate feed rate value for a move.
+    
+    G94: feed = feed_rate * 60 (mm/min).
+    G93: feed = feed_rate * 60 / L, where L is the longer wire-end travel distance.
+    Degenerate move (L <= epsilon) falls back to feed_rate * 60 (G93 requires F on every G1 line).
+    '''
+    def _calculateFeed(self, config, feed_rate, X1, Z1, X2, Z2):
+        feed = float(feed_rate) * 60
+        if self._g93_emitted and self._current_L is not None and self._current_R is not None:
+            L = max(
+                math.hypot(float(X1) - self._current_L[0], float(Z1) - self._current_L[1]),
+                math.hypot(float(X2) - self._current_R[0], float(Z2) - self._current_R[1])
+            )
+            if L > 1e-6:
+                feed = feed / L
+        return feed
+
+    '''
+    Format feed rate token for a move (number only; template supplies the literal F)
+    '''
+    def _formatFeed(self, config, feed_rate, X1, Z1, X2, Z2):
+        return "%.2f" % self._calculateFeed(config, feed_rate, X1, Z1, X2, Z2)
+
+    '''
     Generate travel
     '''
     def generateTravel(self, config, command, feed_rate, wire_power, X1, Z1, X2, Z2):
         # - Create position
         position = self.generateTravelPosition(config, X1, Z1, X2, Z2)
 
+        # - Calculate feed (mode-aware) and track the new position
+        feed = self._formatFeed(config, feed_rate, X1, Z1, X2, Z2)
+        self._setCurrent(X1, Z1, X2, Z2)
+
         # - Create GCODE
-        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)).replace("{WirePower}", str(wire_power)) + "\n"
+        return command.replace("{Position}", str(position)).replace("{FeedRate}", feed).replace("{WirePower}", str(wire_power)) + "\n"
 
     '''
     Generate rapid travel
@@ -87,8 +123,16 @@ class Postprocess():
         # - Create position
         position = self.generateRotationPosition(config, angle)
 
+        # - Calculate feed (mode-aware). Rotation does not change the wire (y,z)
+        #   position, so _current_L/_current_R are not updated.
+        feed = float(feed_rate) * 60
+        if self._g93_emitted:
+            delta = abs(float(angle))
+            if delta > 1e-6:
+                feed = feed / delta
+
         # - Create GCODE
-        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" %  (float(feed_rate) * 60)) + "\n"
+        return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" % feed) + "\n"
 
     '''
     Generate wire enable command
@@ -211,7 +255,13 @@ class Postprocess():
             GCODE += self.makeCommentedLine(config, "- Parking -") + "\n"
             up_posistion  = "%s%.2f %s%.2f" % (config.Z1AxisName, config.ParkZ, config.Z2AxisName, config.ParkZ)
             feed_rate     = config.FeedRateMove
-            GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", str(float(feed_rate) * 60)) + "\n"
+            curX1 = self._current_L[0] if self._current_L is not None else 0.0
+            curX2 = self._current_R[0] if self._current_R is not None else 0.0
+            feed = self._calculateFeed(config, feed_rate, curX1, config.ParkZ, curX2, config.ParkZ)
+            # - G94 keeps today's str() formatting (e.g. F1800.0); G93 uses %.2f
+            feed_str = str(feed) if not self._g93_emitted else "%.2f" % feed
+            self._setCurrent(curX1, config.ParkZ, curX2, config.ParkZ)
+            GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", feed_str) + "\n"
 
         # - Park XZ
         if config.EnableParking:

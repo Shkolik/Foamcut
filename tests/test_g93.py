@@ -128,6 +128,58 @@ class TestG94Mode(unittest.TestCase):
         self.assertEqual(content, G94_NO_PARK_EXPECTED)
 
 
+class TestFeedHelpers(unittest.TestCase):
+    def setUp(self):
+        self.pp = Postprocess.Postprocess()
+        self.cfg = make_config(utilities.FC_FEED_RATE_MODES[1])  # G93
+        self.cfg.EnableHoming = False
+        self.cfg.EnableParking = False
+
+    def test_g94_feed_is_unchanged(self):
+        self.cfg.FeedRateMode = utilities.FC_FEED_RATE_MODES[0]
+        self.pp._g93_emitted = False
+        self.pp._current_L = None
+        self.pp._current_R = None
+        self.assertEqual(self.pp._formatFeed(self.cfg, 30, 20, 120, 20, 120), "1800.00")
+        self.assertEqual(self.pp._formatFeed(self.cfg, 7, 30, 10.6, 30, 10.6), "420.00")
+
+    def test_g93_cut_feed_uses_longer_wire_length(self):
+        self.pp._g93_emitted = True
+        self.pp._current_L = (20.0, 120.0)
+        self.pp._current_R = (20.0, 120.0)
+        # target (30,10.6): L = hypot(10, 109.4) = 109.85608767838039; 420/109.856 = 3.82
+        self.assertEqual(self.pp._formatFeed(self.cfg, 7, 30, 10.6, 30, 10.6), "3.82")
+
+    def test_g93_degenerate_length_falls_back(self):
+        self.pp._g93_emitted = True
+        self.pp._current_L = (20.0, 120.0)
+        self.pp._current_R = (20.0, 120.0)
+        self.assertEqual(self.pp._formatFeed(self.cfg, 7, 20, 120, 20, 120), "420.00")
+
+    def test_g93_rapid_feed(self):
+        self.pp._g93_emitted = True
+        self.pp._current_L = (20.0, 290.0)
+        self.pp._current_R = (20.0, 290.0)
+        # rapid (20,290)->(20,120): L=170; 1800/170 = 10.588235... -> 10.59
+        self.assertEqual(self.pp._formatFeed(self.cfg, 30, 20, 120, 20, 120), "10.59")
+
+    def test_g93_rotation_feed(self):
+        self.pp._g93_emitted = True
+        self.pp.rotation_position = 0.0
+        cmd = self.pp.generateRotation(self.cfg, "G00 {Position} F{FeedRate}", 90, 30)
+        self.assertEqual(cmd, "G00 B90.00 F20.00\n")
+        # rotation_position accumulates: after +90, angle 0 keeps B at 90.00
+        cmd0 = self.pp.generateRotation(self.cfg, "G00 {Position} F{FeedRate}", 0, 30)
+        self.assertEqual(cmd0, "G00 B90.00 F1800.00\n")
+
+    def test_g94_rotation_feed_unchanged(self):
+        self.cfg.FeedRateMode = utilities.FC_FEED_RATE_MODES[0]
+        self.pp._g93_emitted = False
+        self.pp.rotation_position = 0.0
+        cmd = self.pp.generateRotation(self.cfg, "G00 {Position} F{FeedRate}", 90, 30)
+        self.assertEqual(cmd, "G00 B90.00 F1800.00\n")
+
+
 # FreeCADCmd imports the passed script as a module (__name__ is the module
 # basename, never "__main__"), so also run when this file is the entry script.
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):
