@@ -216,6 +216,9 @@ class Postprocess():
 
             # - Initialize position
             GCODE += config.InitPositionCommand.replace("{Position}", initPosCommand ) + "\n"
+            # - After $H + G92 all axes are at their max position (debounce offset),
+            #   declared as the homing coordinates -> position is now known.
+            self._setCurrent(config.HomingX1, config.HomingZ1, config.HomingX2, config.HomingZ2)
 
         if config.EnableParking:
             # - Park
@@ -317,6 +320,14 @@ class Postprocess():
         # ---- Generate startup block
         START = self.generateStartBlock(config, start_point)
 
+        # - Switch to G93 right after the start block when it already established a
+        #   known position (parking and/or homing enabled). Never emitted inside the
+        #   start block.
+        if config.FeedRateMode == utilities.FC_FEED_RATE_MODES[1] and not self._g93_emitted and self._current_L is not None:
+            START += self.makeCommentedLine(config, "Set G93 inverse time feed rate mode") + "\n"
+            START += "G93\n"
+            self._g93_emitted = True
+
         # - Wal all routes
         for route in route_list:
             TASK += "\n"
@@ -327,6 +338,12 @@ class Postprocess():
             if len(route.Offset_L) > 0 or len(route.Offset_R) > 0:                
                 # - Generate rapid travel command
                 TASK += self.generateRapidTravel(config, route.Offset_L[0].y, route.Offset_L[0].z, route.Offset_R[0].y, route.Offset_R[0].z)
+                # - Switch to G93 right after the first route-begin rapid if the
+                #   start block did not establish a position.
+                if config.FeedRateMode == utilities.FC_FEED_RATE_MODES[1] and not self._g93_emitted:
+                    TASK += self.makeCommentedLine(config, "Set G93 inverse time feed rate mode") + "\n"
+                    TASK += "G93\n"
+                    self._g93_emitted = True
             
             for i in range(len(route.Data)):                                
                 # - Access item

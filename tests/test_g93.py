@@ -180,6 +180,118 @@ class TestFeedHelpers(unittest.TestCase):
         self.assertEqual(cmd, "G00 B90.00 F1800.00\n")
 
 
+G93_NO_PARK_EXPECTED = (
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
+    "; Position - Left-Bottom-Front corner in relation to the origin\n"
+    "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
+    "; *** START BLOCK ***\n; Set units to millimeters\nG21\n; Set absolute positioning\nG90\n"
+    "; Set G94 feed rate mode\nG94\nM03 S700.00\n\n"
+    "; *** TASK BLOCK ***\n\n; --- Route begin [Route001] ---\n"
+    "G00 X20.00 Y120.00 Z20.00 A120.00 F1800.00\n"
+    "; Set G93 inverse time feed rate mode\nG93\n\n"
+    "; - Projection [Projection001]\n"
+    "G01 X20.00 Y120.00 Z20.00 A120.00 F420.00 \n"
+    "G01 X30.00 Y10.60 Z30.00 A10.60 F3.82 \n"
+    "; --- Route end [Route001] ---\n\n\n; *** END BLOCK ***\nM05\n"
+)
+
+G93_PARK_HOMING_EXPECTED = (
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
+    "; Position - Left-Bottom-Front corner in relation to the origin\n"
+    "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
+    "; *** START BLOCK ***\n; Set units to millimeters\nG21\n; Set absolute positioning\nG90\n"
+    "; Set G94 feed rate mode\nG94\n; - Homing -\n$H\n"
+    "G92 X110.00 Y290.00 Z110.00 A290.00 B0.00\n; - Parking -\n"
+    "G00 X110.00 Y290.00 Z110.00 A290.00 F1800.00\n"
+    "G00 B0.00 F1800.00\n"
+    "G00 X20.00 Y290.00 Z20.00 A290.00 F1800.00\n"
+    "M03 S700.00\n"
+    "; Set G93 inverse time feed rate mode\nG93\n\n"
+    "; *** TASK BLOCK ***\n\n; --- Route begin [Route001] ---\n"
+    "G00 X20.00 Y120.00 Z20.00 A120.00 F10.59\n\n"
+    "; - Projection [Projection001]\n"
+    "G01 X20.00 Y120.00 Z20.00 A120.00 F420.00 \n"
+    "G01 X30.00 Y10.60 Z30.00 A10.60 F3.82 \n"
+    "; --- Route end [Route001] ---\n\n\n; *** END BLOCK ***\nM05\n"
+    "; - Parking -\nG00 Y290.00 A290.00 F6.44\n"
+    "G00 X110.00 Y290.00 Z110.00 A290.00 F22.50\n"
+    "G00 B0.00 F1800.00\n"
+)
+
+G94_PARK_HOMING_EXPECTED = (
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
+    "; Position - Left-Bottom-Front corner in relation to the origin\n"
+    "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
+    "; *** START BLOCK ***\n; Set units to millimeters\nG21\n; Set absolute positioning\nG90\n"
+    "; Set G94 feed rate mode\nG94\n; - Homing -\n$H\n"
+    "G92 X110.00 Y290.00 Z110.00 A290.00 B0.00\n; - Parking -\n"
+    "G00 X110.00 Y290.00 Z110.00 A290.00 F1800.00\n"
+    "G00 B0.00 F1800.00\n"
+    "G00 X20.00 Y290.00 Z20.00 A290.00 F1800.00\n"
+    "M03 S700.00\n\n"
+    "; *** TASK BLOCK ***\n\n; --- Route begin [Route001] ---\n"
+    "G00 X20.00 Y120.00 Z20.00 A120.00 F1800.00\n\n"
+    "; - Projection [Projection001]\n"
+    "G01 X20.00 Y120.00 Z20.00 A120.00 F420.00 \n"
+    "G01 X30.00 Y10.60 Z30.00 A10.60 F420.00 \n"
+    "; --- Route end [Route001] ---\n\n\n; *** END BLOCK ***\nM05\n"
+    "; - Parking -\nG00 Y290.00 A290.00 F1800.0\n"
+    "G00 X110.00 Y290.00 Z110.00 A290.00 F1800.00\n"
+    "G00 B0.00 F1800.00\n"
+)
+
+
+class TestG93Emission(unittest.TestCase):
+    def test_g93_no_parking_emits_after_first_route_begin_rapid(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[1])
+        outpath = os.path.join(tempfile.gettempdir(), "g93_nopark.gcode")
+        content = generate(cfg, [make_route()], outpath)
+        self.assertEqual(content, G93_NO_PARK_EXPECTED)
+
+    def test_g93_parking_and_homing_emits_after_start_block(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[1])
+        cfg.EnableHoming = True
+        cfg.EnableParking = True
+        outpath = os.path.join(tempfile.gettempdir(), "g93_park.gcode")
+        content = generate(cfg, [make_route()], outpath)
+        self.assertEqual(content, G93_PARK_HOMING_EXPECTED)
+
+    def test_g94_parking_and_homing_byte_identical(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        cfg.EnableHoming = True
+        cfg.EnableParking = True
+        outpath = os.path.join(tempfile.gettempdir(), "g94_park.gcode")
+        content = generate(cfg, [make_route()], outpath)
+        self.assertEqual(content, G94_PARK_HOMING_EXPECTED)
+
+    def test_g93_g01_move_command_always_fills_feed(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[1])
+        cfg.MoveCommand = "G01 {Position} F{FeedRate}"
+        outpath = os.path.join(tempfile.gettempdir(), "g93_g01.gcode")
+        content = generate(cfg, [make_route()], outpath)
+        self.assertIn("G01 X20.00 Y120.00 Z20.00 A120.00 F1800.00", content)
+        self.assertIn("G01 X20.00 Y120.00 Z20.00 A120.00 F420.00", content)
+
+    def test_homing_alone_establishes_position(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[1])
+        cfg.EnableHoming = True
+        cfg.EnableParking = False
+        outpath = os.path.join(tempfile.gettempdir(), "g93_homing.gcode")
+        content = generate(cfg, [make_route()], outpath)
+        # G93 emitted right after the start block (position known from $H + G92)
+        idx_g93 = content.index("G93\n")
+        idx_task = content.index("; *** TASK BLOCK ***")
+        self.assertLess(idx_g93, idx_task)
+
+
 # FreeCADCmd imports the passed script as a module (__name__ is the module
 # basename, never "__main__"), so also run when this file is the entry script.
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):
