@@ -133,7 +133,7 @@ Mirror selected GCODE file around YZ plane. Useful for cutting symmetrical piece
  - ~~Cannot create path by selecting faces. In many cases it could be very useful to just select 2 faces and create path/route based on their edges (somewhat like loft) instead of selecting edges one by one.~~ DONE
  - Configuration setup panel widget
  - ~~Make helper geometry unpicable~~ Done
- - ~~G93 mode~~ - for now I don't se a reason to implement it. GRBL controller take care of simultaneous axis movements.
+ - ~~G93 mode~~ DONE: new `FeedRateMode` setting in the machine config (GCODE group). G94 = mm/min (default for existing documents); G93 = inverse time feed rate (default for new documents), where the physical cutting speed stays synchronized with the wire temperature-dependent kerf. In G93 the postprocessor converts every cut/rapid/rotation feed to inverse time and emits `G94`/`G93` mode switches automatically.
  - ~~mirroring gcode tool~~ DONE
  - ~~Create path by vertex and edge~~ Done
  - ~~Edge projection normal to the working plane~~ DONE
