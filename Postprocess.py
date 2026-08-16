@@ -345,6 +345,10 @@ class Postprocess():
                     TASK += "G93\n"
                     self._g93_emitted = True
             
+            # Exit-ful routes balance with the original full-count first command
+            # (including its Enter lead-in point); only Exit-less routes overrun by one.
+            has_exit = any(route.Objects[route.Data[i]].Type == "Exit" for i in range(len(route.Data)))
+
             for i in range(len(route.Data)):                                
                 # - Access item
                 object_index = route.Data[i]
@@ -369,10 +373,10 @@ class Postprocess():
                     # first command of the route: its end point is shared with the next command
                     # and is appended as part of that command, so consume PointsCount-1 here
                     # (Enter keeps the full PointsCount - its plunge-down point is appended).
-                    points_count = object.PointsCount if ( i == len(route.Data) - 1 or object.Type == "Exit" or (i == 0 and object.Type == "Enter") ) \
+                    points_count = object.PointsCount if ( i == len(route.Data) - 1 or object.Type == "Exit" or (i == 0 and (object.Type == "Enter" or has_exit)) ) \
                         else object.PointsCount - 1
                     
-                    if object.Type == "Enter" and object.LeadInEnabled and i != 0:
+                    if object.Type == "Enter" and object.LeadInEnabled and (has_exit or i != 0):
                         points_count += 1
 
                     if object.Type == "Exit" and object.LeadOutEnabled:
