@@ -19,9 +19,9 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.Type = "Helper"  
         
         obj.addProperty("App::PropertyBool",       "FiveAxisMachine",  "Machine Geometry",  "Enable rotation axis if it's 5 axis machine").FiveAxisMachine = utilities.getParameterBool("FiveAxisMachine", True)
-        obj.addProperty("App::PropertyLength",     "HorizontalTravel", "Machine Geometry",  "Horizontal travel distance").HorizontalTravel = utilities.getParameterFloat("HorizontalTravel", 550)
-        obj.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry",  "Vertical travel distance"  ).VerticalTravel = utilities.getParameterFloat("VerticalTravel", 300)
-        obj.addProperty("App::PropertyLength",     "FieldWidth",       "Machine Geometry",  "Distance between wire ends").FieldWidth = utilities.getParameterFloat("FieldWidth", 730)
+        obj.addProperty("App::PropertyLength",     "HorizontalTravel", "Machine Geometry",  "Horizontal travel distance").HorizontalTravel = utilities.getParameterFloat("HorizontalTravel", 870)
+        obj.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry",  "Vertical travel distance"  ).VerticalTravel = utilities.getParameterFloat("VerticalTravel", 330)
+        obj.addProperty("App::PropertyLength",     "FieldWidth",       "Machine Geometry",  "Distance between wire ends").FieldWidth = utilities.getParameterFloat("FieldWidth", 740)
         obj.addProperty("App::PropertyDistance",   "OriginX",          "Machine Geometry",  "Origin along X axis").OriginX = utilities.getParameterFloat("OriginX", 0)
         obj.addProperty("App::PropertyDistance",   "OriginRotationX",  "Machine Geometry",  "Position of rotation axis along X axis").OriginRotationX = obj.HorizontalTravel / 2
         
@@ -32,22 +32,22 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyString",     "R1AxisName",        "Axis Mapping",     "Name of rotary table axis in GCODE").R1AxisName = utilities.getParameterString("R1AxisName", "B")
 
         obj.addProperty("App::PropertyBool",        "EnableHoming",     "Homing",           "Enable homing before cycle start").EnableHoming = utilities.getParameterBool("EnableHoming", False)
-        obj.addProperty("App::PropertyDistance",    "HomingX1",         "Homing",           "Initial position for X1 axis").HomingX1 = utilities.getParameterFloat("HomingX1", 10)
-        obj.addProperty("App::PropertyDistance",    "HomingZ1",         "Homing",           "Initial position for Z1 axis").HomingZ1 = utilities.getParameterFloat("HomingZ1", 290)
-        obj.addProperty("App::PropertyDistance",    "HomingX2",         "Homing",           "Initial position for X2 axis").HomingX2 = utilities.getParameterFloat("HomingX2", 10)
-        obj.addProperty("App::PropertyDistance",    "HomingZ2",         "Homing",           "Initial position for Z2 axis").HomingZ2 = utilities.getParameterFloat("HomingZ2", 290)
+        obj.addProperty("App::PropertyDistance",    "HomingX1",         "Homing",           "Initial position for X1 axis").HomingX1 = utilities.getParameterFloat("HomingX1", 868)
+        obj.addProperty("App::PropertyDistance",    "HomingZ1",         "Homing",           "Initial position for Z1 axis").HomingZ1 = utilities.getParameterFloat("HomingZ1", 328)
+        obj.addProperty("App::PropertyDistance",    "HomingX2",         "Homing",           "Initial position for X2 axis").HomingX2 = utilities.getParameterFloat("HomingX2", 868)
+        obj.addProperty("App::PropertyDistance",    "HomingZ2",         "Homing",           "Initial position for Z2 axis").HomingZ2 = utilities.getParameterFloat("HomingZ2", 328)
         obj.addProperty("App::PropertyDistance",    "HomingR1",         "Homing",           "Initial position for R1 axis").HomingR1 = utilities.getParameterFloat("HomingR1", 0)
 
         obj.addProperty("App::PropertyBool",        "EnableParking",    "Parking",          "Enable parking before cycle start and after cycle ends").EnableParking = utilities.getParameterBool("EnableParking", False)
-        obj.addProperty("App::PropertyDistance",    "ParkX",            "Parking",          "Parking position for X").ParkX = utilities.getParameterFloat("ParkX", 10)
-        obj.addProperty("App::PropertyDistance",    "ParkZ",            "Parking",          "Parking position for Z").ParkZ = utilities.getParameterFloat("ParkZ", 290)
+        obj.addProperty("App::PropertyDistance",    "ParkX",            "Parking",          "Parking position for X").ParkX = utilities.getParameterFloat("ParkX", 110)
+        obj.addProperty("App::PropertyDistance",    "ParkZ",            "Parking",          "Parking position for Z").ParkZ = utilities.getParameterFloat("ParkZ", 200)
         obj.addProperty("App::PropertyDistance",    "ParkR1",           "Parking",          "Parking position for rotary table").ParkR1 = utilities.getParameterFloat("ParkR1", 0)
 
-        obj.addProperty("App::PropertySpeed",      "FeedRateCut",       "FeedRate",         "Feed rate while cutting").FeedRateCut = utilities.getParameterFloat("FeedRateCut", 7)
+        obj.addProperty("App::PropertySpeed",      "FeedRateCut",       "FeedRate",         "Feed rate while cutting").FeedRateCut = utilities.getParameterFloat("FeedRateCut", 2.66)
         obj.addProperty("App::PropertySpeed",      "FeedRateMove",      "FeedRate",         "Feed rate while moving").FeedRateMove = utilities.getParameterFloat("FeedRateMove", 30)
-        obj.addProperty("App::PropertySpeed",      "FeedRateRotate",    "FeedRate",         "Feed rate while rotating").FeedRateRotate = utilities.getParameterFloat("FeedRateRotate", 30)
+        obj.addProperty("App::PropertySpeed",      "FeedRateRotate",    "FeedRate",         "Feed rate while rotating").FeedRateRotate = utilities.getParameterFloat("FeedRateRotate", 12)
 
-        obj.addProperty("App::PropertyInteger",    "WireMinPower",      "Wire",             "Minimum wire power").WireMinPower = utilities.getParameterInt("WireMinPower", 700)
+        obj.addProperty("App::PropertyInteger",    "WireMinPower",      "Wire",             "Minimum wire power").WireMinPower = utilities.getParameterInt("WireMinPower", 860)
         obj.addProperty("App::PropertyInteger",    "WireMaxPower",      "Wire",             "Maximum wire power").WireMaxPower = utilities.getParameterInt("WireMaxPower", 1000)
         # pending removal
         obj.addProperty("App::PropertyBool",       "DynamicWirePower",  "Wire",             "Dynamic wire power. " + 
@@ -59,7 +59,7 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
                         "Working in pair with WireEllongationLength. Will take any effect only if length greater than 0mm.").WireStretchVerification = utilities.getParameterBool("WireStretchVerification", False)
         obj.addProperty("App::PropertyLength",     "WireStretchLength",      "Wire",    "Wire ellongation specify how much wire can stretch before breaking. " +
                         "Set value greater than 0mm to enable verification.").WireStretchLength = utilities.getParameterFloat("WireStretchLength", 0.0)
-        obj.addProperty("App::PropertyLength",     "KerfCompensation",      "Kerf Compensation",    "Kerf Compensation").KerfCompensation = utilities.getParameterFloat("KerfCompensation", 0.6)
+        obj.addProperty("App::PropertyLength",     "KerfCompensation",      "Kerf Compensation",    "Kerf Compensation").KerfCompensation = utilities.getParameterFloat("KerfCompensation", 0.7)
         obj.addProperty("App::PropertyFloat",      "CompensationDegree",    "Kerf Compensation",    "Kerf Compensation coefficient. \r\n\
 This coefficient help calculate kerf compensation when wire speed is less than nominal. \r\n\
 Usually kerf thickness is directly related to movement speed. Lesser speed - thicker kerf. \r\n\
@@ -68,7 +68,7 @@ Normally it should be 1.0, but for denser foam it could be bigger.").Compensatio
         
         obj.addProperty("App::PropertyLength",     "DiscretizationStep",   "GCODE",         "Discretization step").DiscretizationStep = 0.5
         obj.addProperty("App::PropertyString",     "CutCommand",           "GCODE",         "Command for move while cutting").CutCommand = utilities.getParameterString("CutCommand", "G01 {Position} F{FeedRate} {WirePower}")
-        obj.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",         "Command for move with cold wire").MoveCommand = utilities.getParameterString("MoveCommand", "G00 {Position} F{FeedRate}")
+        obj.addProperty("App::PropertyString",     "MoveCommand",          "GCODE",         "Command for move with cold wire").MoveCommand = utilities.getParameterString("MoveCommand", "G00 {Position}")
         obj.addProperty("App::PropertyString",     "PauseCommand",         "GCODE",         "Command for pause movements").PauseCommand = utilities.getParameterString("PauseCommand", "G04 P{Duration}")
         obj.addProperty("App::PropertyString",     "WireOnCommand",        "GCODE",         "Command for enable wire").WireOnCommand = utilities.getParameterString("WireOnCommand", "M03 S{WirePower}")
         obj.addProperty("App::PropertyString",     "WireOffCommand",       "GCODE",         "Command for disable wire").WireOffCommand = utilities.getParameterString("WireOffCommand", "M05")
@@ -92,14 +92,14 @@ In G93 the physical cutting speed stays synchronized with the wire temperature-d
 New documents default to G93; existing documents are migrated to G94.").FeedRateMode = utilities.FC_FEED_RATE_MODES
         obj.FeedRateMode = utilities.FC_FEED_RATE_MODES.index(utilities.getParameterString("FeedRateMode", "G93"))
         
-        obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = utilities.getParameterFloat("SafeHeight", 200)        
+        obj.addProperty("App::PropertyDistance",   "SafeHeight",           "Travel",        "Safe height for travel").SafeHeight = utilities.getParameterFloat("SafeHeight", 120)        
         obj.addProperty("App::PropertyTime",       "PauseDuration",        "Travel",        "Pause duration seconds").PauseDuration = utilities.getParameterFloat("PauseDuration", 1.0)
         
-        obj.addProperty("App::PropertyLength",     "BlockWidth",            "Foam Block",   "Foam block size along wire").BlockWidth = utilities.getParameterFloat("BlockWidth", 400)
+        obj.addProperty("App::PropertyLength",     "BlockWidth",            "Foam Block",   "Foam block size along wire").BlockWidth = utilities.getParameterFloat("BlockWidth", 450)
         obj.addProperty("App::PropertyLength",     "BlockLength",           "Foam Block",   "Foam block size along machine X axis").BlockLength = utilities.getParameterFloat("BlockLength", 300)
         obj.addProperty("App::PropertyLength",     "BlockHeight",           "Foam Block",   "Foam block size along machine Y axis").BlockHeight = utilities.getParameterFloat("BlockHeight", 50)
         obj.addProperty("App::PropertyPosition",   "BlockPosition",         "Foam Block",   "Foam block position in machine coordinates (x,y,z) where x - coordinate along wire, y - coordinate along machine X axis, z - coordinate along machine Y axis")
-        obj.BlockPosition = App.Vector(float(-obj.BlockWidth / 2.0), float(obj.HorizontalTravel / 2.0) - float(obj.BlockLength / 2), utilities.getParameterFloat("BlockPositionHeight", 50) )
+        obj.BlockPosition = App.Vector(float(-obj.BlockWidth / 2.0), float(obj.HorizontalTravel / 2.0) - float(obj.BlockLength / 2), utilities.getParameterFloat("BlockPositionHeight", 6) )
 
         obj.setEditorMode("HomingCommand", 0 if obj.EnableHoming else 3)     
         obj.setEditorMode("HomingX1", 0 if obj.EnableHoming else 3)
