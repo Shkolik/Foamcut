@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.2.0] - 2026-08-20
 
+### Notes
+
+- Switching to G93 mode require feed and speed calibration. Usually you should aim for 10-15% lower cut speed than in G94, since in G94 mode real "in-foam" speed usually lower than a set speed. In G93 mode real speed is equal to set speed.
+
 ### Added
 
 - G93 feed rate mode: configurable FeedRateMode property (G94/G93), mode-aware feed for travel, rotation and end-block up moves. G94 remains the default for migrated setups.
@@ -22,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - Restrict to one setup per document
 - Error handling on opposite vertex lookup; print replaced with PrintMessage
 - Tooltip and misleading UI fixes
+- New default config values
 
 ## [0.1.12] - 2026-03-30
 
