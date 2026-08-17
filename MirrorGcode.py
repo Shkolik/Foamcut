@@ -14,6 +14,10 @@ from PySide import QtGui
 import utilities
 import re
 
+def _fmt(value, token):
+    """Format value with the same decimal precision as the source token."""
+    return "%.*f" % (len(token.split(".")[1]), value)
+
 class MirrorG():
     """Mirror Gcode"""
 
@@ -79,35 +83,26 @@ class MirrorG():
                 CM = rt.group(1)
                 RT = float(rt.group(2))
                 FR = float(rt.group(3))
-                out_data.append("%s %s%.2f F%.1f\n" % (CM, r1, -RT if RT != 0 else 0, FR))
+                out_data.append("%s %s%s F%s\n" % (CM, r1, _fmt(-RT if RT != 0 else 0, rt.group(2)), _fmt(FR, rt.group(3))))
                 continue
 
-            withPowerChange = True
-            mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s S%s' % (ax1, number, az1, number, ax2, number, az2, number, feed, number), line)
-            if mv is None:
-                withPowerChange = False
-                mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s %s' % (ax1, number, az1, number, ax2, number, az2, number, feed), line)
+            mv = re.search(r'^(G0[01]) %s%s %s%s %s%s %s%s(?: %s)?(?: S%s)?' % (ax1, number, az1, number, ax2, number, az2, number, feed, number), line)
 
             if mv is not None:
-                if withPowerChange:
-                    CM = mv.group(1)
-                    LX = float(mv.group(2))
-                    LY = float(mv.group(3))
-                    RX = float(mv.group(4))
-                    RY = float(mv.group(5))
-                    FR = float(mv.group(6))
-                    PW = float(mv.group(7))
-                    out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f S%.2f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR, PW))
-                    continue
-                else:
-                    CM = mv.group(1)
-                    LX = float(mv.group(2))
-                    LY = float(mv.group(3))
-                    RX = float(mv.group(4))
-                    RY = float(mv.group(5))
-                    FR = float(mv.group(6))
-                    out_data.append("%s %s%.2f %s%.2f %s%.2f %s%.2f F%.1f\n" % (CM, x1, RX, z1, RY, x2, LX, z2, LY, FR))
-                    continue
+                CM = mv.group(1)
+                LX = float(mv.group(2))
+                LY = float(mv.group(3))
+                RX = float(mv.group(4))
+                RY = float(mv.group(5))
+                FR = mv.group(6)
+                PW = mv.group(7)
+                gcode = "%s %s%s %s%s %s%s %s%s" % (CM, x1, _fmt(RX, mv.group(4)), z1, _fmt(RY, mv.group(5)), x2, _fmt(LX, mv.group(2)), z2, _fmt(LY, mv.group(3)))
+                if FR is not None:
+                    gcode += " F%s" % _fmt(float(FR), FR)
+                if PW is not None:
+                    gcode += " S%s" % _fmt(float(PW), PW)
+                out_data.append(gcode + "\n")
+                continue
 
             # - Direct copy line
             out_data.append(line + ("" if line.endswith("\n") else "\n"))
