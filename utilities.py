@@ -292,6 +292,37 @@ def getWorkingPlanes(group, doc):
     else:
         FreeCAD.Console.PrintError("ERROR:\n Parent Job not found.\n")
 
+def validateWorkingArea(points_L, points_R, wpl, wpr, tolerance=1e-7):
+    '''
+    Validate that route points stay inside the working plane boundaries.
+    Checks Y (horizontal travel) and Z (vertical travel) extents of each
+    point list against its working plane rectangle. X is fixed at the plane
+    position by construction and is not checked. Raises an Exception on the
+    first violation with a machine-term message. FreeCAD prefixes the object
+    label when reporting the failure, so the message itself carries no label.
+    @param points_L - left route point list (Offset_L)
+    @param points_R - right route point list (Offset_R)
+    @param wpl - left working plane object (Position, Length, Width)
+    @param wpr - right working plane object (Position, Length, Width)
+    @param tolerance - float noise absorption (not an intentional allowance)
+    '''
+    for points, plane, side in ((points_L, wpl, "left"), (points_R, wpr, "right")):
+        if not points:
+            continue
+        # - Coerce to plain floats: real working planes return Quantity for
+        #   Length/Width and float for Position, so mixed arithmetic would
+        #   raise "Unit mismatch in plus operation".
+        p_y = float(plane.Position.y)
+        p_z = float(plane.Position.z)
+        p_len = float(plane.Length)
+        p_wid = float(plane.Width)
+        ys = [p.y for p in points]
+        zs = [p.z for p in points]
+        if min(ys) < p_y - tolerance or max(ys) > p_y + p_len + tolerance:
+            raise Exception(f"horizontal travel exceed machine boundary on a {side} plane. Adjust model position.")
+        if min(zs) < p_z - tolerance or max(zs) > p_z + p_wid + tolerance:
+            raise Exception(f"vertical travel exceed machine boundary on a {side} plane. Adjust model position.")
+
 def makePathByPointSets(first, second, planes, projection = False):
     '''
     Make path on working planes by one or two sets of points

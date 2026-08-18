@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - G93 feed rate mode: configurable FeedRateMode property (G94/G93), mode-aware feed for travel, rotation and end-block up moves. G94 remains the default for migrated setups.
 - Headless test harness for postprocessor and mirror verification
 - Example added
+- Working area validation: `Label: message` on creation and on recompute
 
 ### Fixed
 
