@@ -32,22 +32,18 @@ class Rotation(FoamCutBase.FoamCutBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
-        try:
-            if obj.Source is None:
-                return
+        if obj.Source is None:
+            return
 
-            obj.Source.ViewObject.Visibility = False
+        obj.Source.ViewObject.Visibility = False
 
-            # - Copy and rotate object
-            shape = obj.Source.Shape.copy()
-            shape.rotate(App.Vector(0.0, obj.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
-            
-            # - Assign new shape
-            obj.Shape     = shape
-            obj.Placement = shape.Placement
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Rotation {obj.Label} {e}\n")
-            raise
+        # - Copy and rotate object
+        shape = obj.Source.Shape.copy()
+        shape.rotate(App.Vector(0.0, obj.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
+        
+        # - Assign new shape
+        obj.Shape     = shape
+        obj.Placement = shape.Placement
 
 class RotationVP(FoamCutViewProviders.FoamCutBaseViewProvider):   
     def getIcon(self):
@@ -89,6 +85,7 @@ class AddRotation():
             
             source = Gui.Selection.getSelectionEx()[0].Object      
             rt = None
+            label = ""
             try:
                 # - Create rotation object
                 rt = doc.addObject("Part::FeaturePython", "Rotation")
@@ -100,10 +97,12 @@ class AddRotation():
                 Gui.Selection.clearSelection()
                 doc.recompute()
                 Gui.Selection.addSelection(doc.Name, rt.Name)
-            except Exception as e:
-                FreeCAD.Console.PrintError(f"Failed to create Rotation.\n")
-                if rt is not None:
-                    doc.removeObject(rt.Name)    
+            except Exception as error:
+                App.Console.PrintError(f"Failed to create Rotation.\n")
+                if rt:
+                    label = f"{rt.Label}: "
+                    doc.removeObject(rt.Name)
+                App.Console.PrintError(f"{label}{error}\n")
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

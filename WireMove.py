@@ -34,32 +34,27 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         obj.Proxy = self
         self.execute(obj)
 
-    def execute(self, obj):        
-        try:
+    def execute(self, obj):       
+        start_vertex = obj.StartPoint[0].getSubObject(obj.StartPoint[1][0])
+        if start_vertex is None:
+            raise Exception("Unable to locate start point vertex.")
 
-            start_vertex = obj.StartPoint[0].getSubObject(obj.StartPoint[1][0])
-            if start_vertex is None:
-                raise Exception(f"ERROR:\n Unable to locate start point vertex.\n")
-
-            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
+        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
+        
+        if oppositeVertex is None:
+            raise Exception("Unable to locate opposite vertex.")
             
-            if oppositeVertex is None:
-                raise Exception(f"ERROR:\n Unable to locate opposite vertex.\n")
-                
-            edges = []
+        edges = []
 
-            if isCommonPoint(vertex, oppositeVertex):
-                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point))
-            else:
-                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if isLeft                      \
-                    else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
-                edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if not isLeft                  \
-                    else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
-            
-            self.createShape(obj, edges, wp, (35, 169, 205))
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Move {obj.Label} {e}\n")
-            raise
+        if isCommonPoint(vertex, oppositeVertex):
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point))
+        else:
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if isLeft                      \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
+            edges.append(Part.makeLine(App.Vector(vertex.X, vertex.Y + float(obj.MoveX), vertex.Z + float(obj.MoveY)), vertex.Point) if not isLeft                  \
+                else Part.makeLine(App.Vector(oppositeVertex.X, oppositeVertex.Y + float(obj.MoveX), oppositeVertex.Z + float(obj.MoveY)), oppositeVertex.Point))
+        
+        self.createShape(obj, edges, wp, (35, 169, 205))
 
 class WireMoveVP(FoamCutViewProviders.FoamCutMovementViewProvider):     
     def getIcon(self):
@@ -96,6 +91,7 @@ class MakeMove():
             objects = getAllSelectedObjects()
             
             move = None
+            label = ""
             try:
                 # - Create object
                 move = doc.addObject("Part::FeaturePython", "Move")
@@ -109,10 +105,12 @@ class MakeMove():
                 doc.recompute()
                 Gui.Selection.addSelection(doc.Name, move.Name)
                 
-            except Exception as e:                
-                FreeCAD.Console.PrintError(f"Failed to create Move.\n")
-                if move is not None:
-                    doc.removeObject(move.Name) 
+            except Exception as error:                
+                App.Console.PrintError(f"Failed to create Move.\n")
+                if move:
+                    label = f"{move.Label}: "
+                    doc.removeObject(move.Name)
+                App.Console.PrintError(f"{label}{error}\n")
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

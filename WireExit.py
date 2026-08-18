@@ -41,70 +41,66 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj): 
-        try:
-            if obj.SafeHeight > 0:
-                # parent object of entry point should be one of FoanCutMovementBaseObject, 
-                # otherwise we can't determine opposite vertex and working plane
-                lastObj : FoamCutBase.FoamCutMovementBaseObject = obj.ExitPoint[0]
+        if obj.SafeHeight > 0:
+            # parent object of entry point should be one of FoanCutMovementBaseObject, 
+            # otherwise we can't determine opposite vertex and working plane
+            lastObj : FoamCutBase.FoamCutMovementBaseObject = obj.ExitPoint[0]
+            
+            exitVertex = lastObj.getSubObject(obj.ExitPoint[1][0])
+            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, lastObj, exitVertex)
+
+            if oppositeVertex is None:
+                raise Exception("Unable to locate opposite vertex.")
                 
-                exitVertex = lastObj.getSubObject(obj.ExitPoint[1][0])
-                (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, lastObj, exitVertex)
+            edges = []
 
-                if oppositeVertex is None:
-                    raise Exception(f"ERROR: Unable to locate opposite vertex.\n")
-                    
-                edges = []
-
-                if isCommonPoint(vertex, oppositeVertex):
-                    exit = vertex.Point
+            if isCommonPoint(vertex, oppositeVertex):
+                exit = vertex.Point
+                obj.ExitPointL = obj.ExitPointR = exit
+                if obj.LeadOutEnabled:
+                    exit = App.Vector(vertex.X, vertex.Y + float(obj.LeadOutX), vertex.Z + float(obj.LeadOutY))
+                    edges.append(Part.makeLine(vertex.Point, exit))
                     obj.ExitPointL = obj.ExitPointR = exit
-                    if obj.LeadOutEnabled:
-                        exit = App.Vector(vertex.X, vertex.Y + float(obj.LeadOutX), vertex.Z + float(obj.LeadOutY))
-                        edges.append(Part.makeLine(vertex.Point, exit))
-                        obj.ExitPointL = obj.ExitPointR = exit
-                    else:
-                        edges.append(Part.Vertex(exit))
                 else:
-                    exit = vertex.Point
-                    exitOpposite = oppositeVertex.Point
-                    if not isLeft:
-                        exit = oppositeVertex.Point
-                        exitOpposite = vertex.Point
+                    edges.append(Part.Vertex(exit))
+            else:
+                exit = vertex.Point
+                exitOpposite = oppositeVertex.Point
+                if not isLeft:
+                    exit = oppositeVertex.Point
+                    exitOpposite = vertex.Point
 
-                    obj.ExitPointL = exit
-                    obj.ExitPointR = exitOpposite
+                obj.ExitPointL = exit
+                obj.ExitPointR = exitOpposite
 
-                    # - if lead-out enabled, calculate lead-out point and add line to exit point
-                    if obj.LeadOutEnabled:
-                        leftLen = getParallelEdgeLength(lastObj, exit.x)
-                        rightLen = getParallelEdgeLength(lastObj, exitOpposite.x)
+                # - if lead-out enabled, calculate lead-out point and add line to exit point
+                if obj.LeadOutEnabled:
+                    leftLen = getParallelEdgeLength(lastObj, exit.x)
+                    rightLen = getParallelEdgeLength(lastObj, exitOpposite.x)
 
-                        # Determine nominal (long) side
-                        leftIsNominal = leftLen >= rightLen
+                    # Determine nominal (long) side
+                    leftIsNominal = leftLen >= rightLen
 
-                        # Avoid division by zero
-                        if leftLen > 0 and rightLen > 0:
-                            leftScale  = 1.0 if leftIsNominal else leftLen / rightLen
-                            rightScale = 1.0 if not leftIsNominal else rightLen / leftLen
-                        else:
-                            leftScale = rightScale = 1.0
-
-                        exitLead = exit + App.Vector(0.0, float(obj.LeadOutX) * leftScale, float(obj.LeadOutY) * leftScale)
-                        oppLead   = exitOpposite + App.Vector(0.0, float(obj.LeadOutX) * rightScale, float(obj.LeadOutY) * rightScale)
-
-                        edges.append(Part.makeLine(exit, exitLead))
-                        edges.append(Part.makeLine(exitOpposite, oppLead))
-                        obj.ExitPointL = exitLead
-                        obj.ExitPointR = oppLead
+                    # Avoid division by zero
+                    if leftLen > 0 and rightLen > 0:
+                        leftScale  = 1.0 if leftIsNominal else leftLen / rightLen
+                        rightScale = 1.0 if not leftIsNominal else rightLen / leftLen
                     else:
-                        # - exit pathes from exit point to safeHeight
-                        edges.append(Part.Vertex(exit))
-                        edges.append(Part.Vertex(exitOpposite))
-                        
-                self.createShape(obj, edges, wp, (255, 0, 0))
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Exit {obj.Label} {e}\n")
-            raise
+                        leftScale = rightScale = 1.0
+
+                    exitLead = exit + App.Vector(0.0, float(obj.LeadOutX) * leftScale, float(obj.LeadOutY) * leftScale)
+                    oppLead   = exitOpposite + App.Vector(0.0, float(obj.LeadOutX) * rightScale, float(obj.LeadOutY) * rightScale)
+
+                    edges.append(Part.makeLine(exit, exitLead))
+                    edges.append(Part.makeLine(exitOpposite, oppLead))
+                    obj.ExitPointL = exitLead
+                    obj.ExitPointR = oppLead
+                else:
+                    # - exit pathes from exit point to safeHeight
+                    edges.append(Part.Vertex(exit))
+                    edges.append(Part.Vertex(exitOpposite))
+                    
+            self.createShape(obj, edges, wp, (255, 0, 0))
 
     def onDocumentRestored(self, obj):
         super().onDocumentRestored(obj)
@@ -203,6 +199,7 @@ class MakeExit():
             objects = getAllSelectedObjects()
             
             exit = None
+            label = ""
             try:
                 # - Create object
                 exit = doc.addObject("Part::FeaturePython", "Exit")
@@ -216,10 +213,12 @@ class MakeExit():
                 Gui.Selection.addSelection(doc.Name, exit.Name)
                 
                 doc.recompute()
-            except Exception as e:
-                FreeCAD.Console.PrintError(f"Failed to create exit.\n")
-                if exit is not None:
-                    doc.removeObject(exit.Name) 
+            except Exception as error:
+                App.Console.PrintError(f"Failed to create Exit.\n")
+                if exit:
+                    label = f"{exit.Label}: "
+                    doc.removeObject(exit.Name)
+                App.Console.PrintError(f"{label}{error}\n")
 
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

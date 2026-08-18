@@ -28,20 +28,16 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj): 
-        try:
-            job = obj.Document.getObject(obj.JobName)
-            if job is None or job.Type != "Job":
-                raise Exception(f"ERROR: Active Job not found\n")
+        job = obj.Document.getObject(obj.JobName)
+        if job is None or job.Type != "Job":
+            raise Exception("Active Job not found.")
 
-            wp = getWorkingPlanes(job, obj.Document)
+        wp = getWorkingPlanes(job, obj.Document)
+    
+        leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
+        rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
         
-            leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
-            rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])
-            
-            self.createShape(obj, [leftEdge, rightEdge], wp, (0, 0, 0))
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Path {obj.Label} {e}\n")
-            raise
+        self.createShape(obj, [leftEdge, rightEdge], wp, (0, 0, 0))
 
 class PathSectionVP(FoamCutViewProviders.FoamCutMovementViewProvider): 
     
@@ -65,6 +61,7 @@ class MakePath():
 
     def CreateFromEdges(self, edges, group):
         path = None
+        label = ""
         try:
             path = group.newObject("Part::FeaturePython","Path")
                 
@@ -74,10 +71,12 @@ class MakePath():
                         group.Name)
             PathSectionVP(path.ViewObject)
             path.ViewObject.PointSize = 4
-        except Exception as e:                
-            FreeCAD.Console.PrintError(f"Failed to create path.\n")
-            if path is not None:
-                path.Document.removeObject(path.Name) 
+        except Exception as error:
+            App.Console.PrintError(f"Failed to create Path.\n")
+            if path:
+                label = f"{path.Label}: "
+                path.Document.removeObject(path.Name)
+            App.Console.PrintError(f"{label}{error}\n")
 
     def FindOppositeEdgeIndex(self, edge, edges_r, skipIndex=None):
         """

@@ -29,24 +29,20 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
-        try:
-            job = obj.Document.getObject(obj.JobName)
-            if job is None or job.Type != "Job":
-                raise Exception(f"ERROR: Active Job not found\n")
+        job = obj.Document.getObject(obj.JobName)
+        if job is None or job.Type != "Job":
+            raise Exception("Active Job not found.")
 
-            # - Get working planes
-            wp = getWorkingPlanes(job, obj.Document)
-            
-            if wp is None or len(wp) != 2:
-                label = job.Label if job is not None else "None"
-                raise Exception(f"ERROR: Working planes not found in Parent object '{label}'\n")
+        # - Get working planes
+        wp = getWorkingPlanes(job, obj.Document)
+        
+        if wp is None or len(wp) != 2:
+            label = job.Label if job is not None else "None"
+            raise Exception(f"Working planes not found in Parent object '{label}'.")
 
-            source = obj.Source[0].getSubObject(obj.Source[1])[0]
+        source = obj.Source[0].getSubObject(obj.Source[1])[0]
 
-            self.createShape(obj, [source], wp, (0, 0, 0))
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Projection {obj.Label} {e}\n")
-            raise   
+        self.createShape(obj, [source], wp, (0, 0, 0))
 
 class ProjectionSectionVP(FoamCutViewProviders.FoamCutMovementViewProvider):     
     def getIcon(self):
@@ -68,16 +64,19 @@ class MakeProjection():
 
     def CreateFromEdge(self, edge, group):
         projection = None
+        label = ""
         try:
             projection = group.newObject("Part::FeaturePython","Projection")
                 
             ProjectionSection(projection, (edge[0], (edge)[1][0]), group.Name)
             ProjectionSectionVP(projection.ViewObject)
             projection.ViewObject.PointSize = 4
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Failed to create projection from edge {edge[0].Name}\n")
-            if projection is not None:
-                projection.Document.removeObject(projection.Name)    
+        except Exception as error:
+            App.Console.PrintError(f"Failed to create Projection.\n")
+            if projection:
+                label = f"{projection.Label}: "
+                projection.Document.removeObject(projection.Name)
+            App.Console.PrintError(f"{label}{error}\n")
 
     def Activated(self):
         group = Gui.ActiveDocument.ActiveView.getActiveObject("group")

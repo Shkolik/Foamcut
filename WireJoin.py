@@ -38,39 +38,35 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         self.execute(obj)
 
     def execute(self, obj):
-        try:
-            start_vertex = obj.StartPoint[0].getSubObject(obj.StartPoint[1][0])
-            if start_vertex is None:
-                raise Exception(f"ERROR: Unable to locate start point vertex.\n")
+        start_vertex = obj.StartPoint[0].getSubObject(obj.StartPoint[1][0])
+        if start_vertex is None:
+            raise Exception("Unable to locate start point vertex.")
 
-            end_vertex = obj.EndPoint[0].getSubObject(obj.EndPoint[1][0])
-            if end_vertex is None:
-                raise Exception(f"ERROR: Unable to locate end point vertex.\n")
+        end_vertex = obj.EndPoint[0].getSubObject(obj.EndPoint[1][0])
+        if end_vertex is None:
+            raise Exception("Unable to locate end point vertex.")
 
-            (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
-            (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], end_vertex)
+        (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
+        (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], end_vertex)
 
-            if oppositeVertexA is None:
-                raise Exception(f"ERROR: Unable to locate opposite vertex for the start point.\n")
+        if oppositeVertexA is None:
+            raise Exception("Unable to locate opposite vertex for the start point.")
 
-            if oppositeVertexB is None:
-                raise Exception(f"ERROR: Unable to locate opposite vertex for the end point.\n")
+        if oppositeVertexB is None:
+            raise Exception("Unable to locate opposite vertex for the end point.")
 
-            if isLeftA != isLeftB:
-                raise Exception(f"ERROR: Start and End points should be on one side.\n")
+        if isLeftA != isLeftB:
+            raise Exception("Start and End points should be on one side.")
 
-            edges = []
+        edges = []
 
-            if isCommonPoint(vertexA, oppositeVertexA):
-                edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
-            else:
-                edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
-                edges.append(Part.makeLine(oppositeVertexA.Point, oppositeVertexB.Point))
-            
-            self.createShape(obj, edges, wp, (35, 0, 205))
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Join {obj.Label} {e}\n")
-            raise
+        if isCommonPoint(vertexA, oppositeVertexA):
+            edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
+        else:
+            edges.append(Part.makeLine(vertexA.Point, vertexB.Point))
+            edges.append(Part.makeLine(oppositeVertexA.Point, oppositeVertexB.Point))
+        
+        self.createShape(obj, edges, wp, (35, 0, 205))
 
 class WireJoinVP(FoamCutViewProviders.FoamCutMovementViewProvider):
     def getIcon(self):
@@ -110,6 +106,7 @@ class MakeJoin():
             objects = getAllSelectedObjects()
             
             join = None
+            label = ""
             try:
                 # - Create object
                 join = doc.addObject("Part::FeaturePython", "Join")
@@ -120,10 +117,12 @@ class MakeJoin():
                 group.addObject(join)
                 Gui.Selection.clearSelection()
                 doc.recompute()
-            except Exception as e:                
-                FreeCAD.Console.PrintError(f"Failed to create entry.\n")
-                if join is not None:
-                    doc.removeObject(join.Name)   
+            except Exception as error:
+                App.Console.PrintError(f"Failed to create Join.\n")
+                if join:
+                    label = f"{join.Label}: "
+                    doc.removeObject(join.Name)
+                App.Console.PrintError(f"{label}{error}\n")
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

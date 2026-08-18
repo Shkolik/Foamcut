@@ -81,72 +81,68 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
             obj.setEditorMode("LeadInY", 0 if obj.LeadInEnabled else 3)
 
     def execute(self, obj):  
-        try:
-            if obj.SafeHeight > 0:
-                # parent object of entry point should be one of FoanCutMovementBaseObject, 
-                # otherwise we can't determine opposite vertex and working plane
-                nextObj : FoamCutBase.FoamCutMovementBaseObject = obj.EntryPoint[0]
+        if obj.SafeHeight > 0:
+            # parent object of entry point should be one of FoanCutMovementBaseObject, 
+            # otherwise we can't determine opposite vertex and working plane
+            nextObj : FoamCutBase.FoamCutMovementBaseObject = obj.EntryPoint[0]
 
-                entryVertex = nextObj.getSubObject(obj.EntryPoint[1][0])
-                (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, nextObj, entryVertex)
+            entryVertex = nextObj.getSubObject(obj.EntryPoint[1][0])
+            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, nextObj, entryVertex)
 
-                if oppositeVertex is None:
-                    raise Exception(f"ERROR: Unable to locate opposite vertex.\n")
+            if oppositeVertex is None:
+                raise Exception("Unable to locate opposite vertex.")
 
-                edges = []
+            edges = []
 
-                if isCommonPoint(vertex, oppositeVertex):
-                    entry = vertex.Point
+            if isCommonPoint(vertex, oppositeVertex):
+                entry = vertex.Point
+                obj.EntryPointL = obj.EntryPointR = entry
+
+                if obj.LeadInEnabled:
+                    entry = App.Vector(vertex.X, vertex.Y + float(obj.LeadInX), vertex.Z + float(obj.LeadInY))
+                    edges.append(Part.makeLine(entry, vertex.Point))
                     obj.EntryPointL = obj.EntryPointR = entry
-
-                    if obj.LeadInEnabled:
-                        entry = App.Vector(vertex.X, vertex.Y + float(obj.LeadInX), vertex.Z + float(obj.LeadInY))
-                        edges.append(Part.makeLine(entry, vertex.Point))
-                        obj.EntryPointL = obj.EntryPointR = entry
-                    else:
-                        edges.append(Part.Vertex(entry))
                 else:
-                    entry = vertex.Point
-                    entryOpposite = oppositeVertex.Point
-                    if not isLeft:
-                        entry = oppositeVertex.Point
-                        entryOpposite = vertex.Point
+                    edges.append(Part.Vertex(entry))
+            else:
+                entry = vertex.Point
+                entryOpposite = oppositeVertex.Point
+                if not isLeft:
+                    entry = oppositeVertex.Point
+                    entryOpposite = vertex.Point
 
-                    obj.EntryPointL = entry
-                    obj.EntryPointR = entryOpposite
+                obj.EntryPointL = entry
+                obj.EntryPointR = entryOpposite
 
-                    # - if lead-in enabled, calculate lead-in point and add line to entry point
-                    if obj.LeadInEnabled:
-                        leftLen = getParallelEdgeLength(nextObj, entry.x)
-                        rightLen = getParallelEdgeLength(nextObj, entryOpposite.x)
-        
-                        # Determine nominal (long) side
-                        leftIsNominal = leftLen >= rightLen
+                # - if lead-in enabled, calculate lead-in point and add line to entry point
+                if obj.LeadInEnabled:
+                    leftLen = getParallelEdgeLength(nextObj, entry.x)
+                    rightLen = getParallelEdgeLength(nextObj, entryOpposite.x)
+    
+                    # Determine nominal (long) side
+                    leftIsNominal = leftLen >= rightLen
 
-                        # Avoid division by zero
-                        if leftLen > 0 and rightLen > 0:
-                            leftScale  = 1.0 if leftIsNominal else leftLen / rightLen
-                            rightScale = 1.0 if not leftIsNominal else rightLen / leftLen                        
-                        else:
-                            leftScale = rightScale = 1.0
-
-                        entryLead = entry + App.Vector(0.0, float(obj.LeadInX) * leftScale, float(obj.LeadInY) * leftScale)
-                        oppLead   = entryOpposite + App.Vector(0.0, float(obj.LeadInX) * rightScale, float(obj.LeadInY) * rightScale)
-
-                        edges.append(Part.makeLine(entryLead, entry))
-                        edges.append(Part.makeLine(oppLead, entryOpposite))
-
-                        obj.EntryPointL = entryLead
-                        obj.EntryPointR = oppLead
+                    # Avoid division by zero
+                    if leftLen > 0 and rightLen > 0:
+                        leftScale  = 1.0 if leftIsNominal else leftLen / rightLen
+                        rightScale = 1.0 if not leftIsNominal else rightLen / leftLen                        
                     else:
-                        # - enter pathes from safeHeight to the entry point
-                        edges.append(Part.Vertex(entry))
-                        edges.append(Part.Vertex(entryOpposite))
-                    
-                self.createShape(obj, edges, wp, (0, 255, 0))
-        except Exception as e:
-            FreeCAD.Console.PrintError(f"Enter {obj.Label} {e}\n")
-            raise
+                        leftScale = rightScale = 1.0
+
+                    entryLead = entry + App.Vector(0.0, float(obj.LeadInX) * leftScale, float(obj.LeadInY) * leftScale)
+                    oppLead   = entryOpposite + App.Vector(0.0, float(obj.LeadInX) * rightScale, float(obj.LeadInY) * rightScale)
+
+                    edges.append(Part.makeLine(entryLead, entry))
+                    edges.append(Part.makeLine(oppLead, entryOpposite))
+
+                    obj.EntryPointL = entryLead
+                    obj.EntryPointR = oppLead
+                else:
+                    # - enter pathes from safeHeight to the entry point
+                    edges.append(Part.Vertex(entry))
+                    edges.append(Part.Vertex(entryOpposite))
+                
+            self.createShape(obj, edges, wp, (0, 255, 0))
 
     def getAdditionalShapes(self, obj):
         '''
@@ -209,6 +205,7 @@ class MakeEnter():
             objects = getAllSelectedObjects()
             
             enter = None
+            label = ""
             try:
                 # - Create object
                 enter = doc.addObject("Part::FeaturePython", "Enter")
@@ -222,10 +219,12 @@ class MakeEnter():
                 Gui.Selection.addSelection(doc.Name, enter.Name)
                 
                 doc.recompute()
-            except Exception as e:                
-                FreeCAD.Console.PrintError(f"Failed to create entry.\n")
-                if enter is not None:
-                    doc.removeObject(enter.Name)    
+            except Exception as error:
+                App.Console.PrintError(f"Failed to create Enter.\n")
+                if enter:
+                    label = f"{enter.Label}: "
+                    doc.removeObject(enter.Name)
+                App.Console.PrintError(f"{label}{error}\n")
     
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:

@@ -5,11 +5,11 @@
 - configuration setup panel
 - projection produced by selecting face - DONE
 - paths produced by selecting face - DONE
-- G93 mode - nothing to do here (well... maybe...)
+- G93 mode - DONE
 - mirroring gcode tool - DONE
 - path by vertex and edge - Done
 - projection to the working plane - DONE
 - toggle projection lines - DONE
 - package.xml - DONE
 - video tutorial
-- examples
+- examples - DONE

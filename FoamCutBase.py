@@ -141,8 +141,8 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         wp = getWorkingPlanes(job, doc)
 
         # check if selected vertex laying on any working plane
-        onLeftPlane = wp[0].Shape.isInside(vertex.Point, 0.01, True)
-        onRightPlane = wp[1].Shape.isInside(vertex.Point, 0.01, True)
+        onLeftPlane = isclose(wp[0].Position.x, vertex.Point.x, abs_tol=1e-7)
+        onRightPlane = isclose(wp[1].Position.x, vertex.Point.x, abs_tol=1e-7)
         onPlane = onLeftPlane or onRightPlane
 
         isLeft = False

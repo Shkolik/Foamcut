@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 - Route validation, offset, path from faces, face projection and intersectLineAndPlane hardening
 - Dynamic wire power and config lookup hardening
 - Restrict to one setup per document
-- Error handling on opposite vertex lookup; print replaced with PrintMessage
+- More robust error handling on all objects
 - Tooltip and misleading UI fixes
 - New default config values
 

@@ -881,6 +881,7 @@ class MakeRoute():
             objects = [item.Object for item in Gui.Selection.getSelectionEx()]
             
             route = None
+            label = ""
             try:
                 # - Create object
                 route = group.newObject("App::FeaturePython", "Route")
@@ -894,12 +895,10 @@ class MakeRoute():
                 doc.recompute()
                 Gui.Selection.clearSelection()
             except Exception as error:
-                App.Console.PrintError(f"Failed to create route.\n")
+                App.Console.PrintError(f"Failed to create Route.\n")
                 if route:
                     label = f"{route.Label}: "
                     doc.removeObject(route.Name)
-                else:
-                    label = ""
                 App.Console.PrintError(f"{label}{error}\n")
 
     def IsActive(self):
