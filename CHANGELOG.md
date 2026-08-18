@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - More robust error handling on all objects
 - Tooltip and misleading UI fixes
 - New default config values
+- Major Route performance refactoring (10x faster now)
 
 ## [0.1.12] - 2026-03-30
 

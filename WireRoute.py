@@ -190,7 +190,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.setExpression(".CompensationDegree", u"<<{}>>.CompensationDegree".format(config))
         
         obj.Proxy = self
-        self.execute(obj)
+        #self.execute(obj)
     
     def onDocumentRestored(self, obj):
         touched = False

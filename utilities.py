@@ -667,6 +667,63 @@ def intersectWires(wire1, wire2, tolerance = 1e-4):
                 else:
                     return (intPoint, "extend", "extend")
 
+def _pointSegmentDistanceSq(point, a, b):
+    '''
+    Squared distance from point to segment [a, b].
+    '''
+    ab = b.sub(a)
+    length_sq = ab.Length * ab.Length
+    if length_sq == 0.0:
+        d = point.sub(a)
+        return d.Length * d.Length
+
+    t = ((point.x - a.x) * ab.x + (point.y - a.y) * ab.y + (point.z - a.z) * ab.z) / length_sq
+    t = max(0.0, min(1.0, t))
+
+    px = a.x + t * ab.x
+    py = a.y + t * ab.y
+    pz = a.z + t * ab.z
+
+    dx = point.x - px
+    dy = point.y - py
+    dz = point.z - pz
+    return dx * dx + dy * dy + dz * dz
+
+
+def findTrimEdgeIndex(wire, point, tolerance=1e-4):
+    '''
+    Find index of the edge in wire where point is located.
+
+    Uses fast point-to-segment scan; falls back to OCC distToShape
+    when the point is not on the wire within tolerance.
+
+    Tie-break: for points within tolerance of a shared vertex the strict
+    '<' scan returns the lower edge index, which yields identical trim
+    output to the OCC distToShape choice.
+    The fast scan measures distance to vertex-to-vertex chords, valid for
+    the straight-segment polylines this function is used on; points
+    deviating > tolerance from the wire fall back to OCC distToShape.
+    '''
+    verts = wire.Vertexes
+    best_idx = -1
+    best_dist_sq = float("inf")
+    for i in range(len(verts) - 1):
+        d = _pointSegmentDistanceSq(point, verts[i].Point, verts[i + 1].Point)
+        if d < best_dist_sq:
+            best_dist_sq = d
+            best_idx = i
+
+    if best_idx >= 0 and best_dist_sq <= tolerance * tolerance:
+        return best_idx
+
+    vertex = Part.Vertex(point)
+    (_, _, infos) = vertex.distToShape(wire)
+    (_, _, _, topo2, index2, _) = infos[0]
+    if topo2 != "Edge":
+        raise Exception("Trim expected intersection on edge.")
+    return index2
+
+
 def trimOrExtendWire(wire, point, mode, side):
     '''
     Extend/Trim wire to the point of intersection
@@ -680,17 +737,11 @@ def trimOrExtendWire(wire, point, mode, side):
     if mode == "none":
         return wire
     elif mode == "trim":
-        vertex = Part.Vertex(point)
-        (_, _, infos) = vertex.distToShape(wire)
-        (_, _, _, topo2, index2, _) = infos[0]
-
-        if topo2 != "Edge":            
-            raise Exception("Trim expected intersection on edge.")
-    
+        index = findTrimEdgeIndex(wire, point)
         if side == "start":
-            return trimWireStart(wire, index2, point)
+            return trimWireStart(wire, index, point)
         else:
-            return trimWireEnd(wire, index2, point)
+            return trimWireEnd(wire, index, point)
         
     elif mode == "extend":
         if side == "start":
@@ -735,15 +786,16 @@ def trimWireEnd(wire, index, point):
     @param point - coordinates of trim point
     @return new wire, where point is it's last vertex
     '''
+    all_edges = wire.Edges
     # no edges to trim - create new one from wire start point and point of intersection
     if index == 0:
-        return Part.Wire(Part.LineSegment(wire.Edges[0].firstVertex().Point, point).toShape())
+        return Part.Wire(Part.LineSegment(all_edges[0].firstVertex().Point, point).toShape())
     
-    edges = [wire.Edges[edge] for edge in range(0, index)]
-    if not wire.Edges[index - 1].lastVertex().Point.isEqual(point, 1e-7):
-        edges.append(Part.LineSegment(wire.Edges[index - 1].lastVertex().Point, point).toShape())
+    edges = [all_edges[edge] for edge in range(0, index)]
+    if not all_edges[index - 1].lastVertex().Point.isEqual(point, 1e-7):
+        edges.append(Part.LineSegment(all_edges[index - 1].lastVertex().Point, point).toShape())
     return Part.Wire(edges)
-    
+
 def trimWireStart(wire, index, point):
     '''
     trim wire at specified point from the start
@@ -752,13 +804,14 @@ def trimWireStart(wire, index, point):
     @param point - coordinates of trim point
     @return new wire, where point is it's first vertex
     '''
+    all_edges = wire.Edges
     # last segment, create new one        
-    if index == len(wire.Edges) - 1:
-        return Part.Wire(Part.LineSegment(point, wire.Edges[-1].lastVertex().Point).toShape())
+    if index == len(all_edges) - 1:
+        return Part.Wire(Part.LineSegment(point, all_edges[-1].lastVertex().Point).toShape())
 
-    edges = [wire.Edges[edge] for edge in range(index + 1, len(wire.Edges))]
-    if not point.isEqual(wire.Edges[index].lastVertex().Point, 1e-7):
-        edges.insert(0, Part.LineSegment(point, wire.Edges[index].lastVertex().Point).toShape())
+    edges = [all_edges[edge] for edge in range(index + 1, len(all_edges))]
+    if not point.isEqual(all_edges[index].lastVertex().Point, 1e-7):
+        edges.insert(0, Part.LineSegment(point, all_edges[index].lastVertex().Point).toShape())
     return Part.Wire(edges)
 
 
