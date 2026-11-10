@@ -3,6 +3,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-11-11
+
+### Fixed
+
+- Route postprocessor: shifted points/move types, lost route endpoint and rapid moves into foam on Enter/Exit routes
+- Route: duplicate Exit end point when lead-out is enabled
+
 ## [0.2.0] - 2026-08-20
 
 ### Notes

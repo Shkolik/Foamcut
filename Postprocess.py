@@ -303,6 +303,55 @@ class Postprocess():
         return wirePowerCommand
     
     '''
+    Number of flattened route points consumed by one movement object.
+    
+    @param object - movement object from route.Objects
+    @param first - True when this is the first movement of the route
+    '''
+    def _points_count_for_object(self, object, first):
+        if object.Type == "Enter":
+            return object.PointsCount + 1
+        if object.Type == "Exit":
+            return object.PointsCount
+        return object.PointsCount if first else object.PointsCount - 1
+
+    '''
+    Expected total number of points in route.Offset_L / Offset_R
+    '''
+    def _expected_route_points(self, route):
+        count = 0
+        for i in range(len(route.Data)):
+            object = route.Objects[route.Data[i]]
+            if object.Type == "Rotation":
+                continue
+            count += self._points_count_for_object(object, count == 0)
+        return count
+
+    '''
+    Recompute routes saved with the previous (duplicate Exit point) layout.
+    
+    Route point layout changed together with the Postprocessor accounting. Older
+    documents keep their stale Offset_L/Offset_R until the Route is touched, so
+    refresh only when the stored length no longer matches the current builder.
+    '''
+    def _refresh_route_points(self, route):
+        expected = self._expected_route_points(route)
+        if len(route.Offset_L) == expected and len(route.Offset_R) == expected:
+            return
+
+        doc = getattr(route, "Document", None)
+        if doc is not None and hasattr(route, "touch"):
+            route.touch()
+            doc.recompute()
+
+        expected = self._expected_route_points(route)
+        if len(route.Offset_L) != expected or len(route.Offset_R) != expected:
+            raise Exception(
+                "ERROR: Route [{}] point data is out of date: {} points stored, {} expected. "
+                "Recompute the route and try again.".format(
+                    route.Label, len(route.Offset_L), expected))
+
+    '''
     Generate GCODE from route
     '''
     def makeGCODE(self, route_list, config):
@@ -310,6 +359,10 @@ class Postprocess():
         # - Task GCODE buffer
         TASK += self.makeCommentedLine(config, "*** TASK BLOCK ***") + "\n"
         start_point = None
+
+        # - Refresh routes created before the Exit point layout was fixed
+        for route in route_list:
+            self._refresh_route_points(route)
 
         # find first point for start block
         for route in route_list:
@@ -345,11 +398,7 @@ class Postprocess():
                     TASK += "G93\n"
                     self._g93_emitted = True
             
-            # Exit-ful routes balance with the original full-count first command
-            # (including its Enter lead-in point); only Exit-less routes overrun by one.
-            has_exit = any(route.Objects[route.Data[i]].Type == "Exit" for i in range(len(route.Data)))
-
-            for i in range(len(route.Data)):                                
+            for i in range(len(route.Data)):
                 # - Access item
                 object_index = route.Data[i]
                 object = route.Objects[object_index]
@@ -370,36 +419,45 @@ class Postprocess():
                     TASK += "\n"
                     TASK += self.makeCommentedLine(config, "- {} [{}]".format(object.Type, object.Label)) + "\n"
 
-                    # first command of the route: its end point is shared with the next command
-                    # and is appended as part of that command, so consume PointsCount-1 here
-                    # (Enter keeps the full PointsCount - its plunge-down point is appended).
-                    points_count = object.PointsCount if ( i == len(route.Data) - 1 or object.Type == "Exit" or (i == 0 and (object.Type == "Enter" or has_exit)) ) \
-                        else object.PointsCount - 1
-                    
-                    if object.Type == "Enter" and object.LeadInEnabled and (has_exit or i != 0):
-                        points_count += 1
-
-                    if object.Type == "Exit" and object.LeadOutEnabled:
-                        points_count += 1
+                    # Route.Offset_L is a continuous polyline:
+                    # - each object's start point is shared with the previous object;
+                    # - Enter prepends a synthetic plunge-down point and leaves its
+                    #   last path point for the next object, so it consumes P + 1;
+                    # - Exit keeps all of its path points and appends its plunge-up,
+                    #   so it consumes P;
+                    # - the first movement object also consumes the route-begin
+                    #   target point, later movement objects consume P - 1.
+                    # Points and move types must advance together; do not derive
+                    # this from LEAD flags alone.
+                    points_count = self._points_count_for_object(object, point_index == 0)
 
                     # - Step over each point
+                    safe_height = float(object.SafeHeight) if hasattr(object, "SafeHeight") else None
                     for p_idx in range(points_count):
-                        allowRapid = True
-
-                        # for enter and exit allow rapid move only for the last segment
-                        # lead-in and lead-out should be normal move to keep wire powered and prevent breakage
-                        if p_idx != points_count - 1 and object.Type == "Exit" and object.LeadOutEnabled:
-                            allowRapid = False
-
-                        if p_idx > 1 and object.Type == "Enter" and object.LeadInEnabled:
-                            allowRapid = False
-
                         point_l = route.Offset_L[point_index]
                         point_r = route.Offset_R[point_index]
 
+                        at_safe_height = safe_height is not None \
+                            and point_l.z >= safe_height - 1e-6 \
+                            and point_r.z >= safe_height - 1e-6
+
+                        allowRapid = True
+                        forceRapid = False
+
+                        if object.Type == "Enter":
+                            # The first Enter point is the synthetic plunge-down
+                            # start. It is either the route-begin target or the
+                            # Exit->Enter travel, both performed at safe height.
+                            allowRapid = p_idx == 0 and at_safe_height
+                            forceRapid = allowRapid
+                        elif object.Type == "Exit":
+                            # Lead-out and plunge-up must not be rapid cuts; only
+                            # the final point (already at safe height) may be rapid.
+                            allowRapid = p_idx == points_count - 1 and at_safe_height
+
                         wirePowerCommand = self.getDynamicWirePowerCommand(point_l, point_r, power, config)
 
-                        if isRapid and allowRapid:
+                        if (isRapid or forceRapid) and allowRapid:
                             # - Generate rapid travel command
                             TASK += self.generateRapidTravel(config, point_l.y, point_l.z, point_r.y, point_r.z)
                         else:

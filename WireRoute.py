@@ -451,9 +451,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             if object.Type == "Enter" and object.LeadInEnabled:
                 pointsCount += 1
 
-            if object.Type == "Exit" and object.LeadOutEnabled:
-                pointsCount += 1
-
             currentEdge.DataIdx = i
             currentEdge.ObjectType = object.Type
             currentEdge.PointsCount = pointsCount
