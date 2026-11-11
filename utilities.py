@@ -20,7 +20,7 @@ END         = -1          # - Segment end point index
 LEFT = -1
 RIGHT = 1
 
-FC_TYPES = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join", "Route", "Job", "Helper"]
+FC_TYPES = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join", "Route", "RouteClone", "Job", "Helper"]
 FC_TYPES_TO_ROUTE = ["Path", "Projection", "Rotation", "Enter", "Exit", "Move", "Join"]
 
 FC_KERF_DIRECTIONS = ["Normal", "None", "Reversed"]

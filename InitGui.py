@@ -30,6 +30,7 @@ class FoamcutWB (Workbench):
         import WireJoin
         import Rotate
         import WireRoute
+        import RouteCloneGui
         import Postprocess
         import MirrorGcode
         import WireProjection
@@ -45,6 +46,7 @@ class FoamcutWB (Workbench):
             "Join", 
             "Rotate", 
             "Route", 
+            "DuplicateRoute",
             "MakeGcode",
             "MirrorGcode"] # A list of command names created in the line above
         

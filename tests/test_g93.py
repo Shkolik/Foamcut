@@ -15,6 +15,7 @@ FreeCADGui.addCommand = lambda *a, **k: None
 import utilities
 import Postprocess
 import MachineConfig
+import WireRoute
 
 
 def make_config(feed_rate_mode):
@@ -54,6 +55,7 @@ def make_route():
     route.Data = [0]
     route.Objects = [obj]
     route.FeedOverrides = [1.0]
+    route.Proxy = WireRoute.WireRoute.__new__(WireRoute.WireRoute)
     return route
 
 

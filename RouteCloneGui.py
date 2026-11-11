@@ -1,0 +1,287 @@
+# -*- coding: utf-8 -*-
+
+__title__ = "Duplicate route"
+__author__ = "Andrew Shkolik"
+__license__ = "LGPL 2.1"
+__doc__ = "GUI for the route clone: view provider, task panel and command."
+
+import FreeCAD
+App=FreeCAD
+import FreeCADGui
+Gui=FreeCADGui
+from PySide import QtGui
+import WireRoute
+import WireRouteClone
+import utilities
+
+
+class WireRouteCloneVP(WireRoute.WireRouteVP):
+
+    def drawRoute(self):
+        source = self.Object.Source
+        while self.node.getNumChildren() > 0:
+            self.node.removeChild(0)
+
+        if source is None:
+            return
+
+        points_L, points_R = self.Object.Proxy.getOutputPoints(self.Object)
+        if len(points_L) == 0 or len(points_R) == 0:
+            return
+
+        self.node.addChild(self.drawRouteLines(points_L, source.RouteBreaks))
+        self.node.addChild(self.drawRouteLines(points_R, source.RouteBreaks))
+
+        if source.Pauses is not None and len(source.Pauses) > 0 and len(source.Pauses) == len(source.PausesDurations):
+            pauses = []
+            for dur_idx, idx in enumerate(source.Pauses):
+                duration = source.PausesDurations[dur_idx]
+                pauses.append([points_L[idx], float(duration)])
+                pauses.append([points_R[idx], float(duration)])
+            self.node.addChild(self.drawPauses(pauses))
+
+    def getIcon(self):
+        return utilities.getIconPath("route-clone.svg")
+
+    def claimChildren(self):
+        source = self.Object.Source
+        if source is None:
+            return []
+        return [source]
+
+    def onDelete(self, obj, subelements):
+        return True
+
+    def updateData(self, obj, prop):
+        if prop == "Redraw" or prop == "Position" or prop == "Mirror" or prop == "Source":
+            self.drawRoute()
+
+    def doubleClicked(self, obj):
+        showRouteClonePanel(self.Object, False)
+        return True
+
+
+class RouteCloneTaskPanel:
+    '''Task panel for creating and editing a route clone.'''
+
+    def __init__(self, clone, created = False):
+        self.clone = clone
+        self.created = created
+        self.original_position = App.Vector(clone.Position)
+        self.original_mirror = clone.Mirror
+        self.original_source = clone.Source
+
+        self.form = QtGui.QWidget()
+        self.form.setWindowTitle("Route clone")
+
+        layout = QtGui.QFormLayout(self.form)
+
+        self._source = QtGui.QComboBox(self.form)
+        current_source = clone.Source
+        job = clone.Document.getObject(clone.JobName)
+        for route in WireRouteClone.getJobRoutes(job):
+            self._source.addItem("{} ({})".format(route.Label, route.Name), route.Name)
+        index = self._source.findData(current_source.Name) if current_source is not None else -1
+        self._source.setCurrentIndex(index)
+        layout.addRow("Source:", self._source)
+
+        self._y = QtGui.QDoubleSpinBox(self.form)
+        self._y.setRange(-100000.0, 100000.0)
+        self._y.setDecimals(3)
+        self._y.setSuffix(" mm")
+        self._y.setValue(float(clone.Position.y))
+        layout.addRow("Y offset:", self._y)
+
+        self._z = QtGui.QDoubleSpinBox(self.form)
+        self._z.setRange(-100000.0, 100000.0)
+        self._z.setDecimals(3)
+        self._z.setSuffix(" mm")
+        self._z.setValue(float(clone.Position.z))
+        layout.addRow("Z offset:", self._z)
+
+        self._mirror_yz = QtGui.QCheckBox("Mirror horizontally (YZ)", self.form)
+        self._mirror_yz.setChecked(clone.Mirror in ("YZ", "YZ+XY"))
+        layout.addRow("", self._mirror_yz)
+
+        self._mirror_xy = QtGui.QCheckBox("Mirror vertically (XY)", self.form)
+        self._mirror_xy.setChecked(clone.Mirror in ("XY", "YZ+XY"))
+        layout.addRow("", self._mirror_xy)
+
+        try:
+            pivot = clone.Proxy.getPivotZ(clone)
+            layout.addRow("XY pivot:", QtGui.QLabel("{:.2f} mm (block mid-height)".format(pivot)))
+        except Exception:
+            layout.addRow("XY pivot:", QtGui.QLabel("-"))
+
+        self._result = QtGui.QLabel("")
+        layout.addRow("Result:", self._result)
+
+        self._status = QtGui.QLabel("")
+        layout.addRow("", self._status)
+
+        for widget in (self._y, self._z):
+            widget.valueChanged.connect(self.preview)
+        self._source.currentIndexChanged.connect(self.sourceChanged)
+        self._mirror_yz.stateChanged.connect(self.preview)
+        self._mirror_xy.stateChanged.connect(self.preview)
+
+        self.preview()
+
+    def getStandardButtons(self):
+        return int(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+
+    def sourceChanged(self):
+        name = self._source.currentData()
+        if not name:
+            return
+
+        source = self.clone.Document.getObject(name)
+        if source is None:
+            return
+
+        self.clone.Source = source
+        self.preview()
+
+    def position(self):
+        return App.Vector(0.0, self._y.value(), self._z.value())
+
+    def mirror(self):
+        yz = self._mirror_yz.isChecked()
+        xy = self._mirror_xy.isChecked()
+        if yz and xy:
+            return "YZ+XY"
+        if yz:
+            return "YZ"
+        if xy:
+            return "XY"
+        return "None"
+
+    def preview(self):
+        '''Apply the current widget values to the clone, validate and redraw. Return False when invalid.'''
+        position = self.position()
+        mirror = self.mirror()
+
+        self.clone.Position = position
+        self.clone.Mirror = mirror
+
+        try:
+            points_L, points_R = self.clone.Proxy.validatePosition(self.clone, position, mirror)
+            self._status.setText("")
+            self._status.setStyleSheet("")
+        except Exception as error:
+            self._status.setText(str(error))
+            self._status.setStyleSheet("color: red;")
+            self.redraw()
+            return False
+
+        all_points = points_L + points_R
+        if all_points:
+            ys = [point.y for point in all_points]
+            zs = [point.z for point in all_points]
+            self._result.setText("Y {:.2f}..{:.2f}   Z {:.2f}..{:.2f}".format(min(ys), max(ys), min(zs), max(zs)))
+        else:
+            self._result.setText("-")
+
+        self.redraw()
+        return True
+
+    def redraw(self):
+        view_object = getattr(self.clone, "ViewObject", None)
+        if view_object is not None and getattr(view_object, "Proxy", None) is not None:
+            try:
+                view_object.Proxy.drawRoute()
+            except Exception:
+                pass
+
+    def accept(self):
+        if not self.preview():
+            return True  # keep the panel open, the validation message is visible
+        self.clone.Document.recompute()
+        Gui.Control.closeDialog()
+        return True
+
+    def reject(self):
+        if self.created:
+            self.clone.Document.removeObject(self.clone.Name)
+        else:
+            self.clone.Source = self.original_source
+            self.clone.Position = self.original_position
+            self.clone.Mirror = self.original_mirror
+            self.redraw()
+        Gui.Control.closeDialog()
+        return True
+
+
+def showRouteClonePanel(clone, created = False):
+    panel = RouteCloneTaskPanel(clone, created)
+    Gui.Control.showDialog(panel)
+
+
+def getActiveJob():
+    '''Return the active Job group, falling back to the document's Job object.'''
+    doc = App.ActiveDocument
+    if doc is None:
+        return None
+
+    view = Gui.ActiveDocument.ActiveView if Gui.ActiveDocument is not None else None
+    group = view.getActiveObject("group") if view is not None else None
+    if group is None or group.Type != "Job":
+        group = doc.getObject("Job")
+
+    if group is None or group.Type != "Job":
+        return None
+    return group
+
+
+class DuplicateRoute():
+    """Duplicate route"""
+
+    def GetResources(self):
+        return {"Pixmap"  : utilities.getIconPath("route-clone.svg"),
+                'Accel' : "",
+                "MenuText": "Duplicate route",
+                "ToolTip" : "Create a parametric clone of the selected route, place and mirror it."}
+
+    def Activated(self):
+        doc = App.ActiveDocument
+        group = getActiveJob()
+        if group is None:
+            return
+
+        selection = Gui.Selection.getSelectionEx()
+        source = selection[0].Object if len(selection) == 1 else None
+        if not WireRouteClone.canDuplicateRoute(source) or source.JobName != group.Name:
+            return
+
+        clone = None
+        try:
+            clone = WireRouteClone.createRouteClone(group, source, recompute = False)
+            WireRouteCloneVP(clone.ViewObject)
+
+            Gui.Selection.clearSelection()
+            doc.recompute()
+            Gui.Selection.addSelection(doc.Name, clone.Name)
+            showRouteClonePanel(clone, created = True)
+        except Exception as error:
+            App.Console.PrintError("Failed to create Route clone.\n")
+            if clone is not None:
+                doc.removeObject(clone.Name)
+            App.Console.PrintError("{}\n".format(error))
+
+    def IsActive(self):
+        if FreeCAD.ActiveDocument is None:
+            return False
+
+        group = getActiveJob()
+        if group is None:
+            return False
+
+        selection = Gui.Selection.getSelectionEx()
+        if len(selection) != 1:
+            return False
+
+        route = selection[0].Object
+        return WireRouteClone.canDuplicateRoute(route) and route.JobName == group.Name
+
+
+Gui.addCommand("DuplicateRoute", DuplicateRoute())

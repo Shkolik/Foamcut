@@ -148,6 +148,88 @@ def validateRoute(objects):
         raise Exception(f"ERROR: {last.Label} - Unsupported last element. Route cannot end with Enter.")
 
 
+def getRoutePointLayout(route):
+    '''
+    Map the flattened route points to the objects that produced them.
+    The route builder appends every object's points except its last one (the
+    shared point is contributed by the next object), prepends an Enter plunge
+    and appends an Exit last point plus plunge. This function reproduces that
+    accounting from Data/Objects without touching the stored points.
+    @param route - Route object
+    @returns list of tuples (object, start_index, point_count)
+    '''
+    data = list(getattr(route, "Data", []))
+    objects = list(getattr(route, "Objects", []))
+
+    last_movement = -1
+    for position, object_index in enumerate(data):
+        if objects[object_index].Type != "Rotation":
+            last_movement = position
+
+    blocks = []
+    index = 0
+    for position, object_index in enumerate(data):
+        object = objects[object_index]
+        if object.Type == "Rotation":
+            continue
+
+        points_count = int(object.PointsCount)
+        if object.Type == "Enter":
+            path_count = points_count + (1 if getattr(object, "LeadInEnabled", False) else 0)
+            count = 1 + max(path_count - 2, 0)
+        elif object.Type == "Exit":
+            count = points_count + 1
+        else:
+            count = points_count if position == last_movement else points_count - 1
+
+        blocks.append((object, index, count))
+        index += count
+
+    total = len(getattr(route, "Offset_L", []))
+    if index != total:
+        raise Exception("ERROR: Route [{}] point layout does not match its points: {} mapped, {} stored. Recompute the route.".format(route.Label, index, total))
+    return blocks
+
+def mirrorRoutePointsXY(route, points, pivot):
+    '''
+    Reflect one side of a route about a horizontal plane.
+    Plunge points stay at safe height, Enter/Exit anchor points are mirrored
+    and their leads are rebuilt from the mirrored anchor with the original
+    offset vector; every other point is simply reflected.
+    @param route - Route object (for the object layout)
+    @param points - one side's flattened points
+    @param pivot - vertical pivot
+    @returns new list of points
+    '''
+    blocks = getRoutePointLayout(route)
+    result = list(points)
+
+    for block_index, (object, start, count) in enumerate(blocks):
+        if count <= 0:
+            continue
+        end = start + count
+
+        if object.Type == "Enter":
+            if block_index + 1 >= len(blocks):
+                raise Exception("ERROR: Enter [{}] has no following route point; cannot rebuild its lead.".format(object.Label))
+            entry = points[blocks[block_index + 1][1]]
+            mirrored_entry = App.Vector(entry.x, entry.y, 2.0 * float(pivot) - entry.z)
+            for i in range(start + 1, end):
+                result[i] = mirrored_entry + (points[i] - entry)
+
+        elif object.Type == "Exit":
+            exit_point = points[start]
+            mirrored_exit = App.Vector(exit_point.x, exit_point.y, 2.0 * float(pivot) - exit_point.z)
+            result[start] = mirrored_exit
+            for i in range(start + 1, end - 1):
+                result[i] = mirrored_exit + (points[i] - exit_point)
+
+        else:
+            for i in range(start, end):
+                result[i] = App.Vector(points[i].x, points[i].y, 2.0 * float(pivot) - points[i].z)
+
+    return result
+
 class WireRoute(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, objects, jobName):   
         super().__init__(obj, jobName)     
@@ -191,6 +273,25 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         
         obj.Proxy = self
         #self.execute(obj)
+
+    def getSourceRoute(self, obj):
+        '''
+        Return the route that owns the geometry.
+        A plain route owns it; a clone overrides this with its Source link.
+        '''
+        return obj
+
+    def getOutputPoints(self, obj):
+        '''
+        Return the route points used by the viewport and the postprocessor.
+        '''
+        return (list(obj.Offset_L), list(obj.Offset_R))
+
+    def getRotationAngle(self, obj, angle):
+        '''
+        Return the rotation angle to emit. A mirrored clone overrides this.
+        '''
+        return float(angle)
     
     def onDocumentRestored(self, obj):
         touched = False

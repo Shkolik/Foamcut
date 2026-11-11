@@ -7,7 +7,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Route duplicate: parametric clone of an original route with a task panel for Y/Z placement and horizontal (YZ) / vertical (XY) mirroring
 - Expected program run time in the G-code preamble and in the console message on export. G93 uses the longer wire-end travel, G94 uses the full commanded-axis vector like GRBL does for orthogonal linear axes; G0 moves use the slowest axis.
+
+### Notes
+
+- Only original routes can be duplicated; clones cannot be cloned. Deleting a source leaves its clones inert with an explicit export error.
+- XY mirror pivots on the foam block mid-height, keeps plunge moves at safe height and rebuilds Enter/Exit leads from the mirrored anchor.
+- Horizontal (YZ) mirror swaps the left/right profiles while keeping every point on its own wire plane, so the viewport and the G-code show the same result.
 
 ### Fixed
 

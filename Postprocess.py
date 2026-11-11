@@ -15,6 +15,8 @@ import utilities
 import os
 import math
 
+ROUTE_TYPES = ("Route", "RouteClone")
+
 class Postprocess():
     """Make Gcode"""
 
@@ -363,13 +365,19 @@ class Postprocess():
 
     '''
     Make GCODE from rotation element
+    @param rt - rotation object
+    @param config - machine configuration
+    @param angle (optional) - angle to emit; mirrored routes pass -Angle
     '''
-    def makeGCODEFromRotation(self, rt, config):
+    def makeGCODEFromRotation(self, rt, config, angle = None):
+        if angle is None:
+            angle = rt.Angle
+
         GCODE = "\n"
         GCODE += self.makeCommentedLine(config, "- Rotation [{}] -".format(rt.Label)) + "\n"
 
         # - Generate rotation command
-        GCODE += self.generateRotation(config, config.MoveCommand, rt.Angle, config.FeedRateRotate)
+        GCODE += self.generateRotation(config, config.MoveCommand, angle, config.FeedRateRotate)
         return GCODE
 
     '''
@@ -399,12 +407,13 @@ class Postprocess():
         return object.PointsCount if first else object.PointsCount - 1
 
     '''
-    Expected total number of points in route.Offset_L / Offset_R
+    Expected total number of points in the source route's Offset_L / Offset_R
     '''
     def _expected_route_points(self, route):
+        source = route.Proxy.getSourceRoute(route)
         count = 0
-        for i in range(len(route.Data)):
-            object = route.Objects[route.Data[i]]
+        for i in range(len(source.Data)):
+            object = source.Objects[source.Data[i]]
             if object.Type == "Rotation":
                 continue
             count += self._points_count_for_object(object, count == 0)
@@ -416,23 +425,25 @@ class Postprocess():
     Route point layout changed together with the Postprocessor accounting. Older
     documents keep their stale Offset_L/Offset_R until the Route is touched, so
     refresh only when the stored length no longer matches the current builder.
+    Route clones never store points; they resolve their source route.
     '''
     def _refresh_route_points(self, route):
+        source = route.Proxy.getSourceRoute(route)
         expected = self._expected_route_points(route)
-        if len(route.Offset_L) == expected and len(route.Offset_R) == expected:
+        if len(source.Offset_L) == expected and len(source.Offset_R) == expected:
             return
 
-        doc = getattr(route, "Document", None)
-        if doc is not None and hasattr(route, "touch"):
-            route.touch()
+        doc = getattr(source, "Document", None)
+        if doc is not None and hasattr(source, "touch"):
+            source.touch()
             doc.recompute()
 
         expected = self._expected_route_points(route)
-        if len(route.Offset_L) != expected or len(route.Offset_R) != expected:
+        if len(source.Offset_L) != expected or len(source.Offset_R) != expected:
             raise Exception(
                 "ERROR: Route [{}] point data is out of date: {} points stored, {} expected. "
                 "Recompute the route and try again.".format(
-                    route.Label, len(route.Offset_L), expected))
+                    source.Label, len(source.Offset_L), expected))
 
     '''
     Generate GCODE from route
@@ -443,14 +454,17 @@ class Postprocess():
         TASK += self.makeCommentedLine(config, "*** TASK BLOCK ***") + "\n"
         start_point = None
 
-        # - Refresh routes created before the Exit point layout was fixed
+        # - Resolve clone sources and read the emitted points once per route
+        route_points = []
         for route in route_list:
             self._refresh_route_points(route)
+            points_L, points_R = route.Proxy.getOutputPoints(route)
+            route_points.append((route, points_L, points_R))
 
         # find first point for start block
-        for route in route_list:
-            if len(route.Offset_L) > 0 and len(route.Offset_R) > 0:
-                start_point = (route.Offset_L[0], route.Offset_R[0])
+        for route, points_L, points_R in route_points:
+            if len(points_L) > 0 and len(points_R) > 0:
+                start_point = (points_L[0], points_R[0])
                 break
 
         # ---- Generate startup block
@@ -465,15 +479,17 @@ class Postprocess():
             self._g93_emitted = True
 
         # - Wal all routes
-        for route in route_list:
+        for route, points_L, points_R in route_points:
+            source = route.Proxy.getSourceRoute(route)
+
             TASK += "\n"
             TASK += self.makeCommentedLine(config, "--- Route begin [{}] ---".format(route.Label)) + "\n"
 
             point_index = 0
 
-            if len(route.Offset_L) > 0 or len(route.Offset_R) > 0:                
+            if len(points_L) > 0 or len(points_R) > 0:                
                 # - Generate rapid travel command
-                TASK += self.generateRapidTravel(config, route.Offset_L[0].y, route.Offset_L[0].z, route.Offset_R[0].y, route.Offset_R[0].z)
+                TASK += self.generateRapidTravel(config, points_L[0].y, points_L[0].z, points_R[0].y, points_R[0].z)
                 # - Switch to G93 right after the first route-begin rapid if the
                 #   start block did not establish a position.
                 if config.FeedRateMode == utilities.FC_FEED_RATE_MODES[1] and not self._g93_emitted:
@@ -481,15 +497,16 @@ class Postprocess():
                     TASK += "G93\n"
                     self._g93_emitted = True
             
-            for i in range(len(route.Data)):
+            for i in range(len(source.Data)):
                 # - Access item
-                object_index = route.Data[i]
-                object = route.Objects[object_index]
+                object_index = source.Data[i]
+                object = source.Objects[object_index]
 
                 if object.Type == "Rotation": # - Make GCODE from rotation
-                    TASK += self.makeGCODEFromRotation(object, config)
+                    angle = route.Proxy.getRotationAngle(route, object.Angle)
+                    TASK += self.makeGCODEFromRotation(object, config, angle)
                 else:
-                    feed_override = route.FeedOverrides[i]
+                    feed_override = source.FeedOverrides[i]
 
                     
                     addPause = object.AddPause if hasattr(object, "AddPause") else False
@@ -502,7 +519,7 @@ class Postprocess():
                     TASK += "\n"
                     TASK += self.makeCommentedLine(config, "- {} [{}]".format(object.Type, object.Label)) + "\n"
 
-                    # Route.Offset_L is a continuous polyline:
+                    # The resolved route points are a continuous polyline:
                     # - each object's start point is shared with the previous object;
                     # - Enter prepends a synthetic plunge-down point and leaves its
                     #   last path point for the next object, so it consumes P + 1;
@@ -517,8 +534,8 @@ class Postprocess():
                     # - Step over each point
                     safe_height = float(object.SafeHeight) if hasattr(object, "SafeHeight") else None
                     for p_idx in range(points_count):
-                        point_l = route.Offset_L[point_index]
-                        point_r = route.Offset_R[point_index]
+                        point_l = points_L[point_index]
+                        point_r = points_R[point_index]
 
                         at_safe_height = safe_height is not None \
                             and point_l.z >= safe_height - 1e-6 \
@@ -609,7 +626,7 @@ class Postprocess():
 
         # - Check routes type
         for route in routes:
-            if not hasattr(route, "Type") or (route.Type != "Route"):
+            if not hasattr(route, "Type") or route.Type not in ROUTE_TYPES:
                 QtGui.QMessageBox.critical(None, "Error generating Gcode", "Object type not supported. Check Selected objects.")
                 return
         
@@ -629,7 +646,7 @@ class Postprocess():
             
             # - Check types
             for route in routes:
-                if not hasattr(route, "Type") or (route.Type != "Route"):
+                if not hasattr(route, "Type") or route.Type not in ROUTE_TYPES:
                     return False
                 
             job_name = routes[0].JobName
