@@ -104,6 +104,7 @@ class TestMachineConfig(unittest.TestCase):
 
 
 G94_NO_PARK_EXPECTED = (
+    "; *** PROGRAM ***\n; Expected run time: 00:00:22\n\n"
     "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
@@ -181,6 +182,7 @@ class TestFeedHelpers(unittest.TestCase):
 
 
 G93_NO_PARK_EXPECTED = (
+    "; *** PROGRAM ***\n; Expected run time: 00:00:16\n\n"
     "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
@@ -197,6 +199,7 @@ G93_NO_PARK_EXPECTED = (
 )
 
 G93_PARK_HOMING_EXPECTED = (
+    "; *** PROGRAM ***\n; Expected run time: 00:00:36\n\n"
     "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
@@ -221,6 +224,7 @@ G93_PARK_HOMING_EXPECTED = (
 )
 
 G94_PARK_HOMING_EXPECTED = (
+    "; *** PROGRAM ***\n; Expected run time: 00:00:43\n\n"
     "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
@@ -242,6 +246,81 @@ G94_PARK_HOMING_EXPECTED = (
     "G00 X110.00 Y290.00 Z110.00 A290.00 F1800.00\n"
     "G00 B0.00 F1800.00\n"
 )
+
+
+class TestRunTimeEstimate(unittest.TestCase):
+    def test_format_run_time(self):
+        pp = Postprocess.Postprocess()
+        self.assertEqual(pp.formatRunTime(0), "00:00:00")
+        self.assertEqual(pp.formatRunTime(59.4), "00:00:59")
+        self.assertEqual(pp.formatRunTime(59.6), "00:01:00")
+        self.assertEqual(pp.formatRunTime(3661), "01:01:01")
+        self.assertEqual(pp.formatRunTime(36000), "10:00:00")
+        self.assertEqual(pp.formatRunTime(-1), "00:00:00")
+
+    def test_preamble_time_differs_by_feed_rate_mode(self):
+        import tempfile
+        expected = {
+            utilities.FC_FEED_RATE_MODES[0]: "00:00:22",  # G94: 4-axis vector
+            utilities.FC_FEED_RATE_MODES[1]: "00:00:16",  # G93: longest wire end
+        }
+        for mode, run_time in expected.items():
+            cfg = make_config(mode)
+            outpath = os.path.join(tempfile.gettempdir(), "time_%s.gcode" % mode)
+            content = generate(cfg, [make_route()], outpath)
+            self.assertIn("; Expected run time: %s" % run_time, content)
+
+    def test_g94_uses_full_axis_vector(self):
+        pp = Postprocess.Postprocess()
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        # Both wire ends travel 10 mm: 4-axis path = sqrt(10^2 + 10^2)
+        pp._current_L = (0.0, 0.0)
+        pp._current_R = (0.0, 0.0)
+        pp._run_time_seconds = 0.0
+        pp._addTravelTime(cfg, 10.0, 0.0, 10.0, 0.0, 10.0)
+        self.assertAlmostEqual(pp._run_time_seconds, 2.0 ** 0.5)
+
+    def test_g93_uses_longest_wire_end(self):
+        pp = Postprocess.Postprocess()
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[1])
+        pp._current_L = (0.0, 0.0)
+        pp._current_R = (0.0, 0.0)
+        pp._run_time_seconds = 0.0
+        pp._addTravelTime(cfg, 10.0, 0.0, 10.0, 0.0, 10.0)
+        self.assertAlmostEqual(pp._run_time_seconds, 1.0)
+
+    def test_g0_time_uses_slowest_axis(self):
+        pp = Postprocess.Postprocess()
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        # G0 ignores F: each axis moves 10 mm at 10 mm/s -> 1 s, not sqrt(2) s
+        pp._current_L = (0.0, 0.0)
+        pp._current_R = (0.0, 0.0)
+        pp._run_time_seconds = 0.0
+        pp._addTravelTime(cfg, 10.0, 0.0, 10.0, 0.0, 10.0, True)
+        self.assertAlmostEqual(pp._run_time_seconds, 1.0)
+
+    def test_pause_adds_to_expected_run_time(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        route = make_route()
+        route.Objects[0].AddPause = True
+        route.Objects[0].PauseDuration = 2.5
+        outpath = os.path.join(tempfile.gettempdir(), "time_pause.gcode")
+        content = generate(cfg, [route], outpath)
+        # 22.19 s of G94 motion + 2.5 s pause = 24.69 s
+        self.assertIn("; Expected run time: 00:00:25", content)
+
+    def test_millisecond_pause_units_do_not_change_estimated_time(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        cfg.TimeUnits = utilities.FC_TIME_UNITS[1]
+        route = make_route()
+        route.Objects[0].AddPause = True
+        route.Objects[0].PauseDuration = 2.5
+        outpath = os.path.join(tempfile.gettempdir(), "time_pause_ms.gcode")
+        content = generate(cfg, [route], outpath)
+        self.assertIn("G04 P2500.00", content)
+        self.assertIn("; Expected run time: 00:00:25", content)
 
 
 class TestG93Emission(unittest.TestCase):

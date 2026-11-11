@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.2.1] - 2026-11-11
 
+### Added
+
+- Expected program run time in the G-code preamble and in the console message on export. G93 uses the longer wire-end travel, G94 uses the full commanded-axis vector like GRBL does for orthogonal linear axes; G0 moves use the slowest axis.
+
 ### Fixed
 
 - Route postprocessor: shifted points/move types, lost route endpoint and rapid moves into foam on Enter/Exit routes

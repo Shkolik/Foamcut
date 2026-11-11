@@ -19,6 +19,78 @@ class Postprocess():
     """Make Gcode"""
 
     '''
+    Format expected run time given in seconds as HH:MM:SS
+    '''
+    def formatRunTime(self, seconds):
+        total = int(round(max(0.0, float(seconds))))
+        hours, remainder = divmod(total, 3600)
+        minutes, secs = divmod(remainder, 60)
+        return "%02d:%02d:%02d" % (hours, minutes, secs)
+
+    '''
+    Accumulate expected motion time (seconds) for a move.
+    
+    Feed rates in the machine configuration are stored in mm/s, so the move
+    time is distance / feed rate regardless of the emitted feed rate mode.
+    '''
+    def _addMoveTime(self, feed_rate, distance):
+        try:
+            rate = float(feed_rate)
+            length = float(distance)
+        except (TypeError, ValueError):
+            return
+        if rate <= 0.0 or length < 0.0:
+            return
+        self._run_time_seconds = getattr(self, "_run_time_seconds", 0.0) + length / rate
+
+    '''
+    Accumulate expected travel time (seconds) for a move.
+
+    G93: the postprocessor emits F = 60 * feed_rate / L, where L is the
+    longer wire-end travel. The move therefore takes L / feed_rate.
+    G94: F is a path feed rate, so the length is the Euclidean length of the
+    commanded axis vector (X1, Z1, X2, Z2), as controllers such as GRBL
+    compute it. This is not the longer wire end: two ends moving 10 mm each
+    produce 14.14 mm of programmed path, not 10 mm.
+    Rapids are G0 moves; controllers derive their speed from the axis rapid
+    rates, so their time is set by the slowest axis, not by F.
+
+    Moves from an unknown position (no homing and no parking) cannot be
+    estimated and are skipped.
+    '''
+    def _addTravelTime(self, config, feed_rate, X1, Z1, X2, Z2, rapid=False):
+        current_L = getattr(self, "_current_L", None)
+        current_R = getattr(self, "_current_R", None)
+        if current_L is None or current_R is None:
+            return
+
+        dX1 = float(X1) - current_L[0]
+        dZ1 = float(Z1) - current_L[1]
+        dX2 = float(X2) - current_R[0]
+        dZ2 = float(Z2) - current_R[1]
+
+        if rapid:
+            # - G0: the slowest axis sets the pace
+            distance = max(abs(dX1), abs(dZ1), abs(dX2), abs(dZ2))
+        elif config.FeedRateMode == utilities.FC_FEED_RATE_MODES[1]: # G93
+            distance = max(math.hypot(dX1, dZ1), math.hypot(dX2, dZ2))
+        else: # G94
+            distance = math.sqrt(dX1 * dX1 + dZ1 * dZ1 + dX2 * dX2 + dZ2 * dZ2)
+
+        self._addMoveTime(feed_rate, distance)
+
+    '''
+    Accumulate expected pause time (seconds)
+    '''
+    def _addPauseTime(self, duration):
+        try:
+            pause = float(duration)
+        except (TypeError, ValueError):
+            return
+        if pause > 0.0:
+            self._run_time_seconds = getattr(self, "_run_time_seconds", 0.0) + pause
+
+    '''
     Makes commented line 
     '''
     def makeCommentedLine(self, config, inputString):
@@ -92,12 +164,13 @@ class Postprocess():
     '''
     Generate travel
     '''
-    def generateTravel(self, config, command, feed_rate, wire_power, X1, Z1, X2, Z2):
+    def generateTravel(self, config, command, feed_rate, wire_power, X1, Z1, X2, Z2, rapid=False):
         # - Create position
         position = self.generateTravelPosition(config, X1, Z1, X2, Z2)
 
-        # - Calculate feed (mode-aware) and track the new position
+        # - Calculate feed (mode-aware) and track the new position/time
         feed = self._formatFeed(config, feed_rate, X1, Z1, X2, Z2)
+        self._addTravelTime(config, feed_rate, X1, Z1, X2, Z2, rapid)
         self._setCurrent(X1, Z1, X2, Z2)
 
         # - Create GCODE
@@ -108,7 +181,7 @@ class Postprocess():
     '''
     def generateRapidTravel(self, config, X1, Z1, X2, Z2):        
         # - Create GCODE
-        return self.generateTravel(config, config.MoveCommand, config.FeedRateMove, '', X1, Z1, X2, Z2)
+        return self.generateTravel(config, config.MoveCommand, config.FeedRateMove, '', X1, Z1, X2, Z2, True)
 
     '''
     Generate pause
@@ -130,6 +203,10 @@ class Postprocess():
             delta = abs(float(angle))
             if delta > 1e-6:
                 feed = feed / delta
+
+        # - Track rotation time. A rotation is emitted on its own line, so the
+        #   angle is the only moving axis: G94 and G93 both take angle / feed_rate.
+        self._addMoveTime(feed_rate, abs(float(angle)))
 
         # - Create GCODE
         return command.replace("{Position}", str(position)).replace("{FeedRate}", "%.2f" % feed) + "\n"
@@ -168,11 +245,16 @@ class Postprocess():
         self.rotation_position = 0.0
         self._current_L = None
         self._current_R = None
+        self._run_time_seconds = 0.0
         self._g93_emitted = False
 
         if config.StartProgramCode:
             GCODE += "{}\n".format(config.StartProgramCode)
             GCODE += "\n"
+
+        GCODE += self.makeCommentedLine(config, "*** PROGRAM ***") + "\n"
+        GCODE += self.makeCommentedLine(config, "Expected run time: {ExpectedRunTime}") + "\n"
+        GCODE += "\n"
 
         GCODE += self.makeCommentedLine(config, "*** MACHINE ***") + "\n"
         GCODE += self.makeCommentedLine(config, "Machine type: {}".format("5-Axis" if config.FiveAxisMachine else "4-Axis")) + "\n"
@@ -263,6 +345,7 @@ class Postprocess():
             feed = self._calculateFeed(config, feed_rate, curX1, config.ParkZ, curX2, config.ParkZ)
             # - G94 keeps today's str() formatting (e.g. F1800.0); G93 uses %.2f
             feed_str = str(feed) if not self._g93_emitted else "%.2f" % feed
+            self._addTravelTime(config, feed_rate, curX1, config.ParkZ, curX2, config.ParkZ, True)
             self._setCurrent(curX1, config.ParkZ, curX2, config.ParkZ)
             GCODE += config.MoveCommand.replace("{Position}", up_posistion).replace("{FeedRate}", feed_str) + "\n"
 
@@ -468,6 +551,7 @@ class Postprocess():
                         point_index += 1
                     
                     if addPause and duration > 0:
+                        self._addPauseTime(duration)
                         if config.TimeUnits == utilities.FC_TIME_UNITS[1]: #["Seconds", "Milliseconds"]
                             duration = duration * 1000
                         TASK += self.generatePause(config.PauseCommand, duration)
@@ -478,9 +562,11 @@ class Postprocess():
         #generate end block        
         END   = self.generateEndBlock(config)
 
-        program = START + ''.join(TASK) + END
+        # - Expected run time is only known once every block has been generated
+        run_time = self.formatRunTime(self._run_time_seconds)
+        program = START.replace("{ExpectedRunTime}", run_time) + ''.join(TASK) + END
 
-        App.Console.PrintMessage("GCODE generated\n")
+        App.Console.PrintMessage("GCODE generated (expected run time: %s)\n" % run_time)
 
         dialog = QtGui.QFileDialog()
         lastDir = dialog.directory().absolutePath()
