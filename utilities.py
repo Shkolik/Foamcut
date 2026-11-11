@@ -532,6 +532,28 @@ def makeLineOffset(wire, offset):
     return makeLineOffsetByPoints(start, end, offset)
 
 
+def _joinMode(wire, point):
+    '''
+    Choose between trimming and extending a wire end to reach point.
+
+    The point is an intersection of the supporting lines of the two wire
+    ends, so it can lie alongside the wire rather than beyond its end.
+    A point that projects onto a wire edge is inside the wire span and
+    must be trimmed to; extending it would prepend/append a segment that
+    reverses the wire direction and creates a cusp.  A point that projects
+    onto a vertex is at/beyond an end and keeps the old extend behaviour.
+
+    @param wire - wire to inspect
+    @param point - candidate join point
+    @return "trim" or "extend"
+    '''
+    vertex = Part.Vertex(point)
+    (_, _, infos) = vertex.distToShape(wire)
+    (_, _, _, topo, _, _) = infos[0]
+
+    return "trim" if topo == "Edge" else "extend"
+
+
 def intersectWires(wire1, wire2, tolerance = 1e-4):
     '''
     Check how wires intersect on a plane
@@ -665,7 +687,14 @@ def intersectWires(wire1, wire2, tolerance = 1e-4):
                     else:
                         raise Exception(f"Intersection is outside of the acceptable range.\n Initial distance check: {dist}, {vectors}, {infos}\n  {distance}, {infos[0]}")
                 else:
-                    return (intPoint, "extend", "extend")
+                    # The point is not on the examined wire.  It may lie
+                    # alongside it (adjacent offsets of different magnitude
+                    # miss each other).  Classify each end independently:
+                    # extending a point that is already alongside the wire
+                    # would reverse the wire and create a cusp.
+                    return (intPoint,
+                            _joinMode(wire1, intPoint),
+                            _joinMode(wire2, intPoint))
 
 def _pointSegmentDistanceSq(point, a, b):
     '''

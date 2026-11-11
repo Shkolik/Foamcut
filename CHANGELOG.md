@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Route postprocessor: shifted points/move types, lost route endpoint and rapid moves into foam on Enter/Exit routes
 - Route: duplicate Exit end point when lead-out is enabled
+- Route: offset joining created a cusp/loop when adjacent edges had different dynamic kerf compensation
 
 ## [0.2.0] - 2026-08-20
 
