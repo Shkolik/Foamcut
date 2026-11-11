@@ -104,6 +104,9 @@ class MakeMove():
                 Gui.Selection.clearSelection()
                 doc.recompute()
                 Gui.Selection.addSelection(doc.Name, move.Name)
+
+                import MovementGui
+                MovementGui.showMovementPanel(move, created = True)
                 
             except Exception as error:                
                 App.Console.PrintError(f"Failed to create Move.\n")

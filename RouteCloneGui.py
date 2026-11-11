@@ -71,10 +71,15 @@ class RouteCloneTaskPanel:
         self.original_mirror = clone.Mirror
         self.original_source = clone.Source
 
+        self._doc = clone.Document
+        if self._doc.getBookedTransactionID() == 0:
+            self._doc.openTransaction("Route clone")
+
         self.form = QtGui.QWidget()
         self.form.setWindowTitle("Route clone")
 
         layout = QtGui.QFormLayout(self.form)
+        layout.setContentsMargins(10, 6, 10, 6)
 
         self._source = QtGui.QComboBox(self.form)
         current_source = clone.Source
@@ -85,18 +90,22 @@ class RouteCloneTaskPanel:
         self._source.setCurrentIndex(index)
         layout.addRow("Source:", self._source)
 
+        y_value, length_unit, self._length_factor = utilities.getPreferredValue(
+            App.Units.Quantity(float(clone.Position.y), App.Units.Length))
+        self._length_unit = length_unit
+
         self._y = QtGui.QDoubleSpinBox(self.form)
         self._y.setRange(-100000.0, 100000.0)
         self._y.setDecimals(3)
-        self._y.setSuffix(" mm")
-        self._y.setValue(float(clone.Position.y))
+        self._y.setSuffix(" {}".format(length_unit))
+        self._y.setValue(y_value)
         layout.addRow("Y offset:", self._y)
 
         self._z = QtGui.QDoubleSpinBox(self.form)
         self._z.setRange(-100000.0, 100000.0)
         self._z.setDecimals(3)
-        self._z.setSuffix(" mm")
-        self._z.setValue(float(clone.Position.z))
+        self._z.setSuffix(" {}".format(length_unit))
+        self._z.setValue(float(clone.Position.z) / self._length_factor)
         layout.addRow("Z offset:", self._z)
 
         self._mirror_yz = QtGui.QCheckBox("Mirror horizontally (YZ)", self.form)
@@ -109,15 +118,18 @@ class RouteCloneTaskPanel:
 
         try:
             pivot = clone.Proxy.getPivotZ(clone)
-            layout.addRow("XY pivot:", QtGui.QLabel("{:.2f} mm (block mid-height)".format(pivot)))
+            pivot_value, pivot_unit, _ = utilities.getPreferredValue(App.Units.Quantity(pivot, App.Units.Length))
+            layout.addRow("XY pivot:", QtGui.QLabel("{:.2f} {} (block mid-height)".format(pivot_value, pivot_unit)))
         except Exception:
             layout.addRow("XY pivot:", QtGui.QLabel("-"))
 
         self._result = QtGui.QLabel("")
+        self._result.setWordWrap(True)
         layout.addRow("Result:", self._result)
 
         self._status = QtGui.QLabel("")
-        layout.addRow("", self._status)
+        self._status.setWordWrap(True)
+        layout.addRow(self._status)
 
         for widget in (self._y, self._z):
             widget.valueChanged.connect(self.preview)
@@ -143,7 +155,9 @@ class RouteCloneTaskPanel:
         self.preview()
 
     def position(self):
-        return App.Vector(0.0, self._y.value(), self._z.value())
+        return App.Vector(0.0,
+                          self._y.value() * self._length_factor,
+                          self._z.value() * self._length_factor)
 
     def mirror(self):
         yz = self._mirror_yz.isChecked()
@@ -176,9 +190,10 @@ class RouteCloneTaskPanel:
 
         all_points = points_L + points_R
         if all_points:
-            ys = [point.y for point in all_points]
-            zs = [point.z for point in all_points]
-            self._result.setText("Y {:.2f}..{:.2f}   Z {:.2f}..{:.2f}".format(min(ys), max(ys), min(zs), max(zs)))
+            ys = [point.y / self._length_factor for point in all_points]
+            zs = [point.z / self._length_factor for point in all_points]
+            self._result.setText("Y {:.2f}..{:.2f} {}   Z {:.2f}..{:.2f} {}".format(
+                min(ys), max(ys), self._length_unit, min(zs), max(zs), self._length_unit))
         else:
             self._result.setText("-")
 
@@ -196,19 +211,25 @@ class RouteCloneTaskPanel:
     def accept(self):
         if not self.preview():
             return True  # keep the panel open, the validation message is visible
-        self.clone.Document.recompute()
+        doc = self._doc
+        doc.commitTransaction()
         Gui.Control.closeDialog()
+        # - Recompute after closing: document recompute is deferred while a task panel is open
+        doc.recompute()
         return True
 
     def reject(self):
+        doc = self._doc
+        doc.abortTransaction()
         if self.created:
-            self.clone.Document.removeObject(self.clone.Name)
+            if doc.getObject(self.clone.Name) is not None:
+                doc.removeObject(self.clone.Name)
         else:
             self.clone.Source = self.original_source
             self.clone.Position = self.original_position
             self.clone.Mirror = self.original_mirror
-            self.redraw()
         Gui.Control.closeDialog()
+        doc.recompute()
         return True
 
 

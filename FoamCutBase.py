@@ -11,6 +11,30 @@ Gui=FreeCADGui
 import Part
 from utilities import *
 
+def getRoutesForObject(obj):
+    '''
+    Return the routes that use a movement object.
+    @param obj - movement object
+    @returns list of Route objects
+    '''
+    doc = getattr(obj, "Document", None)
+    if doc is None:
+        return []
+    return [route for route in doc.Objects
+            if getattr(route, "Type", None) == "Route" and obj in route.Objects]
+
+def recomputeRoutesForObject(obj):
+    '''
+    Recompute every route that uses a movement object.
+    @param obj - movement object
+    @returns list of recomputed Route objects
+    '''
+    routes = getRoutesForObject(obj)
+    for route in routes:
+        route.touch()
+        route.recompute()
+    return routes
+
 class FoamCutBaseObject:
     """FoamCut base object"""
 
@@ -92,6 +116,18 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(configName))
 
         obj.setEditorMode("PauseDuration", 3)
+
+    def getRoutes(self, obj):
+        '''
+        Return the routes that use this movement object.
+        '''
+        return getRoutesForObject(obj)
+
+    def recomputeRoutes(self, obj):
+        '''
+        Recompute the routes that use this movement object.
+        '''
+        return recomputeRoutesForObject(obj)
 
     def onDocumentRestored(self, obj):
         touched = False   

@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Route duplicate: parametric clone of an original route with a task panel for Y/Z placement and horizontal (YZ) / vertical (XY) mirroring
+- Movement task panel for Move: live placement preview, feed/power overrides, unit-aware values and route preview
 - Expected program run time in the G-code preamble and in the console message on export. G93 uses the longer wire-end travel, G94 uses the full commanded-axis vector like GRBL does for orthogonal linear axes; G0 moves use the slowest axis.
 
 ### Notes

@@ -292,6 +292,77 @@ def getWorkingPlanes(group, doc):
     else:
         FreeCAD.Console.PrintError("ERROR:\n Parent Job not found.\n")
 
+def getPropertyExpression(obj, prop):
+    '''
+    Get the expression bound to an object property.
+    @param obj - document object
+    @param prop - property name
+    @returns expression string or None when the property has no expression
+    '''
+    for path, expression in getattr(obj, "ExpressionEngine", []):
+        if path.lstrip(".") == prop:
+            return expression
+    return None
+
+def hasPropertyExpression(obj, prop):
+    '''
+    Check if an object property is driven by an expression.
+    '''
+    return getPropertyExpression(obj, prop) is not None
+
+def overrideProperty(obj, prop, value):
+    '''
+    Detach a property from its expression and assign a literal value.
+    @param obj - document object
+    @param prop - property name
+    @param value - new literal value
+    '''
+    if hasPropertyExpression(obj, prop):
+        obj.clearExpression("." + prop)
+    setattr(obj, prop, value)
+
+def restorePropertyExpression(obj, prop, expression):
+    '''
+    Re-bind a property to an expression. Does nothing when expression is None.
+    @param obj - document object
+    @param prop - property name
+    @param expression - expression string
+    '''
+    if expression:
+        obj.setExpression("." + prop, expression)
+
+def clearPropertyExpression(obj, prop):
+    '''
+    Remove an expression from a property, keeping its current value.
+    '''
+    if hasPropertyExpression(obj, prop):
+        obj.clearExpression("." + prop)
+
+def getConfigExpression(obj, configAttr):
+    '''
+    Build an expression that points to a job config property.
+    @param obj - object with JobName
+    @param configAttr - config property name
+    @returns expression string
+    '''
+    job = obj.Document.getObject(obj.JobName)
+    config = job.getObject(job.ConfigName) if job is not None else None
+    if config is None:
+        raise Exception("ERROR: Config not found for [{}].".format(obj.Label))
+    return u"<<{}>>.{}".format(config.Name, configAttr)
+
+def getPreferredValue(quantity):
+    '''
+    Convert a quantity to the user's preferred unit system.
+    @param quantity - App.Units.Quantity
+    @returns tuple (display_value, unit_string, factor_to_base)
+    '''
+    formatted, factor, unit = quantity.getUserPreferred()
+    factor = float(factor)
+    if factor == 0.0:
+        factor = 1.0
+    return float(quantity) / factor, unit, factor
+
 def validateWorkingArea(points_L, points_R, wpl, wpr, tolerance=1e-7):
     '''
     Validate that route points stay inside the working plane boundaries.

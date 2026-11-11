@@ -40,6 +40,10 @@ class FoamCutMovementViewProvider(FoamCutBaseViewProvider):
         super().__init__(obj)
         obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Task", "Show projection lines between planes").ShowProjectionLines = False
 
+    def doubleClicked(self, _):
+        import MovementGui
+        return MovementGui.openMovementPanel(self.Object)
+
     def attach(self, obj):
         super().attach(obj)
         self.projection = coin.SoGroup()
