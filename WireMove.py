@@ -24,9 +24,9 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyInteger",     "WirePower",    "Task",     "Wire power")
         obj.addProperty("App::PropertyLinkSub",     "StartPoint",   "Task",     "Start Point").StartPoint = start
 
-        config = self.getConfigName(obj)
-        obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
-        obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
+        job = getJob(obj)
+        obj.setExpression(".FeedRate", jobExpression(job, "FeedRateCut"))
+        obj.setExpression(".WirePower", jobExpression(job, "WireMinPower"))
 
         obj.Proxy = self
         self.execute(obj)
@@ -36,7 +36,10 @@ class WireMove(FoamCutBase.FoamCutMovementBaseObject):
         if start_vertex is None:
             raise Exception("Unable to locate start point vertex.")
 
-        (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
+        result = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
+        if result is None:
+            return
+        (isLeft, vertex, oppositeVertex, wp) = result
         
         if oppositeVertex is None:
             raise Exception("Unable to locate opposite vertex.")

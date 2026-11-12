@@ -9,6 +9,7 @@ App=FreeCAD
 import Part
 import FoamCutBase
 from utilities import *
+from MachinePlane import WorkingPlane
 
 FC_KERF_STRATEGY_NONE = 0
 FC_KERF_STRATEGY_UNI = 1
@@ -261,10 +262,10 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                         But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
                         Normally it should be 1.0, but for denser foam it could be bigger.")
         obj.setEditorMode("CompensationDegree", 2)
-        config = self.getConfigName(obj)
-
-        obj.setExpression(".KerfCompensation", u"<<{}>>.KerfCompensation".format(config))
-        obj.setExpression(".CompensationDegree", u"<<{}>>.CompensationDegree".format(config))
+        job = getJob(obj)
+        bindJob(obj, job)
+        obj.setExpression(".KerfCompensation", jobExpression(job, "KerfCompensation"))
+        obj.setExpression(".CompensationDegree", jobExpression(job, "CompensationDegree"))
         
         obj.Proxy = self
         #self.execute(obj)
@@ -314,8 +315,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                         But in some foams it will not be that simple, since wire melts foam and it became dencer. \r\n\
                         Normally it should be 1.0, but for denser foam it could be bigger.")
             obj.setEditorMode("CompensationDegree", 2)
-            config = self.getConfigName(obj)            
-            obj.setExpression(".CompensationDegree", u"<<{}>>.CompensationDegree".format(config))
             App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDegree property.\n".format(obj.Label))
             touched = True
 
@@ -345,15 +344,16 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
     def execute(self, obj):
         # start_time = time.perf_counter()
 
-        config = self.getConfig(obj)
-
         doc = obj.Document
 
         job = doc.getObject(obj.JobName)
         if job is None or job.Type != "Job":
             raise Exception("ERROR: Error updating Enter - active Job not found\n")
 
-        (wpl, wpr) = getWorkingPlanes(job, doc)
+        planes = getWorkingPlanes(job, doc)
+        if planes is None or len(planes) != 2:
+            return
+        (wpl, wpr) = planes
 
         validateRoute(obj.Objects)
 
@@ -592,10 +592,8 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             # build temporary planes for projection
             # and make offsets from resulted projections
             for i, segment in enumerate(segments):                
-                norm = App.Vector(1.0, 0.0, 0.0)
-                xdir = App.Vector(0.0, 1.0, 0.0)
-                leftPlane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(segment.LeftPlaneX, float(-config.OriginX), 0), norm, xdir)
-                rightPlane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(segment.RightPlaneX, float(-config.OriginX), 0), norm, xdir)
+                leftPlane = WorkingPlane.fromX(job, segment.LeftPlaneX)
+                rightPlane = WorkingPlane.fromX(job, segment.RightPlaneX)
 
                 for j, edge in enumerate(segment.Edges):
                     idx = FC_KERF_DIRECTIONS.index(edge.CompensationDirection) if edge.CompensationDirection in FC_KERF_DIRECTIONS else 0                    

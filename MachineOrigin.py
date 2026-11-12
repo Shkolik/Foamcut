@@ -1,9 +1,11 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 __title__ = "Machine origin"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
 __doc__ = "Origin arrors and labels."
+
+__obsolete__ = True  # Kept only for old-document restore/migration; pending removal.
 
 import FreeCAD
 App=FreeCAD
@@ -22,10 +24,12 @@ class MachineOrigin(FoamCutBase.FoamCutBaseObject):
 
         obj.addProperty("App::PropertyDistance", "FieldWidth", "", "", 5)
         
-        config = self.getConfig(obj)
+        job = utilities.getJob(obj)
+        
+        utilities.bindJob(obj, job)
 
-        obj.FieldWidth = config.FieldWidth
-        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config.Name))
+        obj.FieldWidth = job.FieldWidth
+        obj.setExpression(".FieldWidth", utilities.jobExpression(job, "FieldWidth"))
 
         obj.Proxy = self
 
@@ -159,3 +163,4 @@ def CreateOrigin(obj, jobName):
     MachineOriginVP(obj.ViewObject)
     utilities.setPickStyle(obj.ViewObject, utilities.UNPICKABLE)
     Gui.Selection.clearSelection()
+

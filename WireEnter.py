@@ -31,8 +31,8 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
 
         
 
-        config = self.getConfigName(obj)
-        obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
+        job = getJob(obj)
+        obj.setExpression(".SafeHeight", jobExpression(job, "SafeHeight"))
         
         obj.setEditorMode("LeadInX", 0 if obj.LeadInEnabled else 3)     
         obj.setEditorMode("LeadInY", 0 if obj.LeadInEnabled else 3)     
@@ -74,8 +74,10 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
         super().onChanged(obj, prop)
 
         if prop == "LeadInEnabled":
-            obj.setEditorMode("LeadInX", 0 if obj.LeadInEnabled else 3)     
-            obj.setEditorMode("LeadInY", 0 if obj.LeadInEnabled else 3)
+            if hasattr(obj, "LeadInX"):
+                obj.setEditorMode("LeadInX", 0 if obj.LeadInEnabled else 3)
+            if hasattr(obj, "LeadInY"):
+                obj.setEditorMode("LeadInY", 0 if obj.LeadInEnabled else 3)
 
     def execute(self, obj):  
         if obj.SafeHeight > 0:
@@ -84,7 +86,10 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
             nextObj : FoamCutBase.FoamCutMovementBaseObject = obj.EntryPoint[0]
 
             entryVertex = nextObj.getSubObject(obj.EntryPoint[1][0])
-            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, nextObj, entryVertex)
+            result = self.findOppositeVertexes(obj, nextObj, entryVertex)
+            if result is None:
+                return
+            (isLeft, vertex, oppositeVertex, wp) = result
 
             if oppositeVertex is None:
                 raise Exception("Unable to locate opposite vertex.")

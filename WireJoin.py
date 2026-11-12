@@ -10,7 +10,7 @@ import FreeCAD
 App=FreeCAD
 import Part
 import FoamCutBase
-from utilities import isCommonPoint, isMovement
+from utilities import isCommonPoint, isMovement, getJob, jobExpression
 
 class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, end, jobName):  
@@ -25,10 +25,10 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyLinkSub",      "StartPoint",      "Task",   "Start Point").StartPoint = start
         obj.addProperty("App::PropertyLinkSub",      "EndPoint",        "Task",   "End Point").EndPoint = end
 
-        config = self.getConfigName(obj)
-        obj.setExpression(".FeedRate", u"<<{}>>.FeedRateCut".format(config))
-        obj.setExpression(".WirePower", u"<<{}>>.WireMinPower".format(config))
-        obj.setExpression(".FieldWidth", u"<<{}>>.FieldWidth".format(config))
+        job = getJob(obj)
+        obj.setExpression(".FeedRate", jobExpression(job, "FeedRateCut"))
+        obj.setExpression(".WirePower", jobExpression(job, "WireMinPower"))
+        obj.setExpression(".FieldWidth", jobExpression(job, "FieldWidth"))
         
         obj.Proxy = self
         self.execute(obj)
@@ -42,8 +42,12 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         if end_vertex is None:
             raise Exception("Unable to locate end point vertex.")
 
-        (isLeftA, vertexA, oppositeVertexA, wp) = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
-        (isLeftB, vertexB, oppositeVertexB, wp) = self.findOppositeVertexes(obj, obj.EndPoint[0], end_vertex)
+        resultA = self.findOppositeVertexes(obj, obj.StartPoint[0], start_vertex)
+        resultB = self.findOppositeVertexes(obj, obj.EndPoint[0], end_vertex)
+        if resultA is None or resultB is None:
+            return
+        (isLeftA, vertexA, oppositeVertexA, wp) = resultA
+        (isLeftB, vertexB, oppositeVertexB, wp) = resultB
 
         if oppositeVertexA is None:
             raise Exception("Unable to locate opposite vertex for the start point.")

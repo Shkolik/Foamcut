@@ -19,9 +19,11 @@ from ProjectionGui import ProjectionSectionVP
 from RotationGui import RotationVP
 from RouteGui import WireRouteVP
 from RouteCloneGui import WireRouteCloneVP
+from MachineGui import MachineVP
 
 
 VIEW_PROVIDERS = {
+    "Job": MachineVP,
     "Move": WireMoveVP,
     "Enter": WireEnterVP,
     "Exit": WireExitVP,

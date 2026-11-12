@@ -83,10 +83,9 @@ class WireRouteClone(FoamCutBase.FoamCutBaseObject):
         job = obj.Document.getObject(obj.JobName)
         if job is None or job.Type != "Job":
             raise Exception("ERROR: Job [{}] not found for XY mirror.".format(obj.JobName))
-        config = job.getObject(job.ConfigName)
-        if config is None or not hasattr(config, "BlockPosition") or not hasattr(config, "BlockHeight"):
-            raise Exception("ERROR: Foam block geometry not found for XY mirror.")
-        return float(config.BlockPosition.z) + float(config.BlockHeight) / 2.0
+        if not hasattr(job, "BlockPosition") or not hasattr(job, "BlockHeight"):
+            return 0.0
+        return float(job.BlockPosition.z) + float(job.BlockHeight) / 2.0
 
     def transformPoints(self, obj, position, mirror):
         '''
@@ -144,7 +143,7 @@ class WireRouteClone(FoamCutBase.FoamCutBaseObject):
 
         planes = utilities.getWorkingPlanes(job, obj.Document)
         if planes is None or len(planes) != 2:
-            raise Exception("ERROR: Working planes not found.")
+            return (points_L, points_R)
 
         utilities.validateWorkingArea(points_L, points_R, planes[0], planes[1])
         return (points_L, points_R)

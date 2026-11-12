@@ -37,3 +37,24 @@ using a single power value set once via `WireOnCommand`.
   power only matters for extreme tapers where per-move wire length changes.
 
 **Status:** Confirmed for deprecation (author).
+
+---
+
+## 2. Legacy Config and cosmetic helper objects — Confirmed
+
+**Where:**
+- `MachineConfig.py` — `Config` object and `MachineConfigVP`
+- `FoamCut_WorkingPlane.py` — `WPL` / `WPR`
+- `FoamBlock.py` — `Block`
+- `MachineOrigin.py` — `Origin`
+- `RotationAxis.py` — `RotationAxis`
+
+**What it does:** Stores machine/process settings in a separate `Config` child and draws
+the CNC volume, foam block, working planes, origin and rotation axis as document objects.
+
+**Replacement:** Settings live on `Job`; the Job view provider (`MachineGui.MachineVP`)
+draws the same geometry inline. Working planes are `WorkingPlane` value objects.
+
+**Status:** Confirmed. The classes remain only for restoring old documents before
+`Migration.migrate_document()` runs; they are marked `__obsolete__ = True` and pending
+removal after the migration-support window.

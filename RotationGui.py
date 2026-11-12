@@ -158,9 +158,7 @@ class AddRotation():
 
             if group is not None and group.Type == "Job":
 
-                config = group.getObject(group.ConfigName)
-
-                if not config.FiveAxisMachine:
+                if not getattr(group, "FiveAxisMachine", False):
                     return False
 
                 # - Get selecttion

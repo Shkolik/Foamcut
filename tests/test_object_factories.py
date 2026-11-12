@@ -30,7 +30,6 @@ from test_route_postprocess import ensure, new_document
 class TestScriptingFactories(unittest.TestCase):
     def setUp(self):
         self.doc, self.job = new_document()
-        config = self.job.getObject(self.job.ConfigName)
         for prop_type, name, value in [
             ("App::PropertyTime", "PauseDuration", 1.0),
             ("App::PropertyLength", "DiscretizationStep", 0.5),
@@ -40,7 +39,7 @@ class TestScriptingFactories(unittest.TestCase):
             ("App::PropertyLength", "WireStretchLength", 0.0),
             ("App::PropertyDistance", "OriginRotationX", 370.0),
         ]:
-            ensure(config, prop_type, name, value)
+            ensure(self.job, prop_type, name, value)
         self.doc.recompute()
 
         self.box = self.doc.addObject("Part::Box", "Box")

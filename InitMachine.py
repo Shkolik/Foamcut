@@ -10,69 +10,28 @@ import FreeCAD
 App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
-import FoamCutViewProviders
 import FoamCutBase
 import utilities
+import JobConfig
+import Migration
 import MachineConfig
 import MachineOrigin
 import FoamCut_WorkingPlane
 import FoamBlock
 import RotationAxis
 
-def initChildren(config, machine):
-    origin = machine.newObject("App::FeaturePython", "Origin")
-    MachineOrigin.CreateOrigin(origin, machine.Name)
-
-    CNCVolume = machine.newObject("Part::Box", "CNCVolume")
-    CNCVolume.addProperty("App::PropertyString",      "Type",       "", "", 5).Type = "Helper"
-    CNCVolume.setEditorMode("Placement",     3)
-    CNCVolume.setEditorMode("Label",         3)
-    CNCVolume.setEditorMode("Width",         3)
-    CNCVolume.setEditorMode("Height",        3)
-    CNCVolume.setEditorMode("Length",        3)
-    CNCVolume.setEditorMode("MapMode",       3)
-
-    CNCVolume.setExpression(".Placement.Base.y", u"-<<{}>>.OriginX".format(config.Name))
-    CNCVolume.setExpression(".Placement.Base.x", u"- <<{}>>.FieldWidth / 2".format(config.Name))
-    CNCVolume.setExpression(".Length",   u"<<{}>>.FieldWidth".format(config.Name))
-    CNCVolume.setExpression(".Width",   u"<<{}>>.HorizontalTravel".format(config.Name))
-    CNCVolume.setExpression(".Height",   u"<<{}>>.VerticalTravel".format(config.Name))
-    CNCVolume.ViewObject.Transparency = 90
-    CNCVolume.ViewObject.LineWidth = 1.0
-    CNCVolume.ViewObject.PointSize = 1.0
-    CNCVolume.ViewObject.ShapeColor = (190, 190, 190)
-    CNCVolume.ViewObject.Selectable = False
-    utilities.setPickStyle(CNCVolume.ViewObject, utilities.UNPICKABLE)
-
-    
-    wpl = machine.newObject("Part::FeaturePython", "WPL")
-    FoamCut_WorkingPlane.CreateWorkingPlane(wpl, machine.Name, utilities.LEFT)
-    wpl.Label = "Working Plane L"
-
-    machine.WPLName = wpl.Name
-    
-    wpr = machine.newObject("Part::FeaturePython", "WPR")
-    FoamCut_WorkingPlane.CreateWorkingPlane(wpr, machine.Name, utilities.RIGHT)
-    wpr.Label = "Working Plane R"
-
-    machine.WPRName = wpr.Name
-
-    block = machine.newObject("Part::FeaturePython", "Block")
-    FoamBlock.CreateFoamBlock(block, machine.Name)
-    block.Label = "Foam Block"
-
-    if config.FiveAxisMachine:
-        axis = machine.newObject("App::FeaturePython", "RotationAxis")    
-        axis.Label = "Rotation Axis"
-        RotationAxis.CreateRotationAxis(axis, machine.Name)
-
 class Machine(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, jobName):   
         super().__init__(obj, jobName)  
         obj.Type = "Job"
-        obj.addProperty("App::PropertyString",      "ConfigName", "", "", 5)
-        obj.addProperty("App::PropertyString",      "WPLName", "", "", 5)
-        obj.addProperty("App::PropertyString",      "WPRName", "", "", 5)
+        for name in ("ConfigName", "WPLName", "WPRName"):
+            if not hasattr(obj, name):
+                obj.addProperty("App::PropertyString", name, "", "", 5)
+        if not hasattr(obj, "MigrationVersion"):
+            obj.addProperty("App::PropertyInteger", "MigrationVersion", "", "", 5)
+        obj.MigrationVersion = Migration.CURRENT_VERSION
+
+        JobConfig.applyConfigProperties(obj)
 
         obj.setEditorMode("Group",     3)
         obj.Proxy = self
@@ -80,30 +39,42 @@ class Machine(FoamCutBase.FoamCutBaseObject):
     def execute(self, obj):
         pass
 
+    def onChanged(self, obj, prop):
+        # - hidden _Job links do not create a dependency edge, so a
+        #   config change must explicitly touch the children that read it.
+        if prop in JobConfig.CONFIG_PROPERTIES:
+            for child in obj.Group:
+                if hasattr(child, "touch"):
+                    child.touch()
+
+        if prop == "FiveAxisMachine":
+            if hasattr(obj, "OriginRotationX"):
+                obj.setEditorMode("OriginRotationX", 0 if obj.FiveAxisMachine else 3)
+            if hasattr(obj, "R1AxisName"):
+                obj.setEditorMode("R1AxisName", 0 if obj.FiveAxisMachine else 3)
+            if hasattr(obj, "ParkR1"):
+                obj.setEditorMode("ParkR1", 0 if obj.EnableParking and obj.FiveAxisMachine else 3)
+            if hasattr(obj, "HomingR1"):
+                obj.setEditorMode("HomingR1", 0 if obj.EnableHoming and obj.FiveAxisMachine else 3)
+        if prop == "EnableParking":
+            for name in ("ParkX", "ParkZ", "ParkR1"):
+                if hasattr(obj, name):
+                    obj.setEditorMode(name, 0 if obj.EnableParking else 3)
+        if prop == "EnableHoming":
+            for name in ("HomingCommand", "HomingX1", "HomingX2", "HomingZ1", "HomingZ2", "HomingR1"):
+                if hasattr(obj, name):
+                    obj.setEditorMode(name, 0 if obj.EnableHoming else 3)
+        if prop == "WireStretchVerification" and hasattr(obj, "WireStretchLength"):
+            obj.setEditorMode("WireStretchLength", 0 if obj.WireStretchVerification else 3)
+
     def onDocumentRestored(self, obj):
+        # - Migration is user-confirmed after the document is fully restored;
+        #   do not touch the document from this callback.
         for child in obj.Group:
             if hasattr(child, 'Type') and child.Type == "Helper" and child.Name not in [obj.WPLName, obj.WPRName]:
-                utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
+                if child.ViewObject is not None:
+                    utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
 
-class MachineVP(FoamCutViewProviders.FoamCutBaseViewProvider):
-    
-    def attach(self, obj):
-        self.ViewObject = obj
-        self.Object = obj.Object
-        for child in self.Object.Group:
-            if hasattr(child, 'Type') and child.Type == "Helper" and child.Name not in [self.Object.WPLName, self.Object.WPRName]:
-                utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
-
-    def doubleClicked(self, obj):
-        if Gui.ActiveDocument.ActiveView.getActiveObject("group") == obj.Object:
-            Gui.ActiveDocument.ActiveView.setActiveObject("group", None)
-        else:
-            Gui.ActiveDocument.ActiveView.setActiveObject("group", obj.Object)
-        return True
-    
-    def getIcon(self):
-        return utilities.getIconPath("machine.svg")
-    
 class InitMachine():
     """Init machine"""
 
@@ -117,14 +88,8 @@ class InitMachine():
         # - Create group
         machine = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Job")
         Machine(machine, machine.Name)
-        MachineVP(machine.ViewObject)
-
-        # - Create CNC configuration
-        config = machine.newObject("App::DocumentObjectGroupPython", "Config")
-        MachineConfig.createConfig(config, machine.Name)
-
-        machine.ConfigName = config.Name
-        initChildren(config, machine)
+        import MachineGui
+        MachineGui.MachineVP(machine.ViewObject)
 
         Gui.ActiveDocument.ActiveView.setActiveObject('group', machine)
 
@@ -140,3 +105,11 @@ class InitMachine():
         return True
 
 Gui.addCommand("InitMachine", InitMachine())
+
+
+def __getattr__(name):
+    # - Old documents stored the Job view provider as InitMachine.MachineVP.
+    if name == "MachineVP":
+        from MachineGui import MachineVP
+        return MachineVP
+    raise AttributeError("module {!r} has no attribute {!r}".format(__name__, name))

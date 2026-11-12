@@ -28,8 +28,8 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
         obj.addProperty("App::PropertyVector",      "ExitPointL",       "", "", 5)
         obj.addProperty("App::PropertyVector",      "ExitPointR",       "", "", 5)
 
-        config = self.getConfigName(obj)
-        obj.setExpression(".SafeHeight", u"<<{}>>.SafeHeight".format(config))
+        job = getJob(obj)
+        obj.setExpression(".SafeHeight", jobExpression(job, "SafeHeight"))
 
         obj.setEditorMode("LeadOutX", 0 if obj.LeadOutEnabled else 3)     
         obj.setEditorMode("LeadOutY", 0 if obj.LeadOutEnabled else 3)     
@@ -44,7 +44,10 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
             lastObj : FoamCutBase.FoamCutMovementBaseObject = obj.ExitPoint[0]
             
             exitVertex = lastObj.getSubObject(obj.ExitPoint[1][0])
-            (isLeft, vertex, oppositeVertex, wp) = self.findOppositeVertexes(obj, lastObj, exitVertex)
+            result = self.findOppositeVertexes(obj, lastObj, exitVertex)
+            if result is None:
+                return
+            (isLeft, vertex, oppositeVertex, wp) = result
 
             if oppositeVertex is None:
                 raise Exception("Unable to locate opposite vertex.")
@@ -133,8 +136,10 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
         super().onChanged(obj, prop)
 
         if prop == "LeadOutEnabled":
-            obj.setEditorMode("LeadOutX", 0 if obj.LeadOutEnabled else 3)     
-            obj.setEditorMode("LeadOutY", 0 if obj.LeadOutEnabled else 3)
+            if hasattr(obj, "LeadOutX"):
+                obj.setEditorMode("LeadOutX", 0 if obj.LeadOutEnabled else 3)
+            if hasattr(obj, "LeadOutY"):
+                obj.setEditorMode("LeadOutY", 0 if obj.LeadOutEnabled else 3)
 
     def getAdditionalShapes(self, obj):
         '''

@@ -45,24 +45,6 @@ class FoamCutBaseObject:
         if hasattr(obj, "Placement"):
             obj.setEditorMode("Placement", 3)
 
-    def getConfigName(self, obj):
-        job = obj.Document.getObject(obj.JobName)
-
-        if job is None:
-            App.Console.PrintError("ERROR:\n Job with name '{}' not found in document.\n".format(obj.JobName))
-            return None
-                
-        return job.ConfigName
-    
-    def getConfig(self, obj):
-        job = obj.Document.getObject(obj.JobName)
-
-        if job is None:
-            App.Console.PrintError("ERROR:\n Job with name '{}' not found in document.\n".format(obj.JobName))
-            return None
-                
-        return job.getObject(job.ConfigName)
-    
     def getEdges(self, obj):
         left = None
         right = None
@@ -87,8 +69,8 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
     def __init__(self, obj, jobName):
         super().__init__(obj, jobName)  
 
-        configName = self.getConfigName(obj)
-        config = self.getConfig(obj)
+        job = getJob(obj)
+        bindJob(obj, job)
 
         obj.addProperty("App::PropertyVectorList",  "Path_L",     "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Path_R",     "", "", 5)
@@ -107,13 +89,13 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
         obj.addProperty("App::PropertyDistance",    "RightEdgeLength",     "", "", 5)
 
         obj.addProperty("App::PropertyBool",        "AddPause",             "Task", "Add pause at the end of move").AddPause = False
-        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds").PauseDuration = config.PauseDuration
+        obj.addProperty("App::PropertyTime",        "PauseDuration",        "Task", "Pause duration seconds").PauseDuration = job.PauseDuration
         obj.addProperty("App::PropertyBool",        "RapidMove",            "Task", "Move trough this segment with rapid movement speed").RapidMove = False
 
         obj.addProperty("App::PropertyEnumeration", "CompensationDirection", "Kerf Compensation",   "Kerf compensation direction").CompensationDirection = FC_KERF_DIRECTIONS
         obj.CompensationDirection = 0 # Normal compensation by default
 
-        obj.setExpression(".DiscretizationStep", u"<<{}>>.DiscretizationStep".format(configName))
+        obj.setExpression(".DiscretizationStep", jobExpression(job, "DiscretizationStep"))
 
         obj.setEditorMode("PauseDuration", 3)
 
@@ -175,6 +157,8 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             raise Exception(f"ERROR: Active Job not found\n")
 
         wp = getWorkingPlanes(job, doc)
+        if wp is None:
+            return None
 
         # check if selected vertex laying on any working plane
         onLeftPlane = isclose(wp[0].Position.x, vertex.Point.x, abs_tol=1e-7)
@@ -360,16 +344,16 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             obj.RightEdgeName = "%s%d" % (edges[1].ShapeType, shapes.index(edges[1]) + 1)
 
     def validateWireStretch(self, obj):
-        config = self.getConfig(obj)
+        job = getJob(obj)
 
-        if not config.WireStretchVerification or not float(config.WireStretchLength) > 0.0:
+        if not job.WireStretchVerification or not float(job.WireStretchLength) > 0.0:
             return True
 
         if len(obj.Path_L) != len(obj.Path_R):
             raise Exception(f"ERROR: Number of points doesn't match. Object - {obj.Label}")
         
-        delta = float(config.WireStretchLength)
-        wireLength = float(config.FieldWidth)
+        delta = float(job.WireStretchLength)
+        wireLength = float(job.FieldWidth)
 
         for pL, pR in zip(obj.Path_L, obj.Path_R):
             stretch = pL.distanceToPoint(pR) - wireLength

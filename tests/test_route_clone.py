@@ -30,9 +30,8 @@ PIVOT = 25.0
 
 def new_clone_document():
     doc, job = new_document()
-    config = job.getObject(job.ConfigName)
-    ensure(config, "App::PropertyLength", "BlockHeight", 50.0)
-    ensure(config, "App::PropertyPosition", "BlockPosition", App.Vector(0.0, 0.0, 0.0))
+    ensure(job, "App::PropertyLength", "BlockHeight", 50.0)
+    ensure(job, "App::PropertyPosition", "BlockPosition", App.Vector(0.0, 0.0, 0.0))
     return doc, job
 
 

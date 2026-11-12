@@ -3,10 +3,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.1] - 2026-11-11
+## [0.2.1] - 2026-11-13
 
 ### Added
 
+- Machine/process settings now live directly on `Job`; the separate `Config` object is gone.
+- Working planes are lightweight value objects created on demand, with analytic intersections.
+- The Job view provider draws the CNC volume, foam block, working planes, origin and rotation axis.
+- Old documents are detected on open and migrated only after the user confirms
 - Route duplicate: parametric clone of an original route with a task panel for Y/Z placement and horizontal (YZ) / vertical (XY) mirroring
 - Movement task panel for Move: live placement preview, feed/power overrides, unit-aware values and route preview
 - Task panels for Path, Projection, Enter, Exit, Join, Rotation and Route with unit-aware values, expression overrides and route preview

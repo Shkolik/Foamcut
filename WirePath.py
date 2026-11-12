@@ -30,6 +30,8 @@ class PathSection(FoamCutBase.FoamCutMovementBaseObject):
             raise Exception("Active Job not found.")
 
         wp = getWorkingPlanes(job, obj.Document)
+        if wp is None:
+            return
     
         leftEdge = obj.LeftEdge[0].getSubObject(obj.LeftEdge[1][0])
         rightEdge = obj.RightEdge[0].getSubObject(obj.RightEdge[1][0])

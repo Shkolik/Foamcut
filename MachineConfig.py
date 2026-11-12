@@ -3,6 +3,8 @@ __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
 __doc__ = "Describe machine configuration."
 
+__obsolete__ = True  # Kept only for old-document restore/migration; pending removal.
+
 import FreeCAD
 App=FreeCAD
 import FreeCADGui
@@ -180,23 +182,6 @@ In G93 the physical cutting speed stays synchronized with the wire temperature-d
         
     def onChanged(self, obj, prop):
         if prop == "FiveAxisMachine":
-            machine = obj.Document.getObject(obj.JobName)
-            if machine is not None:
-                axis = None
-                for child in machine.Group:
-                    if hasattr(child, "Type") and child.Type == "RotationAxis":
-                        axis = child
-                        break
-
-                if axis is not None:
-                    obj.Document.removeObject(axis.Name)
-
-                if obj.FiveAxisMachine:
-                    axis = machine.newObject("App::FeaturePython", "RotationAxis")    
-                    axis.Label = "Rotation Axis"
-                    RotationAxis.CreateRotationAxis(axis, machine.Name)
-                    
-
             obj.setEditorMode("OriginRotationX", 0 if obj.FiveAxisMachine else 3)
             obj.setEditorMode("R1AxisName", 0 if obj.FiveAxisMachine else 3)
         if prop == "EnableParking":

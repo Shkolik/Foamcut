@@ -33,8 +33,7 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
         wp = getWorkingPlanes(job, obj.Document)
         
         if wp is None or len(wp) != 2:
-            label = job.Label if job is not None else "None"
-            raise Exception(f"Working planes not found in Parent object '{label}'.")
+            return
 
         source = obj.Source[0].getSubObject(obj.Source[1])[0]
 

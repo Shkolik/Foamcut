@@ -618,11 +618,8 @@ class Postprocess():
             QtGui.QMessageBox.critical(None, "Job not found.", "Job [{}] not found in active document.".format(job_name))
             return
         
-        # - Get CNC configuration
-        config = FreeCAD.ActiveDocument.getObject(group.ConfigName)
-        if config is None:
-            QtGui.QMessageBox.critical(None, "Config not found.", "Config [{}] not found in active document.".format(group.ConfigName))
-            return
+        # - Job owns the machine configuration
+        config = group
 
         # - Check routes type
         for route in routes:

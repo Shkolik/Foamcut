@@ -202,6 +202,10 @@ def intersectLineAndPlane(v0, v1, plane):
     if (v0.isEqual(v1, 0.01)):
         v1.x += 1
 
+    # - WorkingPlane value objects use an analytic constant-X intersection
+    if hasattr(plane, "intersectLine"):
+        return plane.intersectLine(v0, v1)
+
     # - Make line
     edge  = Part.makeLine(v0, v1)
 
@@ -223,16 +227,18 @@ def getParallelEdgeLength(obj, planeX):
         obj: Object containing the path and configuration
         planeX: X coordinate of the plane to project onto
     '''
-    if not hasattr(obj.Proxy, "getConfig") or not hasattr(obj, "Path_L") or not hasattr(obj, "Path_R") or not hasattr(obj, "EdgesInverted"):
+    if not hasattr(obj, "Path_L") or not hasattr(obj, "Path_R") or not hasattr(obj, "EdgesInverted"):
         raise Exception(f"Unsupported object type {obj.Label}")
 
-    config = obj.Proxy.getConfig(obj)
+    job = obj.Document.getObject(obj.JobName)
+    if job is None or job.Type != "Job":
+        raise Exception(f"Active Job not found for {obj.Label}")
+
     left_points = obj.Path_L
     right_points = list(reversed(obj.Path_R)) if obj.EdgesInverted else obj.Path_R
 
-    norm = App.Vector(1.0, 0.0, 0.0)
-    xdir = App.Vector(0.0, 1.0, 0.0)
-    plane = Part.makePlane(float(config.HorizontalTravel), float(config.VerticalTravel), App.Vector(planeX, float(-config.OriginX), 0), norm, xdir)
+    from MachinePlane import WorkingPlane
+    plane = WorkingPlane.fromX(job, planeX)
 
     projected = []
 
@@ -245,52 +251,57 @@ def getParallelEdgeLength(obj, planeX):
     
     return float(path.length())
 
-def getConfigByName(config, doc):
+def getJob(obj):
     '''
-    Get Config object by it's name
-
-    @param config - Config object name
-    @param doc - FreeCAD document
-    @returns Config
+    Get the Job object that owns obj.
     '''
+    job = obj.Document.getObject(obj.JobName)
+    if job is None or getattr(job, "Type", None) != "Job":
+        raise Exception("ERROR: Active Job not found for {}.".format(obj.Label))
+    return job
 
-    if config is None or len(config) == 0:
-        FreeCAD.Console.PrintError("Error: Config name is empty.\n")
-        return
-                
-    configObj = doc.getObject(config)
 
-    if configObj is None:
-        FreeCAD.Console.PrintError("Error: Config not found.\n")
-        return
-    
-    return configObj
+def bindJob(obj, job):
+    '''
+    Bind a child to its Job through a hidden link. Expressions use ._Job.Prop.
+    This avoids the parent-group cycle and also works when the Job label
+    contains spaces, which breaks hiddenref(<<Job>>.Prop) in FreeCAD.
+    '''
+    if not hasattr(obj, "_Job"):
+        obj.addProperty("App::PropertyLinkHidden", "_Job", "", "", 5)
+    obj._Job = job
+    return job
+
+
+def jobExpression(job, prop):
+    '''
+    Build a hidden expression reference from a child object to its Job.
+    '''
+    return u"._Job.{}".format(prop)
+
 
 def getWorkingPlanes(group, doc):
     '''
-    Get working planes
+    Get working plane snapshots derived from the Job configuration.
     @param group - Job object
-    @param doc - FreeCAD document
-    @returns list of working planes
+    @param doc - FreeCAD document (kept for call-site compatibility)
+    @returns list of WorkingPlane value objects
     '''
-    if group is not None and group.Type == "Job":
-        # - Initialize result
-        result = []
-        wpl = doc.getObject(group.WPLName)
-        if wpl is not None:
-            result.append(wpl)
-        else:
-            FreeCAD.Console.PrintError("ERROR:\n Left working plane not found.\n")
-            return None
-        wpr = doc.getObject(group.WPRName)
-        if wpr is not None:
-            result.append(wpr)
-        else:
-            FreeCAD.Console.PrintError("ERROR:\n Right working plane not found.\n")
-        
-        return result
-    else:
+    if group is None or group.Type != "Job":
         FreeCAD.Console.PrintError("ERROR:\n Parent Job not found.\n")
+        return None
+
+    # - During document restore the Job may not have been migrated yet.
+    #   Returning None lets proxies skip their execute pass; the migration
+    #   touches the children so the next recompute runs them with real values.
+    if not hasattr(group, "FieldWidth"):
+        return None
+
+    from MachinePlane import WorkingPlane
+    return [
+        WorkingPlane(group, LEFT),
+        WorkingPlane(group, RIGHT),
+    ]
 
 def getPropertyExpression(obj, prop):
     '''
@@ -337,19 +348,6 @@ def clearPropertyExpression(obj, prop):
     '''
     if hasPropertyExpression(obj, prop):
         obj.clearExpression("." + prop)
-
-def getConfigExpression(obj, configAttr):
-    '''
-    Build an expression that points to a job config property.
-    @param obj - object with JobName
-    @param configAttr - config property name
-    @returns expression string
-    '''
-    job = obj.Document.getObject(obj.JobName)
-    config = job.getObject(job.ConfigName) if job is not None else None
-    if config is None:
-        raise Exception("ERROR: Config not found for [{}].".format(obj.Label))
-    return u"<<{}>>.{}".format(config.Name, configAttr)
 
 def getPreferredValue(quantity):
     '''
@@ -1019,6 +1017,8 @@ def setPickStyle(view_object, style):
     @param view_object - view object
     @param style - pick style. Acceptable values: REGULAR, BOUNDBOX, UNPICKABLE
     '''
+    if view_object is None:
+        return
     node = getPickStyleNode(view_object, create = style != 0)
     if node is not None:
         return node.style.setValue(style)

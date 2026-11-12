@@ -1,9 +1,11 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 __title__ = "Rotation Axis"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
 __doc__ = "Rotation axis helper object."
+
+__obsolete__ = True  # Kept only for old-document restore/migration; pending removal.
 
 import FreeCAD
 App=FreeCAD
@@ -19,13 +21,15 @@ class RotationAxis(FoamCutBase.FoamCutBaseObject):
         super().__init__(obj, jobName)       
         obj.Type = "RotationAxis"  
 
-        config = self.getConfigName(obj)
+        job = utilities.getJob(obj)
+
+        utilities.bindJob(obj, job)
 
         obj.addProperty("App::PropertyLength",     "Length", "", "", 5)                         
         obj.addProperty("App::PropertyLength",     "Origin", "", "", 5)
 
-        obj.setExpression(".Origin", u"<<{}>>.OriginRotationX".format(config))
-        obj.setExpression(".Length", u"<<{}>>.VerticalTravel + 50mm".format(config))
+        obj.setExpression(".Origin", utilities.jobExpression(job, "OriginRotationX"))
+        obj.setExpression(".Length", utilities.jobExpression(job, "VerticalTravel") + u" + 50mm")
         
         obj.Proxy = self
 
@@ -81,3 +85,4 @@ class RotationAxisVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 def CreateRotationAxis(obj, jobName):
     RotationAxis(obj, jobName)
     RotationAxisVP(obj.ViewObject)
+

@@ -31,17 +31,14 @@ class MirrorG():
         if doc is None:
             return defaults
         job = doc.getObject("Job")
-        if job is None or not hasattr(job, "ConfigName"):
-            return defaults
-        config = doc.getObject(job.ConfigName)
-        if config is None:
+        if job is None or not hasattr(job, "X1AxisName"):
             return defaults
         return (
-            config.X1AxisName if hasattr(config, "X1AxisName") else "X",
-            config.Z1AxisName if hasattr(config, "Z1AxisName") else "Y",
-            config.X2AxisName if hasattr(config, "X2AxisName") else "Z",
-            config.Z2AxisName if hasattr(config, "Z2AxisName") else "A",
-            config.R1AxisName if hasattr(config, "R1AxisName") else "B",
+            job.X1AxisName if hasattr(job, "X1AxisName") else "X",
+            job.Z1AxisName if hasattr(job, "Z1AxisName") else "Y",
+            job.X2AxisName if hasattr(job, "X2AxisName") else "Z",
+            job.Z2AxisName if hasattr(job, "Z2AxisName") else "A",
+            job.R1AxisName if hasattr(job, "R1AxisName") else "B",
         )
 
     def mirrorGcode(self, file: str):

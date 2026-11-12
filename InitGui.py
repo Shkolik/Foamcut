@@ -43,9 +43,12 @@ class FoamcutWB (Workbench):
         import ExitGui
         import PathGui
         import ProjectionGui
+        import MachineGui
         import ViewProviderMigration
+        import Migration
 
         ViewProviderMigration.install()
+        Migration.install()
         
         self.examples = [] # A list of command names to create example project
         self.list = [

@@ -1,9 +1,11 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 __title__ = "Working Plane"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
 __doc__ = "Working plane."
+
+__obsolete__ = True  # Kept only for old-document restore/migration; pending removal.
 
 import FreeCAD
 App=FreeCAD
@@ -22,17 +24,19 @@ class FoamCutWorkingPlane(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyLength",     "Width", "", "", 5).Width = 100                                          # Machine Y axis
         obj.addProperty("App::PropertyPosition",   "Position", "", "", 5).Position = App.Vector(0.0, 0.0, 0.0)  # Machine base X axis
         
-        config = self.getConfigName(obj)
-
-        obj.setExpression(".Width",   u"<<{}>>.VerticalTravel".format(config))
-        obj.setExpression(".Length",  u"<<{}>>.HorizontalTravel".format(config))
-
-        obj.setExpression(".Position.y", u"-<<{}>>.OriginX".format(config))
+        job = utilities.getJob(obj)
         
+        utilities.bindJob(obj, job)
+
+        obj.setExpression(".Width",   utilities.jobExpression(job, "VerticalTravel"))
+        obj.setExpression(".Length",  utilities.jobExpression(job, "HorizontalTravel"))
+
+        obj.setExpression(".Position.y", u"-" + utilities.jobExpression(job, "OriginX"))
+
         if side == utilities.LEFT:
-            obj.setExpression(".Position.x", u"-<<{}>>.FieldWidth / 2".format(config))
+            obj.setExpression(".Position.x", u"-" + utilities.jobExpression(job, "FieldWidth") + u" / 2")
         else:
-            obj.setExpression(".Position.x", u"<<{}>>.FieldWidth / 2".format(config))
+            obj.setExpression(".Position.x", utilities.jobExpression(job, "FieldWidth") + u" / 2")
 
         obj.Proxy = self
 
@@ -68,3 +72,4 @@ class FoamCutWorkingPlaneVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 def CreateWorkingPlane(obj, jobName, side):
     FoamCutWorkingPlane(obj, jobName, side)
     FoamCutWorkingPlaneVP(obj.ViewObject)
+

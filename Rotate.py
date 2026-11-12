@@ -9,6 +9,7 @@ __usage__ = """Select target body to rotate and activate tool."""
 import FreeCAD
 App=FreeCAD
 import FoamCutBase
+from utilities import getJob, jobExpression, bindJob
  
 class Rotation(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, source, jobName): 
@@ -21,8 +22,9 @@ class Rotation(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyAngle",     "Angle",      "Task",     "Rotate object by angle").Angle = 90
         
 
-        config = self.getConfigName(obj)
-        obj.setExpression(".OriginRotationX", u"<<{}>>.OriginRotationX".format(config))
+        job = getJob(obj)
+        bindJob(obj, job)
+        obj.setExpression(".OriginRotationX", jobExpression(job, "OriginRotationX"))
         
         obj.Proxy = self
         self.execute(obj)

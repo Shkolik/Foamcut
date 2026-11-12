@@ -5,6 +5,8 @@ __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
 __doc__ = "Foam block representation."
 
+__obsolete__ = True  # Kept only for old-document restore/migration; pending removal.
+
 import FreeCAD
 App=FreeCAD
 import FreeCADGui
@@ -22,14 +24,16 @@ class FoamBlock(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyLength",     "Width", "", "", 5).Width = 100  
         obj.addProperty("App::PropertyLength",     "Height", "", "", 5).Height = 100      
         
-        config = self.getConfigName(obj)
-        obj.setExpression(".Width",   u"<<{}>>.BlockWidth".format(config))
-        obj.setExpression(".Length",  u"<<{}>>.BlockLength".format(config))
-        obj.setExpression(".Height",  u"<<{}>>.BlockHeight".format(config))
+        job = utilities.getJob(obj)
+        
+        utilities.bindJob(obj, job)
+        obj.setExpression(".Width",   utilities.jobExpression(job, "BlockWidth"))
+        obj.setExpression(".Length",  utilities.jobExpression(job, "BlockLength"))
+        obj.setExpression(".Height",  utilities.jobExpression(job, "BlockHeight"))
 
-        obj.setExpression(".Placement.Base.x", u"<<{}>>.BlockPosition.x".format(config))
-        obj.setExpression(".Placement.Base.y", u"<<{}>>.BlockPosition.y".format(config))
-        obj.setExpression(".Placement.Base.z", u"<<{}>>.BlockPosition.z".format(config))
+        obj.setExpression(".Placement.Base.x", utilities.jobExpression(job, "BlockPosition") + ".x")
+        obj.setExpression(".Placement.Base.y", utilities.jobExpression(job, "BlockPosition") + ".y")
+        obj.setExpression(".Placement.Base.z", utilities.jobExpression(job, "BlockPosition") + ".z")
         
         obj.Proxy = self
 
@@ -64,3 +68,4 @@ class FoamBlockVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 def CreateFoamBlock(obj, jobName):
     FoamBlock(obj, jobName)
     FoamBlockVP(obj.ViewObject)
+

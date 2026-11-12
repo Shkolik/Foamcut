@@ -28,6 +28,7 @@ import FreeCADGui
 FreeCADGui.addCommand = lambda *a, **k: None
 
 import FoamCut_WorkingPlane
+import JobConfig
 import Postprocess
 import utilities
 import WireRoute
@@ -90,46 +91,35 @@ def new_document():
     doc = App.newDocument("RoutePP")
     job = doc.addObject("App::DocumentObjectGroupPython", "Job")
     ensure(job, "App::PropertyString", "Type", "Job")
-    ensure(job, "App::PropertyString", "ConfigName", "")
-    ensure(job, "App::PropertyString", "WPLName", "")
-    ensure(job, "App::PropertyString", "WPRName", "")
     job.Type = "Job"
 
-    cfg = job.newObject("App::DocumentObjectGroupPython", "Config")
-    ensure(cfg, "App::PropertyLength", "FieldWidth", 740.0)
-    ensure(cfg, "App::PropertyLength", "HorizontalTravel", 870.0)
-    ensure(cfg, "App::PropertyLength", "VerticalTravel", 330.0)
-    ensure(cfg, "App::PropertyFloat", "OriginX", 0.0)
-    ensure(cfg, "App::PropertyLength", "KerfCompensation", 0.0)
-    ensure(cfg, "App::PropertyFloat", "CompensationDegree", 1.0)
-    job.ConfigName = cfg.Name
+    JobConfig.applyConfigProperties(job)
+    job.FieldWidth = 740.0
+    job.HorizontalTravel = 870.0
+    job.VerticalTravel = 330.0
+    job.OriginX = 0.0
+    job.KerfCompensation = 0.0
+    job.CompensationDegree = 1.0
 
-    wpl = doc.addObject("Part::FeaturePython", "WPL")
-    FoamCut_WorkingPlane.FoamCutWorkingPlane(wpl, job.Name, utilities.LEFT)
-    wpl.Length = 870.0
-    wpl.Width = 330.0
-    wpl.Position = App.Vector(-370.0, -304.8, 0.0)
-    job.WPLName = wpl.Name
-
-    wpr = doc.addObject("Part::FeaturePython", "WPR")
-    FoamCut_WorkingPlane.FoamCutWorkingPlane(wpr, job.Name, utilities.RIGHT)
-    wpr.Length = 870.0
-    wpr.Width = 330.0
-    wpr.Position = App.Vector(370.0, -304.8, 0.0)
-    job.WPRName = wpr.Name
+    # - Preserve the old fixture's working plane Y offset.
+    job.WorkingPlaneCustom = True
+    job.WorkingPlaneLeftX = -370.0
+    job.WorkingPlaneRightX = 370.0
+    job.WorkingPlaneY = -304.8
+    job.WorkingPlaneLength = 870.0
+    job.WorkingPlaneWidth = 330.0
 
     return doc, job
 
 
 def build_route(doc, job, objects, kerf=0.0, strategy=None):
-    config = job.getObject(job.ConfigName)
-    config.KerfCompensation = kerf
+    job.KerfCompensation = kerf
     route = doc.addObject("Part::FeaturePython", "Route")
     WireRoute.WireRoute(route, objects, job.Name)
     if strategy is not None:
         route.CompensationStrategy = strategy
     if kerf > 0 and strategy not in (None, "None"):
-        # Kerf compensation is read from the config expression, so let the
+        # Kerf compensation is read from the Job expression, so let the
         # document resolve expressions before executing the route.
         doc.recompute()
     else:
