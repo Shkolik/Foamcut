@@ -8,13 +8,9 @@ __usage__ = """Select face, edge or vertex and activate tool."""
 
 import FreeCAD
 App=FreeCAD
-import FreeCADGui
-Gui=FreeCADGui
-import FoamCutViewProviders
 import FoamCutBase
 import Part
-import utilities
-from utilities import getWorkingPlanes, getAllSelectedObjects, getEdgesLinks
+from utilities import getWorkingPlanes
 
 
 class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
@@ -44,101 +40,35 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
 
         self.createShape(obj, [source], wp, (0, 0, 0))
 
-class ProjectionSectionVP(FoamCutViewProviders.FoamCutMovementViewProvider):     
-    def getIcon(self):
-        return utilities.getIconPath("projection.svg")
 
-    def claimChildren(self):
-        if self.Object.Source is not None and len(self.Object.Source) > 0:
-            return [self.Object.Source[0]]
-        return None
-    
-class MakeProjection():
-    """Make Projection"""
+def createProjection(job, source, label = None, recompute = True):
+    '''
+    Create a Projection object inside a job.
+    Script-friendly entry point: no GUI is required.
+    @param job - Job group
+    @param source - LinkSub (object, subelement) of the source geometry
+    @param label (optional) - object label
+    @param recompute (optional) - recompute the document after creation. True by default
+    @returns Projection object
+    '''
+    doc = job.Document
+    projection = job.newObject("Part::FeaturePython", "Projection")
+    try:
+        ProjectionSection(projection, source, job.Name)
+        if label:
+            projection.Label = label
+    except Exception:
+        doc.removeObject(projection.Name)
+        raise
 
-    def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("projection.svg"), # the name of a svg file available in the resources
-                'Accel' : "", # a default shortcut (optional)
-                "MenuText": "Create Projection",
-                "ToolTip" : "Create projection object from selected face, edge or vertex. Separate projection will be created for each edge or vertex."}
+    if recompute:
+        doc.recompute()
+    return projection
 
-    def CreateFromEdge(self, edge, group):
-        projection = None
-        label = ""
-        try:
-            projection = group.newObject("Part::FeaturePython","Projection")
-                
-            ProjectionSection(projection, (edge[0], (edge)[1][0]), group.Name)
-            ProjectionSectionVP(projection.ViewObject)
-            projection.ViewObject.PointSize = 4
-        except Exception as error:
-            App.Console.PrintError(f"Failed to create Projection.\n")
-            if projection:
-                label = f"{projection.Label}: "
-                projection.Document.removeObject(projection.Name)
-            App.Console.PrintError(f"{label}{error}\n")
 
-    def Activated(self):
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = App.ActiveDocument.getObject("Job")
-            setActive = True
-
-        if group is not None and group.Type == "Job":
-            if setActive:
-                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
-            
-            # - Get selected objects
-            objects = getAllSelectedObjects(True)
-
-            baseObjects = []
-
-            for object in objects:
-                if object[1][0].startswith("Face"):
-                    # - prepare base object. 
-                    # - Sometimes, after reopening file it is necessary to recompute em or list of edges will be empty
-                    if object[0].Name not in baseObjects:
-                        object[0].touch()
-                        baseObjects.append(object[0].Name)
-                        object[0].recompute(True)
-
-                    edges = getEdgesLinks(object[0], object[0].getSubObject(object[1][0]))
-
-                    if len(edges) == 0:
-                        FreeCAD.Console.PrintError("ERROR: No edges of the selected face [{}] match the object shape. Select edges directly instead.\n".format(object[0].Label))
-                        return
-
-                    for edge in edges:
-                        self.CreateFromEdge(edge, group)
-                else:
-                    self.CreateFromEdge(object, group)
-
-            App.ActiveDocument.recompute()
-            Gui.Selection.clearSelection()
-    
-    def IsActive(self):
-        if App.ActiveDocument is None:
-            return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":  
-                # - Get selected objects including Faces
-                objects = getAllSelectedObjects(True)
-
-                # - at least one Edge, Vertex or Face should be selected
-                if len(objects) == 0:               
-                    return False
-                
-                wp = getWorkingPlanes(group, App.ActiveDocument)
-                if wp is None or len(wp) != 2:
-                    return False                    
-                return True
-            return False
-            
-Gui.addCommand("MakeProjection", MakeProjection())
+def __getattr__(name):
+    # - Old documents stored the view provider as WireProjection.ProjectionSectionVP.
+    if name == "ProjectionSectionVP":
+        from ProjectionGui import ProjectionSectionVP
+        return ProjectionSectionVP
+    raise AttributeError("module {!r} has no attribute {!r}".format(__name__, name))

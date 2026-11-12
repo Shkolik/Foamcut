@@ -350,8 +350,9 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             shapes.append(shape)
         
         obj.Shape = Part.makeCompound(shapes)
-        obj.ViewObject.LineColor = color
-        obj.ViewObject.PointColor = color
+        if obj.ViewObject is not None:
+            obj.ViewObject.LineColor = color
+            obj.ViewObject.PointColor = color
 
         if hasattr(obj, "LeftEdgeName"):
             obj.LeftEdgeName = "%s%d" % (edges[0].ShapeType, shapes.index(edges[0]) + 1)

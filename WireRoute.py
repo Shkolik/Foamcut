@@ -6,14 +6,9 @@ __usage__ = """Select multiple paths in order of cutting and activate tool."""
 
 import FreeCAD
 App=FreeCAD
-import FreeCADGui
-Gui=FreeCADGui
 import Part
 import FoamCutBase
-import FoamCutViewProviders
 from utilities import *
-import pivy.coin as coin
-import math
 
 FC_KERF_STRATEGY_NONE = 0
 FC_KERF_STRATEGY_UNI = 1
@@ -810,217 +805,42 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
         return None
 
-class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
-    
-    def attach(self, obj):
-        self.ViewObject = obj
-        self.Object = obj.Object
-        
-        self.node = coin.SoGroup()
 
-        self.drawRoute()
-        obj.addDisplayMode(self.node, "Flat Lines")
-        setPickStyle(obj, UNPICKABLE)
+def createRoute(job, objects, label = None, recompute = True):
+    '''
+    Create a Route object inside a job.
+    Script-friendly entry point: no GUI is required.
+    @param job - Job group
+    @param objects - ordered list of movement objects
+    @param label (optional) - object label
+    @param recompute (optional) - recompute the document after creation. True by default
+    @returns Route object
+    '''
+    doc = job.Document
+    route = job.newObject("App::FeaturePython", "Route")
+    removed = []
+    try:
+        WireRoute(route, objects, job.Name)
+        if label:
+            route.Label = label
+        for obj in objects:
+            if obj in job.Group:
+                job.removeObject(obj)
+                removed.append(obj)
+    except Exception:
+        for obj in removed:
+            job.addObject(obj)
+        doc.removeObject(route.Name)
+        raise
 
-    def drawRoute(self):        
-        if self.Object.Offset_L is not None and self.Object.Offset_R is not None and len(self.Object.Offset_L) > 0 and len(self.Object.Offset_R) > 0:
-            while self.node.getNumChildren() > 0:
-                self.node.removeChild(0)
+    if recompute:
+        doc.recompute()
+    return route
 
-            self.node.addChild(self.drawRouteLines(self.Object.Offset_L, self.Object.RouteBreaks))
-            self.node.addChild(self.drawRouteLines(self.Object.Offset_R, self.Object.RouteBreaks))
 
-            if self.Object.Pauses is not None and len(self.Object.Pauses) > 0 and len(self.Object.Pauses) == len(self.Object.PausesDurations):
-                pauses = []
-                for dur_idx, idx in enumerate(self.Object.Pauses):
-                    dur = self.Object.PausesDurations[dur_idx]
-                    pauses.append([self.Object.Offset_L[idx], float(dur)])
-                    pauses.append([self.Object.Offset_R[idx], float(dur)])
-
-                self.node.addChild(self.drawPauses(pauses))
-
-    def drawPauses(self, points):
-        group = coin.SoGroup()
-        if len(points) > 0:
-            color = coin.SoBaseColor()
-            color.rgb.setValue(1, 0, 0)
-            draw_style = coin.SoDrawStyle()
-            draw_style.style = coin.SoDrawStyle.FILLED
-            draw_style.lineWidth = 1
-            group.addChild(draw_style)
-            group.addChild(color)
-
-            # points is array of pauses each item is also array, where first element is point coordinates and second is pause duration
-            for i in range(len(points)):
-                sep = coin.SoSeparator()                
-               
-                # Define the coordinates of the circle
-                coords = coin.SoCoordinate3()
-                num_segments = 20
-                radius = points[i][1]
-                circle_coords = []
-                for idx in range(num_segments):
-                    angle = 2.0 * math.pi * idx / num_segments
-                    x = radius * math.cos(angle)
-                    y = radius * math.sin(angle)
-                    circle_coords.append((x, y, 0))
-                coords.point.setValues(0, num_segments, circle_coords)
-                
-                faceSet = coin.SoFaceSet()
-                faceSet.numVertices.setValue(num_segments)
-                
-                point = points[i][0]
-                transform = coin.SoTransform()
-                transform.translation.setValue(point.x, point.y, point.z)
-
-                rotation = coin.SbRotation(coin.SbVec3f(0, 1, 0), math.radians(90))
-                transform.rotation.setValue(rotation)
-
-                shapeHints = coin.SoShapeHints()
-                shapeHints.vertexOrdering = coin.SoShapeHints.CLOCKWISE
-
-                sep.addChild(coords)
-                sep.addChild(transform)
-                sep.addChild(shapeHints)
-                sep.addChild(faceSet)
-
-                group.addChild(sep)
-
-        return group
-
-    def drawRouteLines(self, points, breaks):
-        group = coin.SoGroup()
-        if len(points) > 0:
-            pointGroups = []
-
-            if len(breaks) > 0:
-                lastBreak = 0
-                for idx in breaks:
-                    pointGroups.append(points[lastBreak:idx + 1:1])
-                    lastBreak = idx + 1
-                if lastBreak < len(points) - 1:
-                    pointGroups.append(points[lastBreak:])
-            else:
-                pointGroups.append(points)
-            
-            for pg in pointGroups:
-                group.addChild(self.drawRouteLine(pg))
-        return group
-    
-    def drawRouteLine(self, points):
-        sep = coin.SoSeparator()
-        if len(points) > 0:            
-            line = coin.SoLineSet()
-            line.numVertices.setValue(len(points))
-            coords = coin.SoCoordinate3()
-            coords.point.setValues(0, [[p.x, p.y, p.z] for p in points])
-            color = coin.SoBaseColor()
-            color.rgb.setValue(1, 0, 0)
-            draw_style = coin.SoDrawStyle()
-            draw_style.style = coin.SoDrawStyle.FILLED
-            draw_style.lineWidth = 2
-            sep.addChild(draw_style)
-            sep.addChild(color)
-            sep.addChild(coords)
-            sep.addChild(line)
-        return sep 
-    
-    def getIcon(self):
-        return getIconPath("route.svg")
-
-    def getDisplayModes(self, obj):
-        """Return the display modes that this viewprovider supports."""
-        return ["Flat Lines"]
-    
-    def claimChildren(self):
-        return [object for object in self.Object.Objects]
-    
-    def onDelete(self, obj, subelements):
-        doc = self.Object.Document if self.Object is not None else None
-        if doc is None:
-            doc = App.ActiveDocument
-        if doc is not None:
-            group = doc.getObject(self.Object.JobName)
-            if group is not None and group.Type == "Job":
-                for object in self.Object.Objects:
-                    group.addObject(object)
-        return True
-    
-    def updateData(self, obj, prop):
-        if prop == "Redraw":#prop == "Offset_L" or prop == "Offset_R" or prop == "Pauses" or prop == "PausesDurations":
-            self.drawRoute()
-        
-
-class MakeRoute():
-    """Make Route"""
-
-    def GetResources(self):
-        return {"Pixmap"  : getIconPath("route.svg"),
-                'Accel' : "", # a default shortcut (optional)
-                "MenuText": "Create a route",
-                "ToolTip" : "Create a route from selected objects."}
-
-    def Activated(self):
-        view = Gui.ActiveDocument.ActiveView
-        doc = App.ActiveDocument
-        group = view.getActiveObject("group")
-        setActive = False
-
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
-
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
-            
-            # - Get selecttion
-            objects = [item.Object for item in Gui.Selection.getSelectionEx()]
-            
-            route = None
-            label = ""
-            try:
-                # - Create object
-                route = group.newObject("App::FeaturePython", "Route")
-                WireRoute(route, objects, group.Name)
-                WireRouteVP(route.ViewObject)
-
-                for obj in objects:
-                    #obj.ViewObject.Visibility = False
-                    group.removeObject(obj)
-
-                doc.recompute()
-                Gui.Selection.clearSelection()
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Route.\n")
-                if route:
-                    label = f"{route.Label}: "
-                    doc.removeObject(route.Name)
-                App.Console.PrintError(f"{label}{error}\n")
-
-    def IsActive(self):
-        if FreeCAD.ActiveDocument is None:
-            return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-            
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-                # - Get selected objects
-                objects = [item.Object for item in Gui.Selection.getSelectionEx()]
-
-                # - nothing selected
-                if len(objects) == 0:
-                    return False
-                
-                for obj in objects:
-                    if not hasattr(obj, "Type") or obj.Type not in FC_TYPES_TO_ROUTE:
-                        return False                    
-                return True
-            return False
-            
-Gui.addCommand("Route", MakeRoute())
+def __getattr__(name):
+    # - Old documents stored the view provider as WireRoute.WireRouteVP.
+    if name == "WireRouteVP":
+        from RouteGui import WireRouteVP
+        return WireRouteVP
+    raise AttributeError("module {!r} has no attribute {!r}".format(__name__, name))

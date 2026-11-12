@@ -99,7 +99,83 @@ class TestMovementGuiSurface(unittest.TestCase):
         self.assertTrue(hasattr(MovementGui, "MoveTaskPanel"))
         self.assertTrue(hasattr(MovementGui, "showMovementPanel"))
         self.assertTrue(hasattr(MovementGui, "openMovementPanel"))
-        self.assertIn("Move", MovementGui.PANELS)
+        self.assertEqual(sorted(MovementGui.PANELS.keys()),
+                         ["Enter", "Exit", "Join", "Move", "Path", "Projection"])
+
+    def test_object_panels_are_available(self):
+        import TaskPanelBase
+        import RotationGui
+        import RouteGui
+        import MoveGui
+        import EnterGui
+        import ExitGui
+        import JoinGui
+        import PathGui
+        import ProjectionGui
+        self.assertTrue(hasattr(TaskPanelBase, "BaseTaskPanel"))
+        self.assertTrue(hasattr(RotationGui, "RotationTaskPanel"))
+        self.assertTrue(hasattr(RouteGui, "RouteTaskPanel"))
+        self.assertTrue(hasattr(MoveGui, "MakeMove"))
+        self.assertTrue(hasattr(EnterGui, "MakeEnter"))
+        self.assertTrue(hasattr(ExitGui, "MakeExit"))
+        self.assertTrue(hasattr(JoinGui, "MakeJoin"))
+        self.assertTrue(hasattr(PathGui, "MakePath"))
+        self.assertTrue(hasattr(ProjectionGui, "MakeProjection"))
+
+    def test_legacy_view_provider_aliases(self):
+        import WireMove
+        import WireEnter
+        import WireExit
+        import WireJoin
+        import WirePath
+        import WireProjection
+        import Rotate
+        import WireRoute
+        import MoveGui
+        import EnterGui
+        import ExitGui
+        import JoinGui
+        import PathGui
+        import ProjectionGui
+        import RotationGui
+        import RouteGui
+
+        self.assertIs(WireMove.WireMoveVP, MoveGui.WireMoveVP)
+        self.assertIs(WireEnter.WireEnterVP, EnterGui.WireEnterVP)
+        self.assertIs(WireExit.WireExitVP, ExitGui.WireExitVP)
+        self.assertIs(WireJoin.WireJoinVP, JoinGui.WireJoinVP)
+        self.assertIs(WirePath.PathSectionVP, PathGui.PathSectionVP)
+        self.assertIs(WireProjection.ProjectionSectionVP, ProjectionGui.ProjectionSectionVP)
+        self.assertIs(Rotate.RotationVP, RotationGui.RotationVP)
+        self.assertIs(WireRoute.WireRouteVP, RouteGui.WireRouteVP)
+
+
+class TestPanelProperties(unittest.TestCase):
+    def test_feed_and_power_are_optional(self):
+        import MovementGui
+
+        class Dummy:
+            Type = "Enter"
+            CompensationDirection = "Normal"
+
+        panel = MovementGui.MovementTaskPanel.__new__(MovementGui.MovementTaskPanel)
+        panel.obj = Dummy()
+        names = panel.properties()
+        self.assertNotIn("FeedRate", names)
+        self.assertNotIn("WirePower", names)
+        self.assertIn("RapidMove", names)
+
+        Dummy.FeedRate = 1.0
+        Dummy.WirePower = 1
+        names = panel.properties()
+        self.assertIn("FeedRate", names)
+        self.assertIn("WirePower", names)
+
+    def test_standard_buttons_are_int(self):
+        import TaskPanelBase
+        buttons = TaskPanelBase.BaseTaskPanel.getStandardButtons(None)
+        self.assertIsInstance(buttons, int)
+        self.assertTrue(buttons)
 
 
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):

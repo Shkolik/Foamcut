@@ -8,11 +8,7 @@ __usage__ = """Select target body to rotate and activate tool."""
 
 import FreeCAD
 App=FreeCAD
-import FreeCADGui
-Gui=FreeCADGui
-import FoamCutViewProviders
 import FoamCutBase
-import utilities
  
 class Rotation(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, source, jobName): 
@@ -35,8 +31,6 @@ class Rotation(FoamCutBase.FoamCutBaseObject):
         if obj.Source is None:
             return
 
-        obj.Source.ViewObject.Visibility = False
-
         # - Copy and rotate object
         shape = obj.Source.Shape.copy()
         shape.rotate(App.Vector(0.0, obj.OriginRotationX, 0.0), App.Vector(0,0,1), obj.Angle)
@@ -45,103 +39,35 @@ class Rotation(FoamCutBase.FoamCutBaseObject):
         obj.Shape     = shape
         obj.Placement = shape.Placement
 
-class RotationVP(FoamCutViewProviders.FoamCutBaseViewProvider):   
-    def getIcon(self):
-        return utilities.getIconPath("rotation.svg")
-    
-    def claimChildren(self):
-        return [self.Object.Source]
 
-    def onDelete(self, obj, subelements):
-        try:
-            self.Object.Source.ViewObject.Visibility = True
-        except Exception as err:
-            App.Console.PrintError("Error in onDelete: {0} \n".format(err))
-        return True    
+def createRotation(job, source, label = None, recompute = True):
+    '''
+    Create a Rotation object inside a job.
+    Script-friendly entry point: no GUI is required.
+    @param job - Job group
+    @param source - object to rotate
+    @param label (optional) - object label
+    @param recompute (optional) - recompute the document after creation. True by default
+    @returns Rotation object
+    '''
+    doc = job.Document
+    rotation = job.newObject("Part::FeaturePython", "Rotation")
+    try:
+        Rotation(rotation, source, job.Name)
+        if label:
+            rotation.Label = label
+    except Exception:
+        doc.removeObject(rotation.Name)
+        raise
 
-class AddRotation():
-    """Add Rotation"""
+    if recompute:
+        doc.recompute()
+    return rotation
 
-    def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("rotation.svg"), # the name of a svg file available in the resources
-                'Accel' : "", # a default shortcut (optional)
-                "MenuText": "Rotate target",
-                "ToolTip" : "Rotate target object by given angle around rotation axis"}
 
-    def Activated(self):   
-        doc = App.ActiveDocument
-        view = Gui.ActiveDocument.ActiveView
-
-        group = view.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
-
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
-            
-            source = Gui.Selection.getSelectionEx()[0].Object      
-            rt = None
-            label = ""
-            try:
-                # - Create rotation object
-                rt = doc.addObject("Part::FeaturePython", "Rotation")
-                
-                Rotation(rt, source, group.Name)
-                RotationVP(rt.ViewObject)
-
-                group.addObject(rt)
-                Gui.Selection.clearSelection()
-                doc.recompute()
-                Gui.Selection.addSelection(doc.Name, rt.Name)
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Rotation.\n")
-                if rt:
-                    label = f"{rt.Label}: "
-                    doc.removeObject(rt.Name)
-                App.Console.PrintError(f"{label}{error}\n")
-    
-    def IsActive(self):
-        if FreeCAD.ActiveDocument is None:
-            return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-            
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-
-                config = group.getObject(group.ConfigName)
-
-                if not config.FiveAxisMachine:
-                    return False
-                
-                # - Get selecttion
-                selection = Gui.Selection.getSelectionEx()
-
-                # - nothing selected
-                if len(selection) == 0:
-                    return False
-                
-                # - Check object type
-                if selection[0] is None or selection[0].Object is None:   
-                    return False      
-
-                obj = selection[0].Object
-                if not hasattr(obj, "Shape"):
-                    return False
-                
-                if (hasattr(obj, "Type") and
-                    (obj.Type == "Path" or obj.Type == "Enter"  or obj.Type == "Job" or obj.Type == "Helper" or obj.Type == "Config"
-                    or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route" or obj.Type == "Projection")):
-                    return False
-                
-                return True
-            return False
-            
-Gui.addCommand("Rotate", AddRotation())
+def __getattr__(name):
+    # - Old documents stored the view provider as Rotate.RotationVP.
+    if name == "RotationVP":
+        from RotationGui import RotationVP
+        return RotationVP
+    raise AttributeError("module {!r} has no attribute {!r}".format(__name__, name))

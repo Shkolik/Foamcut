@@ -8,10 +8,7 @@ __usage__ = """Select point on left or right working plane and activate tool."""
 
 import FreeCAD
 App=FreeCAD
-import FreeCADGui
-Gui=FreeCADGui
 import Part
-import FoamCutViewProviders
 import FoamCutBase
 from utilities import *
 
@@ -169,93 +166,35 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
             )
         return shapes
 
-class WireEnterVP(FoamCutViewProviders.FoamCutMovementViewProvider):
-    def getIcon(self):
-        return getIconPath("enter.svg")
-    
-    def claimChildren(self):
-        return [self.Object.EntryPoint[0]] if self.Object.EntryPoint is not None and len(self.Object.EntryPoint) > 0 else None
+
+def createEnter(job, entry, label = None, recompute = True):
+    '''
+    Create an Enter object inside a job.
+    Script-friendly entry point: no GUI is required.
+    @param job - Job group
+    @param entry - LinkSub (object, subelement) of the entry point
+    @param label (optional) - object label
+    @param recompute (optional) - recompute the document after creation. True by default
+    @returns Enter object
+    '''
+    doc = job.Document
+    enter = job.newObject("Part::FeaturePython", "Enter")
+    try:
+        WireEnter(enter, entry, job.Name)
+        if label:
+            enter.Label = label
+    except Exception:
+        doc.removeObject(enter.Name)
+        raise
+
+    if recompute:
+        doc.recompute()
+    return enter
 
 
-class MakeEnter():
-    """Make Enter"""
-
-    def GetResources(self):
-        return {"Pixmap"  : getIconPath("enter.svg"), # the name of a svg file available in the resources
-                'Accel' : "", # a default shortcut (optional)
-                "MenuText": "Create enter",
-                "ToolTip" : "Create enter path object to selected entry point"}
-
-    def Activated(self):     
-        doc = App.ActiveDocument
-        view = Gui.ActiveDocument.ActiveView
-
-        group = view.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
-
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
-            
-            # - Get selecttion
-            objects = getAllSelectedObjects()
-            
-            enter = None
-            label = ""
-            try:
-                # - Create object
-                enter = doc.addObject("Part::FeaturePython", "Enter")
-                WireEnter(enter, objects[0], group.Name)
-                WireEnterVP(enter.ViewObject)
-                enter.ViewObject.PointSize = 4
-
-                group.addObject(enter)
-
-                Gui.Selection.clearSelection()
-                Gui.Selection.addSelection(doc.Name, enter.Name)
-                
-                doc.recompute()
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Enter.\n")
-                if enter:
-                    label = f"{enter.Label}: "
-                    doc.removeObject(enter.Name)
-                App.Console.PrintError(f"{label}{error}\n")
-    
-    def IsActive(self):
-        if FreeCAD.ActiveDocument is None:
-            return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-            
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-                # - Get selecttion
-                objects = getAllSelectedObjects()
-
-                # - nothing selected
-                if len(objects) == 0:
-                    return False
-                
-                object = objects[0]
-                parent = object[0]
-                vertex = parent.getSubObject(object[1][0])
-                # - Check object type
-                if not issubclass(type(vertex), Part.Vertex):
-                    return False
-                
-                wp = getWorkingPlanes(group, App.ActiveDocument)
-                if wp is None or len(wp) != 2:
-                    return False
-                
-                return True
-            return False
-            
-Gui.addCommand("MakeEnter", MakeEnter())
+def __getattr__(name):
+    # - Old documents stored the view provider as WireEnter.WireEnterVP.
+    if name == "WireEnterVP":
+        from EnterGui import WireEnterVP
+        return WireEnterVP
+    raise AttributeError("module {!r} has no attribute {!r}".format(__name__, name))

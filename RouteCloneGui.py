@@ -10,12 +10,12 @@ App=FreeCAD
 import FreeCADGui
 Gui=FreeCADGui
 from PySide import QtGui
-import WireRoute
+import RouteGui
 import WireRouteClone
 import utilities
 
 
-class WireRouteCloneVP(WireRoute.WireRouteVP):
+class WireRouteCloneVP(RouteGui.WireRouteVP):
 
     def drawRoute(self):
         source = self.Object.Source
@@ -140,7 +140,9 @@ class RouteCloneTaskPanel:
         self.preview()
 
     def getStandardButtons(self):
-        return int(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        buttons = QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel
+        # - PySide6 returns a StandardButton enum that is not int-convertible
+        return buttons.value if hasattr(buttons, "value") else int(buttons)
 
     def sourceChanged(self):
         name = self._source.currentData()

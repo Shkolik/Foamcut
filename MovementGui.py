@@ -3,54 +3,34 @@
 __title__ = "Movement task panels"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
-__doc__ = "Shared task panel machinery for movement objects."
+__doc__ = "Task panels for movement objects."
 
 import FreeCAD
-App=FreeCAD
+App = FreeCAD
 import FreeCADGui
-Gui=FreeCADGui
+Gui = FreeCADGui
 from PySide import QtGui
 import utilities
+from TaskPanelBase import BaseTaskPanel
 
-MOVE_COMMON_PROPERTIES = ["FeedRate", "WirePower", "RapidMove", "AddPause", "PauseDuration"]
+MOVE_COMMON_PROPERTIES = ["RapidMove", "AddPause", "PauseDuration"]
 
 
-class MovementTaskPanel:
-    '''Base task panel for movement objects.
+class MovementTaskPanel(BaseTaskPanel):
+    '''Task panel for movement objects.
 
     Edits the object and recomputes only that object, so the preview is cheap.
     Routes using the object are updated on OK or by the explicit Preview route button.
     '''
 
-    def __init__(self, obj, created = False):
-        self.obj = obj
-        self.created = created
-        self._status_error = False
-
-        self._original = {}
-        for name in self.properties():
-            if hasattr(obj, name):
-                self._original[name] = (getattr(obj, name), utilities.getPropertyExpression(obj, name))
-
-        self._doc = obj.Document
-        if self._doc.getBookedTransactionID() == 0:
-            self._doc.openTransaction(self.title())
-
-        self.form = QtGui.QWidget()
-        self.form.setWindowTitle(self.title())
-
-        layout = QtGui.QFormLayout(self.form)
-        layout.setContentsMargins(10, 6, 10, 6)
-        self.addObjectSection(layout)
-        self.addCommonSection(layout)
-
-        self.preview()
-
-    def title(self):
-        return "{} [{}]".format(self.obj.Type, self.obj.Label)
-
     def properties(self):
         names = list(self.objectProperties()) + list(MOVE_COMMON_PROPERTIES)
+        # - Feed and power are per-object only on Move and Join; Enter, Exit,
+        #   Path and Projection inherit the config values in the postprocessor.
+        if hasattr(self.obj, "FeedRate"):
+            names.append("FeedRate")
+        if hasattr(self.obj, "WirePower"):
+            names.append("WirePower")
         if self.hasCompensationDirection():
             names.append("CompensationDirection")
         return names
@@ -61,42 +41,60 @@ class MovementTaskPanel:
     def hasCompensationDirection(self):
         return self.obj.Type not in ("Path", "Projection") and hasattr(self.obj, "CompensationDirection")
 
+    def addSections(self, layout):
+        self.addObjectSection(layout)
+        self.addCommonSection(layout)
+
     def addObjectSection(self, layout):
         pass
+
+    def applyValues(self):
+        self.applyObjectValues()
+        self.applyCommonValues()
 
     def applyObjectValues(self):
         pass
 
+    def previewMessage(self):
+        return "Preview updated (route is updated on OK or by Preview route)."
+
     def addCommonSection(self, layout):
-        feed_expression = utilities.getPropertyExpression(self.obj, "FeedRate")
-        feed_value, feed_unit, self._feed_factor = utilities.getPreferredValue(
-            FreeCAD.Units.Quantity(float(self.obj.FeedRate), FreeCAD.Units.Velocity))
+        self._feed_override = None
+        self._feed = None
+        self._feed_factor = 1.0
+        if hasattr(self.obj, "FeedRate"):
+            feed_expression = utilities.getPropertyExpression(self.obj, "FeedRate")
+            feed_value, feed_unit, self._feed_factor = utilities.getPreferredValue(
+                FreeCAD.Units.Quantity(float(self.obj.FeedRate), FreeCAD.Units.Velocity))
 
-        self._feed_override = QtGui.QCheckBox("Override feed rate", self.form)
-        self._feed_override.setChecked(feed_expression is None)
-        self._feed_override.toggled.connect(self.onFeedOverrideToggled)
+            self._feed_override = QtGui.QCheckBox("Override feed rate", self.form)
+            self._feed_override.setChecked(feed_expression is None)
+            self._feed_override.toggled.connect(self.onFeedOverrideToggled)
 
-        self._feed = QtGui.QDoubleSpinBox(self.form)
-        self._feed.setRange(0.0, 1000000.0)
-        self._feed.setDecimals(2)
-        self._feed.setSuffix(" {}".format(feed_unit))
-        self._feed.setValue(feed_value)
-        self._feed.setEnabled(feed_expression is None)
-        self._feed.valueChanged.connect(self.preview)
-        layout.addRow(self._feed_override, self._feed)
+            self._feed = QtGui.QDoubleSpinBox(self.form)
+            self._feed.setRange(0.0, 1000000.0)
+            self._feed.setDecimals(2)
+            self._feed.setSuffix(" {}".format(feed_unit))
+            self._feed.setValue(feed_value)
+            self._feed.setEnabled(feed_expression is None)
+            self._feed.valueChanged.connect(self.preview)
+            layout.addRow(self._feed_override, self._feed)
 
-        power_expression = utilities.getPropertyExpression(self.obj, "WirePower")
+        self._power_override = None
+        self._power = None
+        if hasattr(self.obj, "WirePower"):
+            power_expression = utilities.getPropertyExpression(self.obj, "WirePower")
 
-        self._power_override = QtGui.QCheckBox("Override wire power", self.form)
-        self._power_override.setChecked(power_expression is None)
-        self._power_override.toggled.connect(self.onPowerOverrideToggled)
+            self._power_override = QtGui.QCheckBox("Override wire power", self.form)
+            self._power_override.setChecked(power_expression is None)
+            self._power_override.toggled.connect(self.onPowerOverrideToggled)
 
-        self._power = QtGui.QSpinBox(self.form)
-        self._power.setRange(0, 100000)
-        self._power.setValue(int(self.obj.WirePower))
-        self._power.setEnabled(power_expression is None)
-        self._power.valueChanged.connect(self.preview)
-        layout.addRow(self._power_override, self._power)
+            self._power = QtGui.QSpinBox(self.form)
+            self._power.setRange(0, 100000)
+            self._power.setValue(int(self.obj.WirePower))
+            self._power.setEnabled(power_expression is None)
+            self._power.valueChanged.connect(self.preview)
+            layout.addRow(self._power_override, self._power)
 
         self._rapid = QtGui.QCheckBox("Rapid move", self.form)
         self._rapid.setChecked(bool(self.obj.RapidMove))
@@ -134,10 +132,6 @@ class MovementTaskPanel:
         self._preview_route.setVisible(len(self.routes()) > 0)
         layout.addRow("", self._preview_route)
 
-        self._status = QtGui.QLabel("Route is updated on OK or by Preview route.", self.form)
-        self._status.setWordWrap(True)
-        layout.addRow(self._status)
-
     def routes(self):
         proxy = getattr(self.obj, "Proxy", None)
         if proxy is None or not hasattr(proxy, "getRoutes"):
@@ -165,17 +159,19 @@ class MovementTaskPanel:
         self.preview()
 
     def applyCommonValues(self):
-        if self._feed_override.isChecked():
-            utilities.overrideProperty(self.obj, "FeedRate", float(self._feed.value()) * self._feed_factor)
-        else:
-            expression = self._original.get("FeedRate", (None, None))[1]
-            utilities.restorePropertyExpression(self.obj, "FeedRate", expression)
+        if self._feed_override is not None:
+            if self._feed_override.isChecked():
+                utilities.overrideProperty(self.obj, "FeedRate", float(self._feed.value()) * self._feed_factor)
+            else:
+                expression = self._original.get("FeedRate", (None, None))[1]
+                utilities.restorePropertyExpression(self.obj, "FeedRate", expression)
 
-        if self._power_override.isChecked():
-            utilities.overrideProperty(self.obj, "WirePower", int(self._power.value()))
-        else:
-            expression = self._original.get("WirePower", (None, None))[1]
-            utilities.restorePropertyExpression(self.obj, "WirePower", expression)
+        if self._power_override is not None:
+            if self._power_override.isChecked():
+                utilities.overrideProperty(self.obj, "WirePower", int(self._power.value()))
+            else:
+                expression = self._original.get("WirePower", (None, None))[1]
+                utilities.restorePropertyExpression(self.obj, "WirePower", expression)
 
         self.obj.RapidMove = self._rapid.isChecked()
         self.obj.AddPause = self._pause.isChecked()
@@ -183,22 +179,6 @@ class MovementTaskPanel:
 
         if self._compensation is not None:
             self.obj.CompensationDirection = self._compensation.currentText()
-
-    def applyValues(self):
-        self.applyObjectValues()
-        self.applyCommonValues()
-
-    def preview(self):
-        '''Apply widget values and recompute the object only; return False on error.'''
-        try:
-            self.applyValues()
-            self.obj.recompute()
-        except Exception as error:
-            self.setStatus(str(error), True)
-            return False
-
-        self.setStatus("Preview updated (route is updated on OK or by Preview route).", False)
-        return True
 
     def previewRoute(self):
         if not self.preview():
@@ -218,43 +198,6 @@ class MovementTaskPanel:
 
         self.setStatus("Route preview updated.", False)
 
-    def setStatus(self, text, is_error):
-        self._status.setText(text)
-        self._status.setStyleSheet("color: red;" if is_error else "")
-
-    def restoreOriginal(self):
-        for name, (value, expression) in self._original.items():
-            if expression:
-                utilities.restorePropertyExpression(self.obj, name, expression)
-            else:
-                utilities.clearPropertyExpression(self.obj, name)
-                setattr(self.obj, name, value)
-
-    def getStandardButtons(self):
-        return int(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
-
-    def accept(self):
-        if not self.preview():
-            return True
-        doc = self._doc
-        doc.commitTransaction()
-        Gui.Control.closeDialog()
-        # - Recompute after closing: document recompute is deferred while a task panel is open
-        doc.recompute()
-        return True
-
-    def reject(self):
-        doc = self._doc
-        doc.abortTransaction()
-        if self.created:
-            if doc.getObject(self.obj.Name) is not None:
-                doc.removeObject(self.obj.Name)
-        else:
-            self.restoreOriginal()
-        Gui.Control.closeDialog()
-        doc.recompute()
-        return True
-
 
 class MoveTaskPanel(MovementTaskPanel):
     '''Task panel for the Move movement object.'''
@@ -263,32 +206,92 @@ class MoveTaskPanel(MovementTaskPanel):
         return ["MoveX", "MoveY"]
 
     def addObjectSection(self, layout):
-        x_value, length_unit, self._length_factor = utilities.getPreferredValue(
-            FreeCAD.Units.Quantity(float(self.obj.MoveX), FreeCAD.Units.Length))
-
-        self._move_x = QtGui.QDoubleSpinBox(self.form)
-        self._move_x.setRange(-100000.0, 100000.0)
-        self._move_x.setDecimals(2)
-        self._move_x.setSuffix(" {}".format(length_unit))
-        self._move_x.setValue(x_value)
-        self._move_x.valueChanged.connect(self.preview)
-        layout.addRow("Move X:", self._move_x)
-
-        self._move_y = QtGui.QDoubleSpinBox(self.form)
-        self._move_y.setRange(-100000.0, 100000.0)
-        self._move_y.setDecimals(2)
-        self._move_y.setSuffix(" {}".format(length_unit))
-        self._move_y.setValue(float(self.obj.MoveY) / self._length_factor)
-        self._move_y.valueChanged.connect(self.preview)
-        layout.addRow("Move Y:", self._move_y)
+        self._move_x = self.addLengthRow(layout, "MoveX", "Move X:")
+        self._move_y = self.addLengthRow(layout, "MoveY", "Move Y:")
 
     def applyObjectValues(self):
-        self.obj.MoveX = float(self._move_x.value()) * self._length_factor
-        self.obj.MoveY = float(self._move_y.value()) * self._length_factor
+        pass
+
+
+class JoinTaskPanel(MovementTaskPanel):
+    '''Task panel for the Join movement object.'''
+
+
+class PathTaskPanel(MovementTaskPanel):
+    '''Task panel for the Path movement object.'''
+
+
+class ProjectionTaskPanel(MovementTaskPanel):
+    '''Task panel for the Projection movement object.'''
+
+
+class EnterTaskPanel(MovementTaskPanel):
+    '''Task panel for the Enter movement object.'''
+
+    def objectProperties(self):
+        return ["SafeHeight", "LeadInEnabled", "LeadInX", "LeadInY"]
+
+    def addObjectSection(self, layout):
+        self.addOverrideRow(layout, "SafeHeight", "safe height",
+                            FreeCAD.Units.Quantity(float(self.obj.SafeHeight), FreeCAD.Units.Length))
+
+        self._lead = QtGui.QCheckBox("Add lead-in", self.form)
+        self._lead.setChecked(bool(self.obj.LeadInEnabled))
+        self._lead.toggled.connect(self.onLeadToggled)
+        layout.addRow("", self._lead)
+
+        self._lead_x = self.addLengthRow(layout, "LeadInX", "Lead-in X:")
+        self._lead_y = self.addLengthRow(layout, "LeadInY", "Lead-in Y:")
+        self._lead_x.setEnabled(self._lead.isChecked())
+        self._lead_y.setEnabled(self._lead.isChecked())
+
+    def onLeadToggled(self, checked):
+        self._lead_x.setEnabled(checked)
+        self._lead_y.setEnabled(checked)
+        self.preview()
+
+    def applyValues(self):
+        self.obj.LeadInEnabled = self._lead.isChecked()
+        self.applyCommonValues()
+
+
+class ExitTaskPanel(MovementTaskPanel):
+    '''Task panel for the Exit movement object.'''
+
+    def objectProperties(self):
+        return ["SafeHeight", "LeadOutEnabled", "LeadOutX", "LeadOutY"]
+
+    def addObjectSection(self, layout):
+        self.addOverrideRow(layout, "SafeHeight", "safe height",
+                            FreeCAD.Units.Quantity(float(self.obj.SafeHeight), FreeCAD.Units.Length))
+
+        self._lead = QtGui.QCheckBox("Add lead-out", self.form)
+        self._lead.setChecked(bool(self.obj.LeadOutEnabled))
+        self._lead.toggled.connect(self.onLeadToggled)
+        layout.addRow("", self._lead)
+
+        self._lead_x = self.addLengthRow(layout, "LeadOutX", "Lead-out X:")
+        self._lead_y = self.addLengthRow(layout, "LeadOutY", "Lead-out Y:")
+        self._lead_x.setEnabled(self._lead.isChecked())
+        self._lead_y.setEnabled(self._lead.isChecked())
+
+    def onLeadToggled(self, checked):
+        self._lead_x.setEnabled(checked)
+        self._lead_y.setEnabled(checked)
+        self.preview()
+
+    def applyValues(self):
+        self.obj.LeadOutEnabled = self._lead.isChecked()
+        self.applyCommonValues()
 
 
 PANELS = {
     "Move": MoveTaskPanel,
+    "Join": JoinTaskPanel,
+    "Path": PathTaskPanel,
+    "Projection": ProjectionTaskPanel,
+    "Enter": EnterTaskPanel,
+    "Exit": ExitTaskPanel,
 }
 
 

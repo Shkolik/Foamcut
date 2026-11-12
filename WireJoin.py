@@ -8,13 +8,9 @@ __usage__ = """Select two points on left or right plane and activate tool."""
 
 import FreeCAD
 App=FreeCAD
-import FreeCADGui
-Gui=FreeCADGui
 import Part
-import FoamCutViewProviders
 import FoamCutBase
-import utilities
-from utilities import getAllSelectedObjects, isCommonPoint, isMovement
+from utilities import isCommonPoint, isMovement
 
 class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
     def __init__(self, obj, start, end, jobName):  
@@ -68,86 +64,36 @@ class WireJoin(FoamCutBase.FoamCutMovementBaseObject):
         
         self.createShape(obj, edges, wp, (35, 0, 205))
 
-class WireJoinVP(FoamCutViewProviders.FoamCutMovementViewProvider):
-    def getIcon(self):
-        return utilities.getIconPath("join.svg")
 
-    def claimChildren(self):
-        if (self.Object.StartPoint is not None and len(self.Object.StartPoint) > 0 
-            and self.Object.EndPoint is not None and len(self.Object.EndPoint) > 0 ):
-            return [self.Object.StartPoint[0], self.Object.EndPoint[0]]
-        return None
+def createJoin(job, start, end, label = None, recompute = True):
+    '''
+    Create a Join object inside a job.
+    Script-friendly entry point: no GUI is required.
+    @param job - Job group
+    @param start - LinkSub (object, subelement) of the start point
+    @param end - LinkSub (object, subelement) of the end point
+    @param label (optional) - object label
+    @param recompute (optional) - recompute the document after creation. True by default
+    @returns Join object
+    '''
+    doc = job.Document
+    join = job.newObject("Part::FeaturePython", "Join")
+    try:
+        WireJoin(join, start, end, job.Name)
+        if label:
+            join.Label = label
+    except Exception:
+        doc.removeObject(join.Name)
+        raise
 
-class MakeJoin():
-    """Make Join"""
+    if recompute:
+        doc.recompute()
+    return join
 
-    def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("join.svg"), # the name of a svg file available in the resources
-                'Accel' : "", # a default shortcut (optional)
-                "MenuText": "Join 2 points",
-                "ToolTip" : "Join 2 selected points"}
 
-    def Activated(self):    
-        doc = App.ActiveDocument
-        view = Gui.ActiveDocument.ActiveView
-
-        group = view.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
-
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
-            
-            # - Get selecttion
-            objects = getAllSelectedObjects()
-            
-            join = None
-            label = ""
-            try:
-                # - Create object
-                join = doc.addObject("Part::FeaturePython", "Join")
-                WireJoin(join, objects[0], objects[1], group.Name)
-                WireJoinVP(join.ViewObject)
-                join.ViewObject.PointSize = 4
-        
-                group.addObject(join)
-                Gui.Selection.clearSelection()
-                doc.recompute()
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Join.\n")
-                if join:
-                    label = f"{join.Label}: "
-                    doc.removeObject(join.Name)
-                App.Console.PrintError(f"{label}{error}\n")
-    
-    def IsActive(self):
-        if FreeCAD.ActiveDocument is None:
-            return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-            
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":   
-                # - Get selecttion
-                objects = getAllSelectedObjects()
-
-                # - nothing selected
-                if len(objects) < 2:
-                    return False
-                
-                parentA = objects[0][0]
-                parentB = objects[1][0]
-                # - Check object type
-                if isMovement(parentA) or isMovement(parentB):   
-                    return True
-                
-            return False
-            
-Gui.addCommand("Join", MakeJoin())
+def __getattr__(name):
+    # - Old documents stored the view provider as WireJoin.WireJoinVP.
+    if name == "WireJoinVP":
+        from JoinGui import WireJoinVP
+        return WireJoinVP
+    raise AttributeError("module {!r} has no attribute {!r}".format(__name__, name))

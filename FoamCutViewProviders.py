@@ -38,7 +38,8 @@ class FoamCutBaseViewProvider:
 class FoamCutMovementViewProvider(FoamCutBaseViewProvider):
     def __init__(self, obj):
         super().__init__(obj)
-        obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Task", "Show projection lines between planes").ShowProjectionLines = False
+        if not hasattr(obj, "ShowProjectionLines"):
+            obj.addProperty("App::PropertyBool",        "ShowProjectionLines",  "Task", "Show projection lines between planes").ShowProjectionLines = False
 
     def doubleClicked(self, _):
         import MovementGui

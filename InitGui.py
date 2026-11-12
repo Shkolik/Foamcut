@@ -28,13 +28,24 @@ class FoamcutWB (Workbench):
         import WireExit
         import WireMove
         import MovementGui
+        import MoveGui
         import WireJoin
+        import JoinGui
         import Rotate
+        import RotationGui
         import WireRoute
+        import RouteGui
         import RouteCloneGui
         import Postprocess
         import MirrorGcode
         import WireProjection
+        import EnterGui
+        import ExitGui
+        import PathGui
+        import ProjectionGui
+        import ViewProviderMigration
+
+        ViewProviderMigration.install()
         
         self.examples = [] # A list of command names to create example project
         self.list = [
@@ -57,6 +68,8 @@ class FoamcutWB (Workbench):
 
     def Activated(self):
         "This function is executed when the workbench is activated"
+        import ViewProviderMigration
+        ViewProviderMigration.restore()
         return
 
     def Deactivated(self):
