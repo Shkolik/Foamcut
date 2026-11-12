@@ -10,7 +10,9 @@ turns that cusp into a visible loop.
 
 The first test uses a sliced real-world case: the leading-edge junction of
 the ``left_wing`` route (Path004 -> Path005) from the reported document,
-projected to the temporary plane used by WireRoute.
+projected to the temporary plane used by WireRoute.  When the supporting lines
+cross too far away to be a miter (a compensation step at a tangential joint),
+the ends are bridged instead - see TestCompensationStepAtTangentialJoint.
 
 Run with:
     FreeCADCmd.exe tests/test_offset_join.py
@@ -102,6 +104,67 @@ class TestMissedOffsetJoin(unittest.TestCase):
             self.assertLess(
                 turn_deg(verts[i - 1], verts[i], verts[i + 1]), 90.0,
                 "joined wire reverses at vertex %d: %s" % (i, verts[i]))
+
+
+class TestCompensationStepAtTangentialJoint(unittest.TestCase):
+    """Dynamic compensation jumps by a kerf-scale step at a tangential joint.
+
+    Real case (``Wing_FG3`` in the reported document): the tip side of the
+    route is 1.76x shorter than the root side, so dynamic compensation offsets
+    the tip profile by 1.46 mm while the lead-in move ahead of it is offset by
+    0.7 mm.  The profile leaves the lead-in under only 2.7 deg, so the two
+    offset ends miss each other by 0.76 mm and their supporting lines cross
+    15.9 mm back along the lead-in.  Trimming/extending to that point would
+    consume the lead-in, so the join used to raise
+    "Intersection is outside of the acceptable range" and the route failed.
+
+    The ends must be bridged instead: both wires keep their own offset, and the
+    lead-in absorbs the step (its end point is shared with - and dropped in
+    favour of - the profile's start point).
+    """
+
+    def setUp(self):
+        # Lead-in offset (kerf 0.7 mm), 15 mm long, ends 0.07 mm before the
+        # profile's compensated start.
+        self.lead_in = wire([
+            (247.772741, 24.678670),
+            (232.772741, 24.678670),
+        ])
+        # Tip profile offset (1.4606 mm), first three discretized points.
+        self.profile = wire([
+            (232.842600, 25.437558),
+            (232.558118, 25.451180),
+            (232.273374, 25.464710),
+        ])
+
+    def test_ends_are_bridged_not_consumed(self):
+        point, mode1, mode2 = intersectWires(self.lead_in, self.profile, 5e-3)
+        self.assertEqual((mode1, mode2), ("none", "none"),
+                         "a compensation step must be bridged: trimming or "
+                         "extending here consumes the lead-in")
+        self.assertAlmostEqual(point.z, 25.0581, places=3)
+        self.assertAlmostEqual(point.y, 232.8426, places=3)
+
+    def test_joined_wires_keep_their_own_offsets(self):
+        point, mode1, mode2 = intersectWires(self.lead_in, self.profile, 5e-3)
+        first, second = connectWires(self.lead_in, self.profile,
+                                     (point, mode1, mode2))
+        self.assertEqual([v.Point for v in first.Vertexes],
+                         [v.Point for v in self.lead_in.Vertexes],
+                         "lead-in offset must not be modified")
+        self.assertEqual([v.Point for v in second.Vertexes],
+                         [v.Point for v in self.profile.Vertexes],
+                         "profile must keep its compensated start point")
+
+    def test_large_gap_still_raises(self):
+        # 10 mm off the lead-in is no compensation step - it is a broken offset
+        # and must stay an error instead of being silently bridged.
+        far = wire([
+            (232.842600, 35.437558),
+            (232.558118, 35.451180),
+        ])
+        with self.assertRaises(Exception):
+            intersectWires(self.lead_in, far, 5e-3)
 
 
 class TestOffsetJoinOutsideLimit(unittest.TestCase):

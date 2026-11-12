@@ -623,17 +623,28 @@ def _joinMode(wire, point):
     return "trim" if topo == "Edge" else "extend"
 
 
-def intersectWires(wire1, wire2, tolerance = 1e-4):
+def intersectWires(wire1, wire2, tolerance = 1e-4, maxBridgeGap = 2.0):
     '''
     Check how wires intersect on a plane
     
     @param wire1 - first wire
     @param wire2 - second wire
+    @param tolerance - distance under which wires are treated as touching
+    @param maxBridgeGap - largest gap between the wire ends that is still
+        joined by a straight bridging segment instead of being reported as an
+        error (see the "bridge" case below). Defaults to 2 mm - well above a
+        kerf-scale compensation step, well below a misplaced offset.
 
     @returns intersection of 2 wires as (intersection, wire1 mode, wire2 mode) where:
         - intersection is App.Vector() with coordinates of intersection
         - wire1 mode - mode of intersection for wire1: "none" | "trim" | "extend" | "replace"
         - wire2 mode - mode of intersection for wire2: "none" | "trim" | "extend" | "replace"
+
+    Both modes "none" with a non-touching pair of wires means "bridge": the
+    ends are too far apart for a meaningful intersection but close enough to
+    connect with a straight segment, so neither wire is modified.  The caller
+    that concatenates wires keeps the following wire's start point, so the
+    previous segment is the one that absorbs the step.
     '''
     if wire1 is None and wire2 is None:
         raise Exception("At least one wire should be present")
@@ -753,8 +764,27 @@ def intersectWires(wire1, wire2, tolerance = 1e-4):
                         intPoint = v1.add(v2).multiply(0.5) # use middle point between 2 vertices as intersection
                         return (intPoint, "replace", "replace") # special case when both wires are nearly parallel
                     
-                    else:
-                        raise Exception(f"Intersection is outside of the acceptable range.\n Initial distance check: {dist}, {vectors}, {infos}\n  {distance}, {infos[0]}")
+                    if dist <= maxBridgeGap:
+                        # Adjacent offsets may have different magnitudes (dynamic
+                        # kerf compensation scales the offset per edge), so they
+                        # miss each other by a kerf-scale gap.  The intersection
+                        # of their supporting lines then lies far beyond the far
+                        # end of the examined wire: trimming/extending to it
+                        # would reverse that wire instead of joining the ends.
+                        # Bridge the ends with a straight segment instead.  Both
+                        # wires keep their own offset and the caller drops the
+                        # first wire's end point, so the previous (lead-in) edge
+                        # absorbs the compensation step and the following cut
+                        # edge starts exactly on its own offset.
+                        if not SUPPRESS_WARNINGS:
+                            App.Console.PrintWarning(
+                                "Offset ends miss each other by {:.3f} mm and their "
+                                "intersection lies outside the wires. Bridging them "
+                                "with a straight segment.\n".format(dist))
+                        intPoint = v1.add(v2).multiply(0.5)
+                        return (intPoint, "none", "none")
+
+                    raise Exception(f"Intersection is outside of the acceptable range.\n Initial distance check: {dist}, {vectors}, {infos}\n  {distance}, {infos[0]}")
                 else:
                     # The point is not on the examined wire.  It may lie
                     # alongside it (adjacent offsets of different magnitude
