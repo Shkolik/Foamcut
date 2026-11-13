@@ -24,18 +24,10 @@ class WorkingPlane:
         self.Side = side
         self.Type = "WorkingPlane"
 
-        if getattr(job, "WorkingPlaneCustom", False):
-            left_x = float(job.WorkingPlaneLeftX)
-            right_x = float(job.WorkingPlaneRightX)
-            self.Position = App.Vector(left_x if side == utilities.LEFT else right_x,
-                                       float(job.WorkingPlaneY), 0.0)
-            self.Length = float(job.WorkingPlaneLength)
-            self.Width = float(job.WorkingPlaneWidth)
-        else:
-            x = -float(job.FieldWidth) / 2.0 if side == utilities.LEFT else float(job.FieldWidth) / 2.0
-            self.Position = App.Vector(x, -float(job.OriginX), 0.0)
-            self.Length = float(job.HorizontalTravel)
-            self.Width = float(job.VerticalTravel)
+        x = -float(job.FieldWidth) / 2.0 if side == utilities.LEFT else float(job.FieldWidth) / 2.0
+        self.Position = App.Vector(x, -float(job.OriginX), 0.0)
+        self.Length = float(job.HorizontalTravel)
+        self.Width = float(job.VerticalTravel)
 
         self.Label = "Working Plane L" if side == utilities.LEFT else "Working Plane R"
         self.Name = "WPL" if side == utilities.LEFT else "WPR"

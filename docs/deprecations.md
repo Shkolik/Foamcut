@@ -14,10 +14,10 @@ Status legend:
 ## 1. Dynamic wire power — Confirmed
 
 **Where:**
-- `MachineConfig.DynamicWirePower` — `MachineConfig.py:52-54`
-- `Postprocess.generateWireCompensatedPower` — `Postprocess.py:100-111`
-- `Postprocess.getDynamicWirePowerCommand` — `Postprocess.py:227-234`
-- Start-block compensation — `Postprocess.py:175-183`
+- `JobConfig.DynamicWirePower` — `JobConfig.py:77`
+- `Postprocess.generateWireCompensatedPower` — `Postprocess.py:232`
+- `Postprocess.getDynamicWirePowerCommand` — `Postprocess.py:387`
+- Start-block compensation — `Postprocess.py:323-326`
 
 **What it does:** Varies wire power per move (`Sxx.xx` appended to every cut line)
 based on the instantaneous wire length (`point1.distanceToPoint(point2)`), instead of

@@ -11,7 +11,6 @@ App = FreeCAD
 import JobConfig
 
 CURRENT_VERSION = 4
-_HELPER_NAMES = ("Origin", "CNCVolume", "WPL", "WPR", "Block", "RotationAxis")
 
 
 def _config_reference_pattern(config):
@@ -100,48 +99,15 @@ def _fix_job_references(doc, job):
                 obj.setExpression(path, new_expression)
 
 
-def _capture_working_planes(job, doc):
-    wpl_name = getattr(job, "WPLName", "")
-    wpr_name = getattr(job, "WPRName", "")
-    wpl = doc.getObject(wpl_name) if wpl_name else None
-    wpr = doc.getObject(wpr_name) if wpr_name else None
-    if wpl is None and wpr is None:
-        return
-
-    derived = {
-        "left_x": -float(job.FieldWidth) / 2.0,
-        "right_x": float(job.FieldWidth) / 2.0,
-        "y": -float(job.OriginX),
-        "length": float(job.HorizontalTravel),
-        "width": float(job.VerticalTravel),
-    }
-    actual = dict(derived)
-    if wpl is not None:
-        actual["left_x"] = float(wpl.Position.x)
-        actual["y"] = float(wpl.Position.y)
-        actual["length"] = float(wpl.Length)
-        actual["width"] = float(wpl.Width)
-    if wpr is not None:
-        actual["right_x"] = float(wpr.Position.x)
-        actual["y"] = float(wpr.Position.y)
-        actual["length"] = float(wpr.Length)
-        actual["width"] = float(wpr.Width)
-
-    if any(abs(actual[key] - derived[key]) > 1e-7 for key in derived):
-        job.WorkingPlaneCustom = True
-        job.WorkingPlaneLeftX = actual["left_x"]
-        job.WorkingPlaneRightX = actual["right_x"]
-        job.WorkingPlaneY = actual["y"]
-        job.WorkingPlaneLength = actual["length"]
-        job.WorkingPlaneWidth = actual["width"]
-
-
 def _delete_helpers(job, doc, config):
     config_name = config.Name if config is not None else ""
     children = list(job.Group)
     for obj in children:
         obj_type = getattr(obj, "Type", None)
-        if obj is config or obj_type in ("Helper", "RotationAxis") or obj.Name in _HELPER_NAMES:
+        # - The Type property identifies every helper created by this workbench;
+        #   matching internal names as well could delete an unrelated user
+        #   object that happens to be called "Block" or "Origin".
+        if obj is config or obj_type in ("Helper", "RotationAxis"):
             doc.removeObject(obj.Name)
 
     if config_name and doc.getObject(config_name) is not None:
@@ -155,13 +121,35 @@ def _delete_helpers(job, doc, config):
         job.WPRName = ""
 
 
+def _job_needs_repair(doc, job):
+    '''
+    Check whether a job still needs the Config-to-Job migration.
+    A job whose MigrationVersion is already current can still need repair when
+    an earlier build left ConfigName set or expressions pointing at a Config
+    object that no longer exists.
+    '''
+    if getattr(job, "MigrationVersion", 0) < CURRENT_VERSION:
+        return True
+    if getattr(job, "ConfigName", ""):
+        return True
+    for obj in doc.Objects:
+        if getattr(obj, "JobName", None) != job.Name:
+            continue
+        if getattr(obj, "Type", None) in ("Helper", "RotationAxis"):
+            continue
+        for _, expression in getattr(obj, "ExpressionEngine", []):
+            if "<<Config>>" in expression:
+                return True
+    return False
+
+
 def _migrate_job(job):
     doc = job.Document
     if not hasattr(job, "MigrationVersion"):
         job.addProperty("App::PropertyInteger", "MigrationVersion", "", "", 5)
         job.MigrationVersion = 0
 
-    if job.MigrationVersion >= CURRENT_VERSION:
+    if not _job_needs_repair(doc, job):
         return False
 
     config_name = getattr(job, "ConfigName", "")
@@ -172,7 +160,6 @@ def _migrate_job(job):
 
     if config is not None:
         _copy_config_properties(job, config)
-        _capture_working_planes(job, doc)
         _rewrite_expressions(doc, config, job)
 
     _fix_job_references(doc, job)
@@ -204,7 +191,7 @@ def migrate_document(doc=None, recompute=True):
     if not jobs:
         return 0
 
-    jobs = [job for job in jobs if getattr(job, "MigrationVersion", 0) < CURRENT_VERSION]
+    jobs = [job for job in jobs if _job_needs_repair(doc, job)]
     if not jobs:
         return 0
 
@@ -236,71 +223,45 @@ def _needs_migration(doc):
     jobs = [job for job in doc.Objects if getattr(job, "Type", None) == "Job"]
     if not jobs:
         return False
-    if any(getattr(job, "MigrationVersion", 0) < CURRENT_VERSION for job in jobs):
-        return True
-    if any(getattr(job, "ConfigName", "") for job in jobs):
-        return True
-    # - Repair files that were partially migrated by an older build and now
-    #   contain expressions pointing at a Config object that no longer exists.
-    for obj in doc.Objects:
-        if getattr(obj, "Type", None) in ("Helper", "RotationAxis"):
-            continue
-        for _, expression in getattr(obj, "ExpressionEngine", []):
-            if "<<Config>>" in expression:
-                return True
-    return False
+    return any(_job_needs_repair(doc, job) for job in jobs)
 
 
 def needs_migration(doc):
     return _needs_migration(doc)
 
 
-_prompted_documents = set()
 _restoring_documents = set()
 
 
-def prompt_migration(doc):
+def migrate_on_open(doc):
     '''
-    Ask the user before converting an old document. The document has already
-    been completely restored at this point, so Config and all helper objects
-    are available and expressions can be rewritten safely.
+    Convert an old document to the Job-owned configuration when it is opened.
+    The migration runs without asking: a modal confirmation cannot be shown
+    reliably from the document observer, and a half-migrated document breaks
+    every later command. The console message tells the user what happened.
+    The document has already been completely restored at this point, so Config
+    and all helper objects are available and expressions can be rewritten safely.
+    'needs_migration' is the only guard: it is false after a successful run, so
+    reopening a file that was not saved is migrated again, while an ordinary
+    open does no work.
     '''
-    if doc is None or doc.Name in _prompted_documents:
+    if doc is None:
         return
     if not _needs_migration(doc):
         return
-    _prompted_documents.add(doc.Name)
 
     try:
-        from PySide import QtGui
-    except Exception:
-        return
-
-    answer = QtGui.QMessageBox.question(
-        None,
-        "Foamcut migration",
-        "This document was created with an older Foamcut version.\n\n"
-        "Migrate it now? The document will be converted to Job-owned "
-        "configuration and the old Config/helper objects will be removed.\n\n"
-        "It is recommended to keep a backup copy.",
-        QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
-        QtGui.QMessageBox.No)
-
-    if answer != QtGui.QMessageBox.Yes:
-        return
-
-    try:
-        migrate_document(doc, recompute = False)
-        QtGui.QMessageBox.information(
-            None,
-            "Foamcut migration",
-            "Migration complete. Recompute the document when you are ready "
-            "to update the route geometry.")
+        migrated = migrate_document(doc)
     except Exception as error:
-        QtGui.QMessageBox.critical(
-            None,
-            "Foamcut migration failed",
-            "The document was left unchanged.\n\n{}".format(error))
+        App.Console.PrintError(
+            "Foamcut: migration of [{}] failed: {}\n".format(doc.Label, error))
+        return
+
+    if migrated:
+        App.Console.PrintWarning(
+            "Foamcut: migrated [{}] from an older document format to the Job-based "
+            "configuration; the old Config and helper objects were removed and the "
+            "document was recomputed.\n".format(doc.Label))
 
 
 class _DocumentObserver:
@@ -309,15 +270,11 @@ class _DocumentObserver:
 
     def slotFinishRestoreDocument(self, doc):
         _restoring_documents.discard(doc.Name)
-        prompt_migration(doc)
+        migrate_on_open(doc)
 
     def slotActivateDocument(self, doc):
         if doc.Name not in _restoring_documents:
-            prompt_migration(doc)
-
-    def slotCloseDocument(self, doc):
-        _prompted_documents.discard(doc.Name)
-        _restoring_documents.discard(doc.Name)
+            migrate_on_open(doc)
 
 
 _observer = None

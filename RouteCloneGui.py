@@ -270,6 +270,10 @@ class DuplicateRoute():
         group = getActiveJob()
         if group is None:
             return
+        if not hasattr(group, "FieldWidth"):
+            # - Pre-0.2.1 document; the migration must run first, otherwise the
+            #   clone would read a stale source route.
+            return
 
         selection = Gui.Selection.getSelectionEx()
         source = selection[0].Object if len(selection) == 1 else None
@@ -296,7 +300,7 @@ class DuplicateRoute():
             return False
 
         group = getActiveJob()
-        if group is None:
+        if group is None or not hasattr(group, "FieldWidth"):
             return False
 
         selection = Gui.Selection.getSelectionEx()

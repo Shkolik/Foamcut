@@ -19,11 +19,14 @@ import FreeCADGui
 FreeCADGui.addCommand = lambda *a, **k: None
 
 import Migration
-import utilities
 
 
 def make_old_document():
     doc = App.newDocument("OldMigration")
+    # - FreeCADCmd starts with UndoMode = 0, where openTransaction/abortTransaction
+    #   are no-ops. The GUI (and therefore the migration rollback guarantee)
+    #   runs with undo enabled, so the tests must do the same.
+    doc.UndoMode = 1
     job = doc.addObject("App::DocumentObjectGroupPython", "Job")
     job.addProperty("App::PropertyString", "Type", "", "")
     job.Type = "Job"
@@ -84,6 +87,43 @@ def make_old_document():
     return doc, job
 
 
+def make_partially_migrated_document():
+    '''
+    A document left half-converted by an intermediate 0.2.1 build:
+    MigrationVersion is already current but Config and its references remain.
+    '''
+    doc = App.newDocument("PartialMigration")
+    doc.UndoMode = 1
+    job = doc.addObject("App::DocumentObjectGroupPython", "Job")
+    job.addProperty("App::PropertyString", "Type", "", "")
+    job.Type = "Job"
+    for name in ("ConfigName", "WPLName", "WPRName"):
+        job.addProperty("App::PropertyString", name, "", "")
+    job.addProperty("App::PropertyInteger", "MigrationVersion", "", "")
+    job.MigrationVersion = Migration.CURRENT_VERSION
+
+    config = job.newObject("App::FeaturePython", "Config")
+    config.addProperty("App::PropertyString", "Type", "", "")
+    config.Type = "Helper"
+    for prop_type, name, value in [
+        ("App::PropertyLength", "FieldWidth", 500.0),
+        ("App::PropertyLength", "DiscretizationStep", 0.25),
+    ]:
+        config.addProperty(prop_type, name, "", "")
+        setattr(config, name, value)
+    job.ConfigName = config.Name
+
+    path = job.newObject("App::FeaturePython", "Path")
+    path.addProperty("App::PropertyString", "Type", "", "")
+    path.addProperty("App::PropertyString", "JobName", "", "")
+    path.Type = "Path"
+    path.JobName = job.Name
+    path.addProperty("App::PropertyLength", "DiscretizationStep", "", "")
+    path.setExpression(".DiscretizationStep", "<<Config>>.DiscretizationStep")
+    doc.recompute()
+    return doc, job
+
+
 class TestMigration(unittest.TestCase):
     def tearDown(self):
         App.closeDocument(App.ActiveDocument.Name)
@@ -112,14 +152,26 @@ class TestMigration(unittest.TestCase):
         self.assertEqual(Migration.migrate_document(doc), 1)
         self.assertEqual(Migration.migrate_document(doc), 0)
 
-    def test_custom_working_plane_is_preserved(self):
-        doc, job = make_old_document()
-        Migration.migrate_document(doc)
-        self.assertTrue(job.WorkingPlaneCustom)
-        self.assertAlmostEqual(float(job.WorkingPlaneY), -304.8, places=5)
+    def test_repairs_partially_migrated_document(self):
+        doc, job = make_partially_migrated_document()
+        self.assertTrue(Migration.needs_migration(doc))
+        self.assertEqual(Migration.migrate_document(doc), 1)
 
-        left = utilities.getWorkingPlanes(job, doc)[0]
-        self.assertAlmostEqual(float(left.Position.y), -304.8, places=5)
+        self.assertIsNone(doc.getObject("Config"))
+        self.assertEqual(job.ConfigName, "")
+        self.assertAlmostEqual(float(job.FieldWidth), 500.0, places=5)
+        self.assertAlmostEqual(float(job.DiscretizationStep), 0.25, places=5)
+        self.assertEqual(
+            doc.getObject("Path").ExpressionEngine[0][1],
+            "._Job.DiscretizationStep")
+        self.assertFalse(Migration.needs_migration(doc))
+
+    def test_document_open_migrates_automatically(self):
+        doc, job = make_old_document()
+        Migration.migrate_on_open(doc)
+        self.assertIsNone(doc.getObject("Config"))
+        self.assertEqual(job.MigrationVersion, Migration.CURRENT_VERSION)
+        self.assertFalse(Migration.needs_migration(doc))
 
     def test_failed_migration_leaves_document_unchanged(self):
         doc, job = make_old_document()

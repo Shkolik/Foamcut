@@ -85,6 +85,12 @@ class MakeJoin():
                 group = App.ActiveDocument.getObject("Job")
 
             if group is not None and group.Type == "Job":
+                # - Pre-0.2.1 documents are not migrated yet: their settings
+                #   are not on the Job, so a new object would bind broken
+                #   expressions. Let the migration run first.
+                if not hasattr(group, "FieldWidth"):
+                    return False
+
                 # - Get selecttion
                 objects = getAllSelectedObjects()
 

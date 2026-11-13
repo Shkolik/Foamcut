@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 - Machine/process settings now live directly on `Job`; the separate `Config` object is gone.
 - Working planes are lightweight value objects created on demand, with analytic intersections.
 - The Job view provider draws the CNC volume, foam block, working planes, origin and rotation axis.
-- Old documents are detected on open and migrated only after the user confirms
+- Old documents are detected on open and migrated automatically; the migration is reported in the console and the document is recomputed
 - Route duplicate: parametric clone of an original route with a task panel for Y/Z placement and horizontal (YZ) / vertical (XY) mirroring
 - Job task panel: every machine and process setting is editable from one panel that opens on Job creation and on double-click, with a group selector and pages for machine geometry, foam block, travel, axis mapping, feed rates, wire, kerf compensation, homing/parking and G-code. Values are unit-aware, dependent settings appear when their option is enabled, and Cancel restores the previous setup or removes a freshly created Job.
 - Movement task panel for Move: live placement preview, feed/power overrides, unit-aware values and route preview

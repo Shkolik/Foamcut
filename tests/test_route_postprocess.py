@@ -101,14 +101,6 @@ def new_document():
     job.KerfCompensation = 0.0
     job.CompensationDegree = 1.0
 
-    # - Preserve the old fixture's working plane Y offset.
-    job.WorkingPlaneCustom = True
-    job.WorkingPlaneLeftX = -370.0
-    job.WorkingPlaneRightX = 370.0
-    job.WorkingPlaneY = -304.8
-    job.WorkingPlaneLength = 870.0
-    job.WorkingPlaneWidth = 330.0
-
     return doc, job
 
 

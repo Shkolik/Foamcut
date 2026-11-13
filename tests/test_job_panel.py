@@ -66,7 +66,6 @@ class TestPropertyLabels(unittest.TestCase):
             "FeedRateMode": "Feed rate mode",
             "OriginX": "Origin X",
             "OriginRotationX": "Origin rotation X",
-            "WorkingPlaneLeftX": "Working plane left X",
         }
         for name, label in cases.items():
             self.assertEqual(MachineGui.propertyLabel(name), label)
@@ -132,9 +131,6 @@ class TestPanelModel(unittest.TestCase):
         self.assertIn("HomingX1", names)
         self.assertIn("ParkX", names)
         self.assertIn("HomingCommand", names)
-        # - Migration-only overrides live outside any visible group.
-        self.assertNotIn("WorkingPlaneLeftX", names)
-        self.assertNotIn("WorkingPlaneCustom", names)
 
     def test_reserved_and_internal_properties_are_not_part_of_the_panel(self):
         names = self.panelNames()
@@ -167,8 +163,6 @@ class TestPanelDefinition(unittest.TestCase):
         panel.obj = self.job
 
         self.assertEqual(panel.properties(), JobConfig.configPropertyNames(self.job))
-        # - Hidden migration overrides are restored when the panel is cancelled.
-        self.assertIn("WorkingPlaneLeftX", panel.properties())
 
     def test_value_comparison(self):
         same = MachineGui.JobTaskPanel.sameValue

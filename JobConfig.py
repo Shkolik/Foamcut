@@ -105,16 +105,6 @@ def applyConfigProperties(obj):
     add("App::PropertyLength", "BlockHeight", "Foam Block", "Foam block size along machine Y axis", utilities.getParameterFloat("BlockHeight", 50))
     add("App::PropertyPosition", "BlockPosition", "Foam Block", "Foam block position in machine coordinates", App.Vector(-obj.BlockWidth / 2.0, obj.HorizontalTravel / 2.0 - obj.BlockLength / 2.0, utilities.getParameterFloat("BlockPositionHeight", 6)))
 
-    # - Optional overrides for legacy working planes that were manually changed.
-    add("App::PropertyBool", "WorkingPlaneCustom", "", "Use custom working plane values", False)
-    add("App::PropertyDistance", "WorkingPlaneLeftX", "", "Custom left working plane X", -obj.FieldWidth / 2.0)
-    add("App::PropertyDistance", "WorkingPlaneRightX", "", "Custom right working plane X", obj.FieldWidth / 2.0)
-    add("App::PropertyDistance", "WorkingPlaneY", "", "Custom working plane Y", -obj.OriginX)
-    add("App::PropertyLength", "WorkingPlaneLength", "", "Custom working plane length", obj.HorizontalTravel)
-    add("App::PropertyLength", "WorkingPlaneWidth", "", "Custom working plane width", obj.VerticalTravel)
-    for name in ("WorkingPlaneCustom", "WorkingPlaneLeftX", "WorkingPlaneRightX", "WorkingPlaneY", "WorkingPlaneLength", "WorkingPlaneWidth"):
-        obj.setEditorMode(name, 3)
-
     obj.setEditorMode("HomingCommand", 0 if obj.EnableHoming else 3)
     obj.setEditorMode("HomingX1", 0 if obj.EnableHoming else 3)
     obj.setEditorMode("HomingX2", 0 if obj.EnableHoming else 3)

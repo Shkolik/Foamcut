@@ -449,6 +449,14 @@ class Postprocess():
     Generate GCODE from route
     '''
     def makeGCODE(self, route_list, config):
+        if not hasattr(config, "CommentStyle"):
+            # - A pre-0.2.1 Job keeps its settings on a separate Config object
+            #   until the document is migrated. Fail with an actionable message
+            #   instead of an AttributeError on the first config property.
+            raise Exception(
+                "Document not migrated: reopen it and confirm the Foamcut migration prompt "
+                "before generating GCODE.")
+
         TASK = "\n"
         # - Task GCODE buffer
         TASK += self.makeCommentedLine(config, "*** TASK BLOCK ***") + "\n"
@@ -620,6 +628,17 @@ class Postprocess():
         
         # - Job owns the machine configuration
         config = group
+
+        # - Pre-0.2.1 documents keep the configuration on a Config object until
+        #   they are migrated; the Job has no process settings yet.
+        if not hasattr(config, "CommentStyle"):
+            QtGui.QMessageBox.critical(
+                None, "Document not migrated",
+                "This document was created with an older Foamcut version and has not "
+                "been migrated yet.\n\n"
+                "Reopen the document and confirm the Foamcut migration prompt, "
+                "then generate the GCODE again.")
+            return
 
         # - Check routes type
         for route in routes:

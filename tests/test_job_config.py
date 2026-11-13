@@ -74,21 +74,6 @@ class TestJobConfig(unittest.TestCase):
         self.assertAlmostEqual(analytic.y, surface_point.Y, places=5)
         self.assertAlmostEqual(analytic.z, surface_point.Z, places=5)
 
-    def test_custom_working_plane_values(self):
-        self.job.WorkingPlaneCustom = True
-        self.job.WorkingPlaneLeftX = -400.0
-        self.job.WorkingPlaneRightX = 400.0
-        self.job.WorkingPlaneY = -50.0
-        self.job.WorkingPlaneLength = 800.0
-        self.job.WorkingPlaneWidth = 300.0
-
-        left, right = utilities.getWorkingPlanes(self.job, self.doc)
-        self.assertAlmostEqual(float(left.Position.x), -400.0, places=5)
-        self.assertAlmostEqual(float(right.Position.x), 400.0, places=5)
-        self.assertAlmostEqual(float(left.Position.y), -50.0, places=5)
-        self.assertAlmostEqual(float(left.Length), 800.0, places=5)
-        self.assertAlmostEqual(float(left.Width), 300.0, places=5)
-
     def test_working_planes_are_none_before_migration(self):
         old_job = self.doc.addObject("App::DocumentObjectGroupPython", "OldJob")
         old_job.addProperty("App::PropertyString", "Type", "", "")

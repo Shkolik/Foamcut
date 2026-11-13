@@ -271,6 +271,11 @@ class MakeRoute():
             setActive = True
 
         if group is not None and group.Type == "Job":
+            if not hasattr(group, "FieldWidth"):
+                # - Pre-0.2.1 document; the migration must run before routes
+                #   can bind to the Job configuration.
+                return
+
             if setActive:
                 view.setActiveObject("group", group)
 
@@ -307,6 +312,12 @@ class MakeRoute():
                 group = App.ActiveDocument.getObject("Job")
 
             if group is not None and group.Type == "Job":
+                # - Pre-0.2.1 documents are not migrated yet: their settings
+                #   are not on the Job, so the route would bind broken
+                #   expressions. Let the migration run first.
+                if not hasattr(group, "FieldWidth"):
+                    return False
+
                 # - Get selected objects
                 objects = [item.Object for item in Gui.Selection.getSelectionEx()]
 
