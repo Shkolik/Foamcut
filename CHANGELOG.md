@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - The Job view provider draws the CNC volume, foam block, working planes, origin and rotation axis.
 - Old documents are detected on open and migrated only after the user confirms
 - Route duplicate: parametric clone of an original route with a task panel for Y/Z placement and horizontal (YZ) / vertical (XY) mirroring
+- Job task panel: every machine and process setting is editable from one panel that opens on Job creation and on double-click, with a group selector and pages for machine geometry, foam block, travel, axis mapping, feed rates, wire, kerf compensation, homing/parking and G-code. Values are unit-aware, dependent settings appear when their option is enabled, and Cancel restores the previous setup or removes a freshly created Job.
 - Movement task panel for Move: live placement preview, feed/power overrides, unit-aware values and route preview
 - Task panels for Path, Projection, Enter, Exit, Join, Rotation and Route with unit-aware values, expression overrides and route preview
 - Expected program run time in the G-code preamble and in the console message on export. G93 uses the longer wire-end travel, G94 uses the full commanded-axis vector like GRBL does for orthogonal linear axes; G0 moves use the slowest axis.
@@ -24,6 +25,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Job: the machine graphics no longer turn green when the Job is selected - the Job is unpickable in the 3D view, its selection style is reduced to a bounding box and opening the Job panel clears the selection
 - Route postprocessor: shifted points/move types, lost route endpoint and rapid moves into foam on Enter/Exit routes
 - Route: duplicate Exit end point when lead-out is enabled
 - Route: offset joining created a cusp/loop when adjacent edges had different dynamic kerf compensation

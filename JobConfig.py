@@ -130,4 +130,10 @@ def applyConfigProperties(obj):
 
 
 def configPropertyNames(obj):
-    return [name for name in obj.PropertiesList if name not in RESERVED_PROPERTIES]
+    '''
+    Return the names of the machine/process properties carried by a Job.
+    Reserved object properties and FreeCAD internals (underscore prefixed)
+    are not configuration.
+    '''
+    return [name for name in obj.PropertiesList
+            if name not in RESERVED_PROPERTIES and not name.startswith("_")]

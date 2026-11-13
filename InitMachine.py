@@ -82,18 +82,33 @@ class InitMachine():
         return {"Pixmap"  : utilities.getIconPath("foamcut.svg"), # the name of a svg file available in the resources
                 'Accel' : "", # a default shortcut (optional)
                 "MenuText": "Init machine",
-                "ToolTip" : "Create Machine object and define working area and machine properties"}
+                "ToolTip" : "Create the Job and edit machine geometry, working area and process settings"}
 
     def Activated(self):     
+        doc = FreeCAD.ActiveDocument
         # - Create group
-        machine = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython", "Job")
-        Machine(machine, machine.Name)
-        import MachineGui
-        MachineGui.MachineVP(machine.ViewObject)
+        machine = doc.addObject("App::DocumentObjectGroupPython", "Job")
+        try:
+            Machine(machine, machine.Name)
+            import MachineGui
+            MachineGui.MachineVP(machine.ViewObject)
 
-        Gui.ActiveDocument.ActiveView.setActiveObject('group', machine)
+            Gui.ActiveDocument.ActiveView.setActiveObject('group', machine)
 
-        FreeCAD.ActiveDocument.recompute()
+            doc.recompute()
+        except Exception as error:
+            App.Console.PrintError("Failed to create Job.\n")
+            if machine.Document is not None:
+                doc.removeObject(machine.Name)
+            App.Console.PrintError("{}\n".format(error))
+            return
+
+        try:
+            MachineGui.showJobPanel(machine, created = True)
+        except Exception as error:
+            # - The Job is valid; only the editor failed to open.
+            App.Console.PrintError("Could not open the Job task panel.\n")
+            App.Console.PrintError("{}\n".format(error))
 
     def IsActive(self):
         if App.ActiveDocument is None:

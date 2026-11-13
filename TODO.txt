@@ -2,7 +2,7 @@
 - origin arrows - DONE
 - kerf settings - DONE
 - unpicable helper geometry in one group - Done
-- configuration setup panel
+- configuration setup panel - DONE
 - projection produced by selecting face - DONE
 - paths produced by selecting face - DONE
 - G93 mode - DONE

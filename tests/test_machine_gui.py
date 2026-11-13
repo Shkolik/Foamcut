@@ -21,6 +21,7 @@ FreeCADGui.addCommand = lambda *a, **k: None
 import pivy.coin as coin
 import InitMachine
 import MachineGui
+import utilities
 
 
 class TestMachineGraphics(unittest.TestCase):
@@ -101,6 +102,69 @@ class TestMachineGraphics(unittest.TestCase):
         provider.Object = old_job
         provider.draw()
         self.assertEqual(provider.node.getNumChildren(), 0)
+
+
+class TestJobSelectionPolicy(unittest.TestCase):
+    def setUp(self):
+        self.doc = App.newDocument("MachineSelection")
+        self.job = self.doc.addObject("App::DocumentObjectGroupPython", "Job")
+        InitMachine.Machine(self.job, self.job.Name)
+        self.doc.recompute()
+
+    def tearDown(self):
+        App.closeDocument(self.doc.Name)
+
+    def make_view_object(self):
+        class ViewObject:
+            def __init__(self, obj):
+                self.Object = obj
+                self.RootNode = coin.SoSeparator()
+                self.Visibility = True
+                self.SelectionStyle = "Shape"
+                self.properties = []
+
+            def addProperty(self, prop_type, name, group, description):
+                self.properties.append(name)
+                setattr(self, name, False)
+
+        return ViewObject(self.job)
+
+    def make_provider(self, view_object):
+        provider = MachineGui.MachineVP.__new__(MachineGui.MachineVP)
+        provider.ViewObject = view_object
+        provider.Object = self.job
+        provider.node = coin.SoSeparator()
+        return provider
+
+    def test_attach_applies_the_selection_policy(self):
+        view_object = self.make_view_object()
+        provider = MachineGui.MachineVP(view_object)
+
+        # - The pick style helper uses a Coin search action that is not usable
+        #   on a detached scene graph in FreeCADCmd; the policy is what matters.
+        original = utilities.setPickStyle
+        utilities.setPickStyle = lambda view_object, style: None
+        try:
+            provider.attach(view_object)
+        finally:
+            utilities.setPickStyle = original
+
+        self.assertEqual(view_object.SelectionStyle, "BoundBox")
+
+    def test_finish_restoring_reapplies_the_selection_policy(self):
+        view_object = self.make_view_object()
+        provider = self.make_provider(view_object)
+
+        view_object.SelectionStyle = "Shape"
+        provider.finishRestoring()
+        self.assertEqual(view_object.SelectionStyle, "BoundBox")
+
+    def test_view_object_without_selection_style_is_ignored(self):
+        class BareViewObject:
+            pass
+
+        provider = self.make_provider(BareViewObject())
+        provider.finishRestoring()  # must not raise
 
 
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):
