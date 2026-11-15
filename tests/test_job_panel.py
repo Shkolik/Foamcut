@@ -23,6 +23,7 @@ import InitMachine
 import JobConfig
 import MachineGui
 import TaskPanelBase
+import utilities
 
 QT_AVAILABLE = False
 try:
@@ -389,7 +390,8 @@ class TestGuiIntegration(unittest.TestCase):
     '''Wiring checks with fake GUI pieces; no widgets are created here.'''
 
     def setUp(self):
-        self.original_gui = InitMachine.Gui
+        self.original_gui = MachineGui.Gui
+        self.original_utilities_gui = utilities.Gui
         self.original_view_provider = MachineGui.MachineVP
         self.original_show = MachineGui.showJobPanel
         self.view = type("View", (), {
@@ -400,20 +402,22 @@ class TestGuiIntegration(unittest.TestCase):
         self.fake_gui = type("Gui", (), {
             "ActiveDocument": type("Document", (), {"ActiveView": self.view})(),
         })()
-        InitMachine.Gui = self.fake_gui
+        MachineGui.Gui = self.fake_gui
+        utilities.Gui = self.fake_gui
         MachineGui.MachineVP = lambda view_object: None
         self.opened = []
         MachineGui.showJobPanel = lambda obj, created = False: self.opened.append((obj, created)) or True
 
     def tearDown(self):
-        InitMachine.Gui = self.original_gui
+        MachineGui.Gui = self.original_gui
+        utilities.Gui = self.original_utilities_gui
         MachineGui.MachineVP = self.original_view_provider
         MachineGui.showJobPanel = self.original_show
 
     def test_init_machine_opens_the_job_panel(self):
         doc = App.newDocument("JobPanelCreation")
         try:
-            InitMachine.InitMachine().Activated()
+            MachineGui.InitMachine().Activated()
 
             job = doc.getObject("Job")
             self.assertIsNotNone(job)
@@ -421,7 +425,21 @@ class TestGuiIntegration(unittest.TestCase):
             self.assertEqual(len(self.opened), 1)
             self.assertIs(self.opened[0][0], job)
             self.assertTrue(self.opened[0][1])
-            self.assertIs(self.view.getActiveObject("group"), job)
+            self.assertIs(self.view.getActiveObject(utilities.ACTIVE_JOB_KEY), job)
+        finally:
+            App.closeDocument(doc.Name)
+
+    def test_init_machine_creates_several_setups(self):
+        doc = App.newDocument("JobPanelMulti")
+        try:
+            self.assertTrue(MachineGui.InitMachine().IsActive())
+            MachineGui.InitMachine().Activated()
+            self.assertTrue(MachineGui.InitMachine().IsActive())
+            MachineGui.InitMachine().Activated()
+
+            jobs = [obj for obj in doc.Objects if getattr(obj, "Type", None) == "Job"]
+            self.assertEqual(len(jobs), 2)
+            self.assertIs(self.view.getActiveObject(utilities.ACTIVE_JOB_KEY), jobs[-1])
         finally:
             App.closeDocument(doc.Name)
 
@@ -434,7 +452,7 @@ class TestGuiIntegration(unittest.TestCase):
 
         InitMachine.Machine = broken_machine
         try:
-            InitMachine.InitMachine().Activated()
+            MachineGui.InitMachine().Activated()
             self.assertIsNone(doc.getObject("Job"))
             self.assertEqual(self.opened, [])
         finally:

@@ -5,9 +5,9 @@
 
   <description>Foamcut workbench provide functionality to prepare job and generate Gcode for 4 or 5 axis cnc hotwire cutter.</description>
 
-  <version>0.2.1</version>
+  <version>0.2.2</version>
 
-  <date>2026-11-13</date>
+  <date>2026-11-29</date>
 
   <maintainer email="shkolik@gmail.com">Andrew Shkolik</maintainer>
 

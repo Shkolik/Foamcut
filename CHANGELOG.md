@@ -3,6 +3,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-11-29
+
+### Added
+
+- Several setups (Jobs) per document. The active setup, shown in bold in the tree, receives new objects; double-click a Job or use Activate in its context menu to switch to it, and Edit setup opens its settings. With several setups and none active the object commands stay disabled; a document with a single setup keeps working without activating it.
+
+### Changed
+
+- `InitMachine` follows the scripting template: the module is now GUI-free domain code with the script-friendly `createMachine(doc)` factory, and the Init machine command lives in `MachineGui` next to the Job view provider.
+
 ## [0.2.1] - 2026-11-13
 
 ### Added

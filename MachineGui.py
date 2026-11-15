@@ -3,7 +3,7 @@
 __title__ = "Job GUI"
 __author__ = "Andrew Shkolik"
 __license__ = "LGPL 2.1"
-__doc__ = "Job view provider, inline machine graphics and configuration task panel."
+__doc__ = "Job view provider, inline machine graphics, configuration task panel and Init machine command."
 
 import math
 import re
@@ -16,6 +16,7 @@ import pivy.coin as coin
 import utilities
 import FoamCutViewProviders
 import JobConfig
+from InitMachine import createMachine
 from TaskPanelBase import BaseTaskPanel
 
 VIEW_PROPERTIES = (
@@ -228,10 +229,26 @@ class MachineVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 
     def doubleClicked(self, obj):
         # - Editing the Job config replaces the old activate/deactivate toggle.
+        #   Double-clicking a setup also makes it the target for new objects.
         #   An unmigrated Job returns False and keeps the default double-click.
-        if getattr(obj, "Object", None) is None:
+        job = getattr(obj, "Object", None)
+        if job is None:
             return False
-        return showJobPanel(obj.Object)
+        utilities.setActiveJob(job)
+        return showJobPanel(job)
+
+    def setupContextMenu(self, obj, menu):
+        '''Tree context menu: activate this setup or edit its settings.'''
+        job = getattr(obj, "Object", None)
+        if job is None or getattr(job, "Type", None) != "Job":
+            return
+
+        # - Kept as plain actions: the bold tree entry already shows which
+        #   setup is active, and clearing the active Job is not useful.
+        menu.addAction("Activate").triggered.connect(
+            lambda checked = False, target = job: utilities.setActiveJob(target))
+        menu.addAction("Edit setup").triggered.connect(
+            lambda checked = False, target = job: showJobPanel(target))
 
     def updateData(self, obj, prop):
         if hasattr(self, "node") and prop not in ("Group", "Label", "Proxy"):
@@ -739,8 +756,8 @@ class JobTaskPanel(BaseTaskPanel):
     def reject(self):
         if self.created:
             view = Gui.ActiveDocument.ActiveView if getattr(Gui, "ActiveDocument", None) is not None else None
-            if view is not None and view.getActiveObject("group") is self.obj:
-                view.setActiveObject("group", None)
+            if view is not None and view.getActiveObject(utilities.ACTIVE_JOB_KEY) is self.obj:
+                utilities.setActiveJob(None)
         return super().reject()
 
 
@@ -773,3 +790,43 @@ def openJobPanel(obj):
     Open the Job panel for an existing Job (double-click).
     '''
     return showJobPanel(obj, False)
+
+
+class InitMachine():
+    """Init machine"""
+
+    def GetResources(self):
+        return {"Pixmap"  : utilities.getIconPath("foamcut.svg"), # the name of a svg file available in the resources
+                'Accel' : "", # a default shortcut (optional)
+                "MenuText": "Init machine",
+                "ToolTip" : "Create the Job and edit machine geometry, working area and process settings"}
+
+    def Activated(self):
+        doc = App.ActiveDocument
+        machine = None
+        try:
+            machine = createMachine(doc, recompute = False)
+            MachineVP(machine.ViewObject)
+
+            utilities.setActiveJob(machine)
+
+            doc.recompute()
+        except Exception as error:
+            App.Console.PrintError("Failed to create Job.\n")
+            if machine is not None and machine.Document is not None:
+                doc.removeObject(machine.Name)
+            App.Console.PrintError("{}\n".format(error))
+            return
+
+        try:
+            showJobPanel(machine, created = True)
+        except Exception as error:
+            # - The Job is valid; only the editor failed to open.
+            App.Console.PrintError("Could not open the Job task panel.\n")
+            App.Console.PrintError("{}\n".format(error))
+
+    def IsActive(self):
+        # - A document can hold several setups; Init machine adds another one.
+        return App.ActiveDocument is not None
+
+Gui.addCommand("InitMachine", InitMachine())

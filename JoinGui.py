@@ -38,73 +38,59 @@ class MakeJoin():
 
     def Activated(self):
         doc = App.ActiveDocument
-        view = Gui.ActiveDocument.ActiveView
 
-        group = view.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
+        group = utilities.requireActiveJob("Cannot create Join", doc)
+        if group is None:
+            return
 
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
+        # - Get selecttion
+        objects = getAllSelectedObjects()
 
-            # - Get selecttion
-            objects = getAllSelectedObjects()
+        join = None
+        label = ""
+        try:
+            # - Create object
+            join = WireJoin.createJoin(group, objects[0], objects[1], recompute = False)
+            WireJoinVP(join.ViewObject)
+            join.ViewObject.PointSize = 4
 
-            join = None
-            label = ""
-            try:
-                # - Create object
-                join = WireJoin.createJoin(group, objects[0], objects[1], recompute = False)
-                WireJoinVP(join.ViewObject)
-                join.ViewObject.PointSize = 4
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(doc.Name, join.Name)
+            doc.recompute()
 
-                Gui.Selection.clearSelection()
-                Gui.Selection.addSelection(doc.Name, join.Name)
-                doc.recompute()
-
-                MovementGui.showMovementPanel(join, created = True)
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Join.\n")
-                if join:
-                    label = f"{join.Label}: "
-                    doc.removeObject(join.Name)
-                App.Console.PrintError(f"{label}{error}\n")
+            MovementGui.showMovementPanel(join, created = True)
+        except Exception as error:
+            App.Console.PrintError(f"Failed to create Join.\n")
+            if join:
+                label = f"{join.Label}: "
+                doc.removeObject(join.Name)
+            App.Console.PrintError(f"{label}{error}\n")
 
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
 
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-                # - Pre-0.2.1 documents are not migrated yet: their settings
-                #   are not on the Job, so a new object would bind broken
-                #   expressions. Let the migration run first.
-                if not hasattr(group, "FieldWidth"):
-                    return False
-
-                # - Get selecttion
-                objects = getAllSelectedObjects()
-
-                # - nothing selected
-                if len(objects) < 2:
-                    return False
-
-                parentA = objects[0][0]
-                parentB = objects[1][0]
-                # - Check object type
-                if isMovement(parentA) or isMovement(parentB):
-                    return True
-
+        group = utilities.getActiveJob()
+        if group is None:
             return False
+
+        # - Pre-0.2.1 documents are not migrated yet: their settings
+        #   are not on the Job, so a new object would bind broken
+        #   expressions. Let the migration run first.
+        if not hasattr(group, "FieldWidth"):
+            return False
+
+        # - Get selecttion
+        objects = getAllSelectedObjects()
+
+        # - nothing selected
+        if len(objects) < 2:
+            return False
+
+        parentA = objects[0][0]
+        parentB = objects[1][0]
+        # - Check object type
+        return isMovement(parentA) or isMovement(parentB)
 
 
 Gui.addCommand("Join", MakeJoin())

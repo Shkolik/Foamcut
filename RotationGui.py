@@ -109,85 +109,73 @@ class AddRotation():
 
     def Activated(self):
         doc = App.ActiveDocument
-        view = Gui.ActiveDocument.ActiveView
 
-        group = view.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
+        group = utilities.requireActiveJob("Cannot create Rotation", doc)
+        if group is None:
+            return
 
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
-
-            source = Gui.Selection.getSelectionEx()[0].Object
-            rt = None
-            label = ""
+        source = Gui.Selection.getSelectionEx()[0].Object
+        rt = None
+        label = ""
+        try:
+            # - Create rotation object
+            rt = Rotate.createRotation(group, source, recompute = False)
+            RotationVP(rt.ViewObject)
             try:
-                # - Create rotation object
-                rt = Rotate.createRotation(group, source, recompute = False)
-                RotationVP(rt.ViewObject)
-                try:
-                    source.ViewObject.Visibility = False
-                except Exception:
-                    pass
+                source.ViewObject.Visibility = False
+            except Exception:
+                pass
 
-                Gui.Selection.clearSelection()
-                doc.recompute()
-                Gui.Selection.addSelection(doc.Name, rt.Name)
+            Gui.Selection.clearSelection()
+            doc.recompute()
+            Gui.Selection.addSelection(doc.Name, rt.Name)
 
-                showRotationPanel(rt, created = True)
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Rotation.\n")
-                if rt:
-                    label = f"{rt.Label}: "
-                    doc.removeObject(rt.Name)
-                App.Console.PrintError(f"{label}{error}\n")
+            showRotationPanel(rt, created = True)
+        except Exception as error:
+            App.Console.PrintError(f"Failed to create Rotation.\n")
+            if rt:
+                label = f"{rt.Label}: "
+                doc.removeObject(rt.Name)
+            App.Console.PrintError(f"{label}{error}\n")
 
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
 
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-                # - Pre-0.2.1 documents are not migrated yet: their settings
-                #   are not on the Job, so a new object would bind broken
-                #   expressions. Let the migration run first.
-                if not hasattr(group, "FieldWidth"):
-                    return False
-
-                if not getattr(group, "FiveAxisMachine", False):
-                    return False
-
-                # - Get selecttion
-                selection = Gui.Selection.getSelectionEx()
-
-                # - nothing selected
-                if len(selection) == 0:
-                    return False
-
-                # - Check object type
-                if selection[0] is None or selection[0].Object is None:
-                    return False
-
-                obj = selection[0].Object
-                if not hasattr(obj, "Shape"):
-                    return False
-
-                if (hasattr(obj, "Type") and
-                    (obj.Type == "Path" or obj.Type == "Enter"  or obj.Type == "Job" or obj.Type == "Helper" or obj.Type == "Config"
-                    or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route" or obj.Type == "Projection")):
-                    return False
-
-                return True
+        group = utilities.getActiveJob()
+        if group is None:
             return False
+
+        # - Pre-0.2.1 documents are not migrated yet: their settings
+        #   are not on the Job, so a new object would bind broken
+        #   expressions. Let the migration run first.
+        if not hasattr(group, "FieldWidth"):
+            return False
+
+        if not getattr(group, "FiveAxisMachine", False):
+            return False
+
+        # - Get selecttion
+        selection = Gui.Selection.getSelectionEx()
+
+        # - nothing selected
+        if len(selection) == 0:
+            return False
+
+        # - Check object type
+        if selection[0] is None or selection[0].Object is None:
+            return False
+
+        obj = selection[0].Object
+        if not hasattr(obj, "Shape"):
+            return False
+
+        if (hasattr(obj, "Type") and
+            (obj.Type == "Path" or obj.Type == "Enter"  or obj.Type == "Job" or obj.Type == "Helper" or obj.Type == "Config"
+            or obj.Type == "Exit" or obj.Type == "Move" or obj.Type == "Join" or obj.Type == "Route" or obj.Type == "Projection")):
+            return False
+
+        return True
 
 
 Gui.addCommand("Rotate", AddRotation())

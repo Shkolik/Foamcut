@@ -260,76 +260,62 @@ class MakeRoute():
                 "ToolTip" : "Create a route from selected objects."}
 
     def Activated(self):
-        view = Gui.ActiveDocument.ActiveView
         doc = App.ActiveDocument
-        group = view.getActiveObject("group")
-        setActive = False
+        group = utilities.requireActiveJob("Cannot create Route", doc)
+        if group is None:
+            return
+        if not hasattr(group, "FieldWidth"):
+            # - Pre-0.2.1 document; the migration must run before routes
+            #   can bind to the Job configuration.
+            return
 
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
+        # - Get selecttion
+        objects = [item.Object for item in Gui.Selection.getSelectionEx()]
 
-        if group is not None and group.Type == "Job":
-            if not hasattr(group, "FieldWidth"):
-                # - Pre-0.2.1 document; the migration must run before routes
-                #   can bind to the Job configuration.
-                return
+        route = None
+        label = ""
+        try:
+            # - Create object
+            route = WireRoute.createRoute(group, objects, recompute = False)
+            WireRouteVP(route.ViewObject)
 
-            if setActive:
-                view.setActiveObject("group", group)
+            doc.recompute()
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(doc.Name, route.Name)
 
-            # - Get selecttion
-            objects = [item.Object for item in Gui.Selection.getSelectionEx()]
-
-            route = None
-            label = ""
-            try:
-                # - Create object
-                route = WireRoute.createRoute(group, objects, recompute = False)
-                WireRouteVP(route.ViewObject)
-
-                doc.recompute()
-                Gui.Selection.clearSelection()
-                Gui.Selection.addSelection(doc.Name, route.Name)
-
-                showRoutePanel(route, created = True)
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Route.\n")
-                if route:
-                    label = f"{route.Label}: "
-                    doc.removeObject(route.Name)
-                App.Console.PrintError(f"{label}{error}\n")
+            showRoutePanel(route, created = True)
+        except Exception as error:
+            App.Console.PrintError(f"Failed to create Route.\n")
+            if route:
+                label = f"{route.Label}: "
+                doc.removeObject(route.Name)
+            App.Console.PrintError(f"{label}{error}\n")
 
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
 
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-                # - Pre-0.2.1 documents are not migrated yet: their settings
-                #   are not on the Job, so the route would bind broken
-                #   expressions. Let the migration run first.
-                if not hasattr(group, "FieldWidth"):
-                    return False
-
-                # - Get selected objects
-                objects = [item.Object for item in Gui.Selection.getSelectionEx()]
-
-                # - nothing selected
-                if len(objects) == 0:
-                    return False
-
-                for obj in objects:
-                    if not hasattr(obj, "Type") or obj.Type not in FC_TYPES_TO_ROUTE:
-                        return False
-                return True
+        group = utilities.getActiveJob()
+        if group is None:
             return False
+
+        # - Pre-0.2.1 documents are not migrated yet: their settings
+        #   are not on the Job, so the route would bind broken
+        #   expressions. Let the migration run first.
+        if not hasattr(group, "FieldWidth"):
+            return False
+
+        # - Get selected objects
+        objects = [item.Object for item in Gui.Selection.getSelectionEx()]
+
+        # - nothing selected
+        if len(objects) == 0:
+            return False
+
+        for obj in objects:
+            if not hasattr(obj, "Type") or obj.Type not in FC_TYPES_TO_ROUTE:
+                return False
+        return True
 
 
 Gui.addCommand("Route", MakeRoute())

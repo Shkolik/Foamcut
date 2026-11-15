@@ -53,80 +53,72 @@ class MakeProjection():
         return projection
 
     def Activated(self):
-        group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = App.ActiveDocument.getObject("Job")
-            setActive = True
+        doc = App.ActiveDocument
 
-        if group is not None and group.Type == "Job":
-            if setActive:
-                Gui.ActiveDocument.ActiveView.setActiveObject("group", group)
+        group = utilities.requireActiveJob("Cannot create Projection", doc)
+        if group is None:
+            return
 
-            # - Get selected objects
-            objects = getAllSelectedObjects(True)
+        # - Get selected objects
+        objects = getAllSelectedObjects(True)
 
-            baseObjects = []
+        baseObjects = []
 
-            created = []
-            for object in objects:
-                if object[1][0].startswith("Face"):
-                    # - prepare base object.
-                    # - Sometimes, after reopening file it is necessary to recompute em or list of edges will be empty
-                    if object[0].Name not in baseObjects:
-                        object[0].touch()
-                        baseObjects.append(object[0].Name)
-                        object[0].recompute(True)
+        created = []
+        for object in objects:
+            if object[1][0].startswith("Face"):
+                # - prepare base object.
+                # - Sometimes, after reopening file it is necessary to recompute em or list of edges will be empty
+                if object[0].Name not in baseObjects:
+                    object[0].touch()
+                    baseObjects.append(object[0].Name)
+                    object[0].recompute(True)
 
-                    edges = getEdgesLinks(object[0], object[0].getSubObject(object[1][0]))
+                edges = getEdgesLinks(object[0], object[0].getSubObject(object[1][0]))
 
-                    if len(edges) == 0:
-                        FreeCAD.Console.PrintError("ERROR: No edges of the selected face [{}] match the object shape. Select edges directly instead.\n".format(object[0].Label))
-                        return
+                if len(edges) == 0:
+                    FreeCAD.Console.PrintError("ERROR: No edges of the selected face [{}] match the object shape. Select edges directly instead.\n".format(object[0].Label))
+                    return
 
-                    for edge in edges:
-                        projection = self.CreateFromEdge(edge, group)
-                        if projection is not None:
-                            created.append(projection)
-                else:
-                    projection = self.CreateFromEdge(object, group)
+                for edge in edges:
+                    projection = self.CreateFromEdge(edge, group)
                     if projection is not None:
                         created.append(projection)
+            else:
+                projection = self.CreateFromEdge(object, group)
+                if projection is not None:
+                    created.append(projection)
 
-            App.ActiveDocument.recompute()
-            Gui.Selection.clearSelection()
+        App.ActiveDocument.recompute()
+        Gui.Selection.clearSelection()
 
-            if len(created) == 1:
-                Gui.Selection.addSelection(App.ActiveDocument.Name, created[0].Name)
-                MovementGui.showMovementPanel(created[0], created = True)
-            elif created:
-                for projection in created:
-                    Gui.Selection.addSelection(App.ActiveDocument.Name, projection.Name)
-                App.Console.PrintMessage("{} projections created. Double-click a projection to edit settings.\n".format(len(created)))
+        if len(created) == 1:
+            Gui.Selection.addSelection(App.ActiveDocument.Name, created[0].Name)
+            MovementGui.showMovementPanel(created[0], created = True)
+        elif created:
+            for projection in created:
+                Gui.Selection.addSelection(App.ActiveDocument.Name, projection.Name)
+            App.Console.PrintMessage("{} projections created. Double-click a projection to edit settings.\n".format(len(created)))
 
     def IsActive(self):
         if App.ActiveDocument is None:
             return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
 
-            if group is not None and group.Type == "Job":
-                # - Get selected objects including Faces
-                objects = getAllSelectedObjects(True)
-
-                # - at least one Edge, Vertex or Face should be selected
-                if len(objects) == 0:
-                    return False
-
-                wp = getWorkingPlanes(group, App.ActiveDocument)
-                if wp is None or len(wp) != 2:
-                    return False
-                return True
+        group = utilities.getActiveJob()
+        if group is None:
             return False
+
+        # - Get selected objects including Faces
+        objects = getAllSelectedObjects(True)
+
+        # - at least one Edge, Vertex or Face should be selected
+        if len(objects) == 0:
+            return False
+
+        wp = getWorkingPlanes(group, App.ActiveDocument)
+        if wp is None or len(wp) != 2:
+            return False
+        return True
 
 
 Gui.addCommand("MakeProjection", MakeProjection())

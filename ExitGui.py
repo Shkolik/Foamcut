@@ -12,7 +12,7 @@ Gui = FreeCADGui
 import Part
 import FoamCutViewProviders
 import MovementGui
-from utilities import getIconPath, getAllSelectedObjects, getWorkingPlanes
+from utilities import getIconPath, getAllSelectedObjects, getWorkingPlanes, getActiveJob, requireActiveJob
 import WireExit
 
 
@@ -35,74 +35,62 @@ class MakeExit():
 
     def Activated(self):
         doc = App.ActiveDocument
-        view = Gui.ActiveDocument.ActiveView
 
-        group = view.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
+        group = requireActiveJob("Cannot create Exit", doc)
+        if group is None:
+            return
 
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
+        # - Get selecttion
+        objects = getAllSelectedObjects()
 
-            # - Get selecttion
-            objects = getAllSelectedObjects()
+        exit = None
+        label = ""
+        try:
+            # - Create object
+            exit = WireExit.createExit(group, objects[0], recompute = False)
+            WireExitVP(exit.ViewObject)
+            exit.ViewObject.PointSize = 4
 
-            exit = None
-            label = ""
-            try:
-                # - Create object
-                exit = WireExit.createExit(group, objects[0], recompute = False)
-                WireExitVP(exit.ViewObject)
-                exit.ViewObject.PointSize = 4
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(doc.Name, exit.Name)
 
-                Gui.Selection.clearSelection()
-                Gui.Selection.addSelection(doc.Name, exit.Name)
+            doc.recompute()
 
-                doc.recompute()
-
-                MovementGui.showMovementPanel(exit, created = True)
-            except Exception as error:
-                App.Console.PrintError(f"Failed to create Exit.\n")
-                if exit:
-                    label = f"{exit.Label}: "
-                    doc.removeObject(exit.Name)
-                App.Console.PrintError(f"{label}{error}\n")
+            MovementGui.showMovementPanel(exit, created = True)
+        except Exception as error:
+            App.Console.PrintError(f"Failed to create Exit.\n")
+            if exit:
+                label = f"{exit.Label}: "
+                doc.removeObject(exit.Name)
+            App.Console.PrintError(f"{label}{error}\n")
 
     def IsActive(self):
         if FreeCAD.ActiveDocument is None:
             return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
 
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-                # - Get selecttion
-                objects = getAllSelectedObjects()
-
-                # - nothing selected
-                if len(objects) == 0:
-                    return False
-
-                object = objects[0]
-                parent = object[0]
-                vertex = parent.getSubObject(object[1][0])
-                # - Check object type
-                if not issubclass(type(vertex), Part.Vertex):
-                    return False
-
-                wp = getWorkingPlanes(group, App.ActiveDocument)
-                if wp is None or len(wp) != 2:
-                    return False
-
-                return True
+        group = getActiveJob()
+        if group is None:
             return False
+
+        # - Get selecttion
+        objects = getAllSelectedObjects()
+
+        # - nothing selected
+        if len(objects) == 0:
+            return False
+
+        object = objects[0]
+        parent = object[0]
+        vertex = parent.getSubObject(object[1][0])
+        # - Check object type
+        if not issubclass(type(vertex), Part.Vertex):
+            return False
+
+        wp = getWorkingPlanes(group, App.ActiveDocument)
+        if wp is None or len(wp) != 2:
+            return False
+
+        return True
 
 
 Gui.addCommand("MakeExit", MakeExit())

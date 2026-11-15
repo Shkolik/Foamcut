@@ -261,6 +261,113 @@ def getJob(obj):
     return job
 
 
+# - Key of the active Job in the 3D view. A workbench-specific name keeps it
+#   separate from the keys other workbenches use for their active containers
+#   ("part", "pdbody", "assembly", ...).
+ACTIVE_JOB_KEY = "foamcut_job"
+
+
+def getJobs(doc = None):
+    '''
+    Return every Job (machine setup) in a document, in document order.
+    @param doc (optional) - document; the active document by default
+    @returns list of Job objects
+    '''
+    if doc is None:
+        doc = App.ActiveDocument
+    if doc is None:
+        return []
+    return [obj for obj in doc.Objects if getattr(obj, "Type", None) == "Job"]
+
+
+def activeJobView():
+    '''
+    Return the active 3D view, or None when no GUI or no 3D view is available.
+    '''
+    try:
+        gui_document = Gui.ActiveDocument
+    except AttributeError:
+        return None
+    if gui_document is None:
+        return None
+    return getattr(gui_document, "ActiveView", None)
+
+
+def getActiveJob(doc = None):
+    '''
+    Return the Job that new operations should be added to.
+    A Job becomes active when it is created, double-clicked in the tree or
+    activated from its context menu. The only Job of a document is used as a
+    fallback, so a single-setup document needs no activation. With several
+    setups and none active there is no unambiguous target and None is
+    returned; the caller must ask the user to activate a setup.
+    @param doc (optional) - document; the active document by default
+    @returns Job object or None
+    '''
+    if doc is None:
+        doc = App.ActiveDocument
+    if doc is None:
+        return None
+
+    view = activeJobView()
+    if view is not None:
+        job = view.getActiveObject(ACTIVE_JOB_KEY)
+        job_document = getattr(job, "Document", None) if job is not None else None
+        if (job_document is not None and job_document.Name == doc.Name
+                and getattr(job, "Type", None) == "Job"):
+            return job
+
+    jobs = getJobs(doc)
+    if len(jobs) == 1:
+        return jobs[0]
+    return None
+
+
+def setActiveJob(job):
+    '''
+    Make a Job the target for new operations. Pass None to clear it.
+    @returns True when the active view accepted the change
+    '''
+    view = activeJobView()
+    if view is None:
+        return False
+    view.setActiveObject(ACTIVE_JOB_KEY, job)
+    return True
+
+
+def requireActiveJob(action = None, doc = None):
+    '''
+    Return the Job new operations should be added to, or report why there is
+    none: several setups exist and the user has to activate one.
+    @param action (optional) - what the caller was about to do, e.g. "Cannot create paths"
+    @param doc (optional) - document; the active document by default
+    @returns Job object or None
+    '''
+    job = getActiveJob(doc)
+    if job is not None:
+        # - Show the target in the tree (bold) also when it came from the
+        #   single-setup fallback.
+        setActiveJob(job)
+        return job
+
+    prefix = "" if not action else "{}: ".format(action)
+    jobs = getJobs(doc)
+    if not jobs:
+        message = "{}No Job in the document. Create one with the Init machine command.".format(prefix)
+    else:
+        message = ("{}No active Job. This document has {} setups; activate the one the new "
+                   "object belongs to by double-clicking it in the tree, or with Activate in "
+                   "its context menu.").format(prefix, len(jobs))
+    App.Console.PrintError(message + "\n")
+    if App.GuiUp:
+        try:
+            from PySide import QtGui
+            QtGui.QMessageBox.warning(None, "FoamCut", message)
+        except Exception:
+            pass
+    return None
+
+
 def bindJob(obj, job):
     '''
     Bind a child to its Job through a hidden link. Expressions use ._Job.Prop.

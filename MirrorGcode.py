@@ -30,7 +30,12 @@ class MirrorG():
         doc = App.ActiveDocument
         if doc is None:
             return defaults
-        job = doc.getObject("Job")
+        job = utilities.getActiveJob(doc)
+        if job is None:
+            # - Axis names belong to the machine: with several setups and none
+            #   active, any setup gives the same mapping for this file tool.
+            jobs = utilities.getJobs(doc)
+            job = jobs[0] if jobs else None
         if job is None or not hasattr(job, "X1AxisName"):
             return defaults
         return (

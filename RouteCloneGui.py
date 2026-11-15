@@ -240,22 +240,6 @@ def showRouteClonePanel(clone, created = False):
     Gui.Control.showDialog(panel)
 
 
-def getActiveJob():
-    '''Return the active Job group, falling back to the document's Job object.'''
-    doc = App.ActiveDocument
-    if doc is None:
-        return None
-
-    view = Gui.ActiveDocument.ActiveView if Gui.ActiveDocument is not None else None
-    group = view.getActiveObject("group") if view is not None else None
-    if group is None or group.Type != "Job":
-        group = doc.getObject("Job")
-
-    if group is None or group.Type != "Job":
-        return None
-    return group
-
-
 class DuplicateRoute():
     """Duplicate route"""
 
@@ -267,7 +251,7 @@ class DuplicateRoute():
 
     def Activated(self):
         doc = App.ActiveDocument
-        group = getActiveJob()
+        group = utilities.requireActiveJob("Cannot duplicate route", doc)
         if group is None:
             return
         if not hasattr(group, "FieldWidth"):
@@ -299,7 +283,7 @@ class DuplicateRoute():
         if FreeCAD.ActiveDocument is None:
             return False
 
-        group = getActiveJob()
+        group = utilities.getActiveJob()
         if group is None or not hasattr(group, "FieldWidth"):
             return False
 

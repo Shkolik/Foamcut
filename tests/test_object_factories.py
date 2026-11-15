@@ -16,6 +16,7 @@ import FreeCADGui
 FreeCADGui.addCommand = lambda *a, **k: None
 
 import Part
+import InitMachine
 import Rotate
 import WireMove
 import WireEnter
@@ -53,6 +54,7 @@ class TestScriptingFactories(unittest.TestCase):
         App.closeDocument(self.doc.Name)
 
     def test_factories_are_exposed(self):
+        self.assertTrue(hasattr(InitMachine, "createMachine"))
         self.assertTrue(hasattr(WireMove, "createMove"))
         self.assertTrue(hasattr(WireEnter, "createEnter"))
         self.assertTrue(hasattr(WireExit, "createExit"))
@@ -62,8 +64,22 @@ class TestScriptingFactories(unittest.TestCase):
         self.assertTrue(hasattr(Rotate, "createRotation"))
         self.assertTrue(hasattr(WireRoute, "createRoute"))
 
-    def _edge_on_plane(self, x):
-        for index, edge in enumerate(self.box.Shape.Edges):
+    def test_create_machine_inside_document(self):
+        doc = App.newDocument("MachineFactory")
+        try:
+            job = InitMachine.createMachine(doc, label = "Setup A", recompute = False)
+
+            self.assertEqual(job.Type, "Job")
+            self.assertEqual(job.Label, "Setup A")
+            self.assertIs(job.Document, doc)
+            self.assertIn(job, doc.Objects)
+            self.assertTrue(hasattr(job, "FieldWidth"))
+        finally:
+            App.closeDocument(doc.Name)
+
+    def _edge_on_plane(self, x, obj = None):
+        obj = obj if obj is not None else self.box
+        for index, edge in enumerate(obj.Shape.Edges):
             if all(abs(vertex.Point.x - x) < 1e-6 for vertex in edge.Vertexes):
                 return index + 1
         raise AssertionError("edge not found on x={}".format(x))
@@ -85,6 +101,34 @@ class TestScriptingFactories(unittest.TestCase):
         self.assertEqual(rotation.Type, "Rotation")
         self.assertIn(rotation, self.job.Group)
         self.assertGreater(rotation.Shape.Volume, 0)
+
+    def test_objects_bind_to_the_selected_setup(self):
+        doc = App.newDocument("TwoSetups")
+        try:
+            first = InitMachine.createMachine(doc, label = "Setup A", recompute = False)
+            second = InitMachine.createMachine(doc, label = "Setup B", recompute = False)
+
+            box = doc.addObject("Part::Box", "Box")
+            box.Length = 740.0
+            box.Width = 200.0
+            box.Height = 100.0
+            box.Placement.Base = App.Vector(-370.0, -100.0, 50.0)
+            doc.recompute()
+
+            left = (box, "Edge{}".format(self._edge_on_plane(-370.0, box)))
+            right = (box, "Edge{}".format(self._edge_on_plane(370.0, box)))
+
+            path_a = WirePath.createPath(first, left, right, recompute = False)
+            path_b = WirePath.createPath(second, left, right, recompute = False)
+            doc.recompute()
+
+            self.assertIn(path_a, first.Group)
+            self.assertNotIn(path_a, second.Group)
+            self.assertIn(path_b, second.Group)
+            self.assertIs(path_a._Job, first)
+            self.assertIs(path_b._Job, second)
+        finally:
+            App.closeDocument(doc.Name)
 
 
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):

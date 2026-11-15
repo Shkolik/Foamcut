@@ -11,7 +11,7 @@ import FreeCADGui
 Gui = FreeCADGui
 import FoamCutViewProviders
 import MovementGui
-from utilities import getIconPath, getAllSelectedObjects, getWorkingPlanes, getEdgesLinks
+from utilities import getIconPath, getAllSelectedObjects, getWorkingPlanes, getEdgesLinks, getActiveJob, requireActiveJob
 import WirePath
 
 
@@ -139,60 +139,48 @@ class MakePath():
 
     def Activated(self):
         doc = App.ActiveDocument
-        view = Gui.ActiveDocument.ActiveView
 
-        group = view.getActiveObject("group")
-        setActive = False
-        # - if machine is not active, try to select first one in a document
-        if group is None or group.Type != "Job":
-            group = doc.getObject("Job")
-            setActive = True
-
-        if group is None or group.Type != "Job":
-            FreeCAD.Console.PrintError("ERROR: Cannot create paths. No active Job found.\n")
+        group = requireActiveJob("Cannot create paths", doc)
+        if group is None:
             return
 
-        if group is not None and group.Type == "Job":
-            if setActive:
-                view.setActiveObject("group", group)
+        # - Get selected objects
+        objects = getAllSelectedObjects(True)
 
-            # - Get selected objects
-            objects = getAllSelectedObjects(True)
+        # left working plane
+        wps = getWorkingPlanes(group, App.ActiveDocument)
 
-            # left working plane
-            wps = getWorkingPlanes(group, App.ActiveDocument)
+        baseObjects = []
 
-            baseObjects = []
+        edges_l = []
+        edges_r = []
 
-            edges_l = []
-            edges_r = []
+        edgesPairs = []
 
-            edgesPairs = []
+        firstSub = objects[0][0].getSubObject(objects[0][1][0])
+        (dist_l, _, _) = firstSub.distToShape(wps[0].Shape) # distance to left working plane
+        (dist_r, _, _) = firstSub.distToShape(wps[1].Shape) # distance to right working plane
 
-            firstSub = objects[0][0].getSubObject(objects[0][1][0])
-            (dist_l, _, _) = firstSub.distToShape(wps[0].Shape) # distance to left working plane
-            (dist_r, _, _) = firstSub.distToShape(wps[1].Shape) # distance to right working plane
+        right = dist_l > dist_r
 
-            right = dist_l > dist_r
+        for object in objects:
+            if object[1][0].startswith("Face"):
+                # - prepare base object.
+                # - Sometimes, after reopening file it is necessary to recompute em or list of edges will be empty
+                if object[0].Name not in baseObjects:
+                    object[0].touch()
+                    baseObjects.append(object[0].Name)
+                    object[0].recompute(True)
 
-            for object in objects:
-                if object[1][0].startswith("Face"):
-                    # - prepare base object.
-                    # - Sometimes, after reopening file it is necessary to recompute em or list of edges will be empty
-                    if object[0].Name not in baseObjects:
-                        object[0].touch()
-                        baseObjects.append(object[0].Name)
-                        object[0].recompute(True)
-
-                    if right:
-                        edges_r = object[0].getSubObject(object[1][0]).Edges
-                        right = False
-                    else:
-                        edges_l = object[0].getSubObject(object[1][0]).Edges
-                        right = True
+                if right:
+                    edges_r = object[0].getSubObject(object[1][0]).Edges
+                    right = False
                 else:
-                    edgesPairs.append(objects)
-                    break
+                    edges_l = object[0].getSubObject(object[1][0]).Edges
+                    right = True
+            else:
+                edgesPairs.append(objects)
+                break
 
         # - Face selection: create paths for each edge pair
         if objects[0][1][0].startswith("Face"):
@@ -231,42 +219,38 @@ class MakePath():
     def IsActive(self):
         if App.ActiveDocument is None:
             return False
-        else:
-            group = Gui.ActiveDocument.ActiveView.getActiveObject("group")
 
-            # - if machine is not active, try to select first one in a document
-            if group is None or group.Type != "Job":
-                group = App.ActiveDocument.getObject("Job")
-
-            if group is not None and group.Type == "Job":
-                # - Get selected objects
-                objects = getAllSelectedObjects(True)
-
-                # - Number of edges or faces should be 2
-                if len(objects) != 2:
-                    return False
-
-                # - supported selected objects combinations is:
-                # - Face and Face
-                # - Edge and Edge
-                # - Vertex and Vertex
-                object1 = objects[0]
-                object2 = objects[1]
-
-                def selectionKind(sub):
-                    for kind in ("Face", "Edge", "Vertex"):
-                        if sub.startswith(kind):
-                            return kind
-                    return ""
-
-                if selectionKind(object1[1][0]) != selectionKind(object2[1][0]):
-                    return False
-
-                wp = getWorkingPlanes(group, App.ActiveDocument)
-                if wp is None or len(wp) != 2:
-                    return False
-                return True
+        group = getActiveJob()
+        if group is None:
             return False
+
+        # - Get selected objects
+        objects = getAllSelectedObjects(True)
+
+        # - Number of edges or faces should be 2
+        if len(objects) != 2:
+            return False
+
+        # - supported selected objects combinations is:
+        # - Face and Face
+        # - Edge and Edge
+        # - Vertex and Vertex
+        object1 = objects[0]
+        object2 = objects[1]
+
+        def selectionKind(sub):
+            for kind in ("Face", "Edge", "Vertex"):
+                if sub.startswith(kind):
+                    return kind
+            return ""
+
+        if selectionKind(object1[1][0]) != selectionKind(object2[1][0]):
+            return False
+
+        wp = getWorkingPlanes(group, App.ActiveDocument)
+        if wp is None or len(wp) != 2:
+            return False
+        return True
 
 
 Gui.addCommand("MakePath", MakePath())

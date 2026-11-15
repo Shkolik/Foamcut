@@ -3,22 +3,15 @@
 __title__ = "Create and initialize Job"
 __author__ = "Andrew Shkolik & Andrei Bezborodov"
 __license__ = "LGPL 2.1"
-__doc__ = "Create and initialize Job."
-__usage__ = """Create and initialize Job."""
+__doc__ = "Job object and its script-friendly factory."
+__usage__ = """Create a Job from the GUI command in MachineGui or with createMachine()."""
 
 import FreeCAD
 App=FreeCAD
-import FreeCADGui
-Gui=FreeCADGui
 import FoamCutBase
 import utilities
 import JobConfig
 import Migration
-import MachineConfig
-import MachineOrigin
-import FoamCut_WorkingPlane
-import FoamBlock
-import RotationAxis
 
 class Machine(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, jobName):   
@@ -75,51 +68,28 @@ class Machine(FoamCutBase.FoamCutBaseObject):
                 if child.ViewObject is not None:
                     utilities.setPickStyle(child.ViewObject, utilities.UNPICKABLE)
 
-class InitMachine():
-    """Init machine"""
 
-    def GetResources(self):
-        return {"Pixmap"  : utilities.getIconPath("foamcut.svg"), # the name of a svg file available in the resources
-                'Accel' : "", # a default shortcut (optional)
-                "MenuText": "Init machine",
-                "ToolTip" : "Create the Job and edit machine geometry, working area and process settings"}
+def createMachine(doc, label = None, recompute = True):
+    '''
+    Create a Job (machine setup) in a document.
+    Script-friendly entry point: no GUI is required.
+    @param doc - document that will own the Job
+    @param label (optional) - object label
+    @param recompute (optional) - recompute the document after creation. True by default
+    @returns Job object
+    '''
+    machine = doc.addObject("App::DocumentObjectGroupPython", "Job")
+    try:
+        Machine(machine, machine.Name)
+        if label:
+            machine.Label = label
+    except Exception:
+        doc.removeObject(machine.Name)
+        raise
 
-    def Activated(self):     
-        doc = FreeCAD.ActiveDocument
-        # - Create group
-        machine = doc.addObject("App::DocumentObjectGroupPython", "Job")
-        try:
-            Machine(machine, machine.Name)
-            import MachineGui
-            MachineGui.MachineVP(machine.ViewObject)
-
-            Gui.ActiveDocument.ActiveView.setActiveObject('group', machine)
-
-            doc.recompute()
-        except Exception as error:
-            App.Console.PrintError("Failed to create Job.\n")
-            if machine.Document is not None:
-                doc.removeObject(machine.Name)
-            App.Console.PrintError("{}\n".format(error))
-            return
-
-        try:
-            MachineGui.showJobPanel(machine, created = True)
-        except Exception as error:
-            # - The Job is valid; only the editor failed to open.
-            App.Console.PrintError("Could not open the Job task panel.\n")
-            App.Console.PrintError("{}\n".format(error))
-
-    def IsActive(self):
-        if App.ActiveDocument is None:
-            return False
-        else:
-            for obj in App.ActiveDocument.Objects:
-                if hasattr(obj, "Type") and obj.Type == "Job":
-                    return False
-        return True
-
-Gui.addCommand("InitMachine", InitMachine())
+    if recompute:
+        doc.recompute()
+    return machine
 
 
 def __getattr__(name):

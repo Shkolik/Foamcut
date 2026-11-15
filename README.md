@@ -75,7 +75,9 @@ Old tutorials (using macro), but workflow is the same (in Russian).
 
 ### ![machineIcon](./Resources/icons/machine.svg) Init Machine
 
-Creates the Job object and opens the Job settings task panel. The panel groups every machine and process setting into pages (machine geometry, foam block, travel, axis mapping, feed rates, wire, kerf compensation, homing/parking and G-code). Values use the preferred unit system; dependent settings appear when their option is enabled (for example the homing positions once "Enable homing" is checked). All objects in the Job are rebuilt when the panel is closed with OK, and Cancel restores the previous setup (or removes a freshly created Job). Double-click the Job to edit the settings again. The Job itself cannot be picked in the 3D view: its machine graphics are drawn inline and are never painted in the selection color (selecting the Job shows only a bounding box, and opening the panel clears the selection). To turn off machine graphics, uncheck the corresponding checkbox in Properties -> View.
+Creates the Job object and opens the Job settings task panel. The panel groups every machine and process setting into pages (machine geometry, foam block, travel, axis mapping, feed rates, wire, kerf compensation, homing/parking and G-code). Values use the preferred unit system; dependent settings appear when their option is enabled (for example the homing positions once "Enable homing" is checked). All objects in the Job are rebuilt when the panel is closed with OK, and Cancel restores the previous setup (or removes a freshly created Job). Double-click the Job to make it active and edit the settings again; the Job context menu has *Activate* and *Edit setup*. The Job itself cannot be picked in the 3D view: its machine graphics are drawn inline and are never painted in the selection color (selecting the Job shows only a bounding box, and opening the panel clears the selection). To turn off machine graphics, uncheck the corresponding checkbox in Properties -> View.
+
+A document may contain several Jobs, for example one setup per foam block. New objects go into the **active** Job, shown in bold in the tree; the newly created Job is always activated. Activate another one by double-clicking it or with *Activate* in its context menu. When none is active, a document with a single Job uses it automatically, while with several setups the object commands stay disabled until one is activated.
 
 ![Config example](Examples/Config.png)
 
@@ -247,10 +249,11 @@ This section lets you set postprocessor settings:
 
 ## Scripting the workbench
 
-Every tool is a thin wrapper around a Python object factory, so the whole workflow can be reproduced from the FreeCAD Python console, a macro or `FreeCADCmd` without opening a single task panel. Each command module exposes a `create*` function:
+Every tool is a thin wrapper around a Python object factory, so the whole workflow can be reproduced from the FreeCAD Python console, a macro or `FreeCADCmd` without opening a single task panel. Each domain module exposes a `create*` function:
 
 | Object | Module | Factory |
 | --- | --- | --- |
+| Job | `InitMachine` | `createMachine(doc)` |
 | Path | `WirePath` | `createPath(job, left_edge, right_edge)` |
 | Projection | `WireProjection` | `createProjection(job, source)` |
 | Move | `WireMove` | `createMove(job, start)` |
@@ -263,10 +266,12 @@ Every tool is a thin wrapper around a Python object factory, so the whole workfl
 
 All factories follow the same convention:
 
-- the first argument is the `Job` object that will own the new object;
+- the first argument is the `Job` that will own the new object; `createMachine` is the exception and takes the document;
 - optional `label` sets the object label, the internal name stays `Path`, `Route`, ...
 - optional `recompute` (default `True`) recomputes the document, pass `False` while building a chain and recompute once at the end;
 - the created object is returned, so it can be configured further.
+
+Scripts are not limited by the active Job: every factory takes its target explicitly, so several setups can be built in one document by keeping the returned Job objects.
 
 Geometry references are ordinary FreeCAD `LinkSub` values - a `(object, "Edge3")` pair. Subelement names are the usual FreeCAD ones: `Edge1`, `Vertex2`, `Face3`.
 
@@ -289,8 +294,7 @@ import WirePath, WireEnter, WireExit, WireRoute
 doc = App.ActiveDocument or App.newDocument("Foamcut")
 
 # - 1. Job: owns the machine geometry and every process setting
-job = doc.addObject("App::DocumentObjectGroupPython", "Job")
-InitMachine.Machine(job, job.Name)
+job = InitMachine.createMachine(doc)
 if App.GuiUp:
     import MachineGui
     MachineGui.MachineVP(job.ViewObject)      # draws the machine in the 3D view
