@@ -557,9 +557,13 @@ class Postprocess():
                         if object.Type == "Enter":
                             # The first Enter point is the synthetic plunge-down
                             # start. It is either the route-begin target or the
-                            # Exit->Enter travel, both performed at safe height.
-                            allowRapid = p_idx == 0 and at_safe_height
-                            forceRapid = allowRapid
+                            # Exit->Enter travel, both performed at safe height
+                            # and always rapid. The second point is the plunge to
+                            # the lead-in start (or to the entry point when lead-in
+                            # is disabled); it is rapid only when the Enter object
+                            # asks for it. The lead-in to the entry point is a cut.
+                            forceRapid = p_idx == 0 and at_safe_height
+                            allowRapid = forceRapid or (p_idx == 1 and isRapid)
                         elif object.Type == "Exit":
                             # Lead-out and plunge-up must not be rapid cuts; only
                             # the final point (already at safe height) may be rapid.

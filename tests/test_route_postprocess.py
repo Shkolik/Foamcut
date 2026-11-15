@@ -189,9 +189,11 @@ class RoutePointTests(unittest.TestCase):
                 moves[-1].dest, expected, len(route.Offset_L))
         )
 
-    def _assert_no_rapid_in_foam(self, blocks):
+    def _assert_no_rapid_in_foam(self, blocks, allowed = ()):
         for move in all_moves(blocks):
             if move.command != "G00":
+                continue
+            if any(all(abs(a - b) < EPS for a, b in zip(move.dest, dest)) for dest in allowed):
                 continue
             self.assertGreaterEqual(
                 move.dest[1], SAFE_HEIGHT - EPS,
@@ -209,6 +211,18 @@ class RoutePointTests(unittest.TestCase):
         self.assertEqual(
             move.command, "G01",
             "%s: move to %s was %s, expected G01 (cut); moves=%s" % (
+                message, point, move.command,
+                [(m.command, m.dest) for m in block.moves]))
+
+    def _assert_rapid(self, block, point, message):
+        move = has_dest(block, point)
+        self.assertIsNotNone(
+            move, "%s: no move to %s in %s [%s]; moves=%s" % (
+                message, point, block.obj_type, block.label,
+                [m.dest for m in block.moves]))
+        self.assertEqual(
+            move.command, "G00",
+            "%s: move to %s was %s, expected G00 (rapid); moves=%s" % (
                 message, point, move.command,
                 [(m.command, m.dest) for m in block.moves]))
 
@@ -254,6 +268,69 @@ class RoutePointTests(unittest.TestCase):
         finally:
             App.closeDocument(doc.Name)
 
+    def test_enter_lead_in_plunge_respects_rapid_move(self):
+        """Enter with lead-in: safe travel, plunge, then lead-in cut.
+
+        RapidMove makes only the plunge rapid; the lead-in to the entry point
+        always stays a cut.
+        """
+        for enter_rapid, expected in ((True, ["G00", "G00", "G01"]),
+                                      (False, ["G00", "G01", "G01"])):
+            with self.subTest(enter_rapid = enter_rapid):
+                doc, job = new_document()
+                try:
+                    objects = [
+                        add_movement(doc, "Enter", "Enter",
+                                     [(5.0, CUT_HEIGHT), (10.0, CUT_HEIGHT)],
+                                     lead = True, rapid = enter_rapid),
+                        add_movement(doc, "Path", "Path",
+                                     [(10.0, CUT_HEIGHT), (20.0, CUT_HEIGHT)]),
+                        add_movement(doc, "Exit", "Exit",
+                                     [(20.0, CUT_HEIGHT), (25.0, CUT_HEIGHT)],
+                                     lead = True),
+                    ]
+                    route, blocks = self._route(doc, job, objects)
+                    enter = [b for b in blocks if b.obj_type == "Enter"][0]
+
+                    self.assertEqual([m.command for m in enter.moves], expected)
+                    self.assertAlmostEqual(enter.moves[0].dest[1], SAFE_HEIGHT)
+                    self.assertAlmostEqual(enter.moves[1].dest[1], CUT_HEIGHT)
+                    self.assertAlmostEqual(enter.moves[2].dest[0], 10.0)
+                finally:
+                    App.closeDocument(doc.Name)
+
+    def test_enter_without_lead_in_plunge_respects_rapid_move(self):
+        """Enter without lead-in: safe travel, then rapid or cut plunge.
+
+        Old files used a Move object as the lead-in; such an Enter only
+        plunges from safe height straight to the entry point. RapidMove makes
+        that plunge rapid, otherwise it stays a cut.
+        """
+        for enter_rapid, expected in ((True, ["G00", "G00"]),
+                                      (False, ["G00", "G01"])):
+            with self.subTest(enter_rapid = enter_rapid):
+                doc, job = new_document()
+                try:
+                    objects = [
+                        add_movement(doc, "Enter", "Enter",
+                                     [(10.0, CUT_HEIGHT)],
+                                     rapid = enter_rapid),
+                        add_movement(doc, "Path", "Path",
+                                     [(10.0, CUT_HEIGHT), (20.0, CUT_HEIGHT)]),
+                        add_movement(doc, "Exit", "Exit",
+                                     [(20.0, CUT_HEIGHT), (25.0, CUT_HEIGHT)],
+                                     lead = True),
+                    ]
+                    route, blocks = self._route(doc, job, objects)
+                    enter = [b for b in blocks if b.obj_type == "Enter"][0]
+
+                    self.assertEqual([m.command for m in enter.moves], expected)
+                    self.assertAlmostEqual(enter.moves[0].dest[1], SAFE_HEIGHT)
+                    self.assertAlmostEqual(enter.moves[-1].dest[0], 10.0)
+                    self.assertAlmostEqual(enter.moves[-1].dest[1], CUT_HEIGHT)
+                finally:
+                    App.closeDocument(doc.Name)
+
     def test_enter_middle_exit_all_lead_and_rapid_combinations(self):
         """Enter -> Path/Projection/Move -> Exit over every flag combination."""
         for middle_type in ("Path", "Projection", "Move"):
@@ -288,23 +365,39 @@ class RoutePointTests(unittest.TestCase):
             ]
             route, blocks = self._route(doc, job, objects)
 
+            # - Rapid is allowed into the foam only for the intentional Enter
+            #   plunge when its RapidMove flag is set.
+            plunge_point = (5.0 if lead_in else 10.0, CUT_HEIGHT)
+            allowed = [(plunge_point[0], plunge_point[1], plunge_point[0], plunge_point[1])] \
+                if enter_rapid else []
             self._assert_all_points_consumed(route, blocks)
-            self._assert_no_rapid_in_foam(blocks)
+            self._assert_no_rapid_in_foam(blocks, allowed)
 
             self.assertEqual([b.obj_type for b in blocks],
                              ["Enter", middle_type, "Exit"],
                              "%s: unexpected block sequence" % label)
             enter_block, middle_block, exit_block = blocks
 
-            self._assert_cut(
-                enter_block,
-                (10.0, CUT_HEIGHT, 10.0, CUT_HEIGHT),
-                "%s: Enter entry point" % label)
             if lead_in:
+                if enter_rapid:
+                    self._assert_rapid(enter_block,
+                                       (5.0, CUT_HEIGHT, 5.0, CUT_HEIGHT),
+                                       "%s: Enter plunge to lead-in" % label)
+                else:
+                    self._assert_cut(enter_block,
+                                     (5.0, CUT_HEIGHT, 5.0, CUT_HEIGHT),
+                                     "%s: Enter lead-in point" % label)
+
+            if lead_in or not enter_rapid:
                 self._assert_cut(
                     enter_block,
-                    (5.0, CUT_HEIGHT, 5.0, CUT_HEIGHT),
-                    "%s: Enter lead-in point" % label)
+                    (10.0, CUT_HEIGHT, 10.0, CUT_HEIGHT),
+                    "%s: Enter entry point" % label)
+            else:
+                self._assert_rapid(
+                    enter_block,
+                    (10.0, CUT_HEIGHT, 10.0, CUT_HEIGHT),
+                    "%s: Enter plunge to entry" % label)
 
             self._assert_cut(
                 middle_block,
