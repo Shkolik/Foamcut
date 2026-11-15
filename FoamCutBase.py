@@ -133,6 +133,13 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             obj.CompensationDirection = dir
             App.Console.PrintMessage("{} - Migrating from 0.1.2 to 0.1.3 - adding CompensationDirection property.\n".format(obj.Label))  
             touched = True
+        # - Migrating to 0.2.2 - Path and Projection kerf direction is user
+        #   selectable now; older documents saved it hidden and read-only.
+        if obj.Type in ("Path", "Projection") and hasattr(obj, "CompensationDirection"):
+            mode = obj.getEditorMode("CompensationDirection")
+            if "Hidden" in mode or "ReadOnly" in mode:
+                obj.setEditorMode("CompensationDirection", 0)
+                App.Console.PrintMessage("{} - Migrating to 0.2.2 - enabling CompensationDirection for {}.\n".format(obj.Label, obj.Type))
         if not hasattr(obj, "RapidMove"):
             obj.addProperty("App::PropertyBool",        "RapidMove",            "Task", "Move trough this segment with rapid movement speed").RapidMove = False
             App.Console.PrintMessage("{} - Migrating from 0.1.9 to 0.1.10 - adding RapidMove property.\n".format(obj.Label))  

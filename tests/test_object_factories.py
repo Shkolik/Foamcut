@@ -102,6 +102,37 @@ class TestScriptingFactories(unittest.TestCase):
         self.assertIn(rotation, self.job.Group)
         self.assertGreater(rotation.Shape.Volume, 0)
 
+    def test_path_and_projection_expose_kerf_direction(self):
+        left = (self.box, "Edge{}".format(self._edge_on_plane(-370.0)))
+        right = (self.box, "Edge{}".format(self._edge_on_plane(370.0)))
+        path = WirePath.createPath(self.job, left, right, recompute = False)
+        projection = WireProjection.createProjection(self.job, (self.box, "Edge1"), recompute = False)
+        self.doc.recompute()
+
+        for obj in (path, projection):
+            mode = obj.getEditorMode("CompensationDirection")
+            self.assertNotIn("Hidden", mode)
+            self.assertNotIn("ReadOnly", mode)
+            self.assertEqual(obj.CompensationDirection, "Normal")
+            obj.CompensationDirection = "Reversed"
+            self.assertEqual(obj.CompensationDirection, "Reversed")
+
+    def test_old_path_and_projection_unhide_kerf_direction(self):
+        left = (self.box, "Edge{}".format(self._edge_on_plane(-370.0)))
+        right = (self.box, "Edge{}".format(self._edge_on_plane(370.0)))
+        path = WirePath.createPath(self.job, left, right, recompute = False)
+        projection = WireProjection.createProjection(self.job, (self.box, "Edge1"), recompute = False)
+
+        for obj in (path, projection):
+            obj.setEditorMode("CompensationDirection", 3)
+            self.assertIn("Hidden", obj.getEditorMode("CompensationDirection"))
+
+            obj.Proxy.onDocumentRestored(obj)
+
+            mode = obj.getEditorMode("CompensationDirection")
+            self.assertNotIn("Hidden", mode)
+            self.assertNotIn("ReadOnly", mode)
+
     def test_objects_bind_to_the_selected_setup(self):
         doc = App.newDocument("TwoSetups")
         try:

@@ -171,6 +171,23 @@ class TestPanelProperties(unittest.TestCase):
         self.assertIn("FeedRate", names)
         self.assertIn("WirePower", names)
 
+    def test_path_and_projection_list_kerf_direction(self):
+        import MovementGui
+
+        class Dummy:
+            Type = "Path"
+            CompensationDirection = "Normal"
+
+        panel = MovementGui.MovementTaskPanel.__new__(MovementGui.MovementTaskPanel)
+        panel.obj = Dummy()
+
+        self.assertTrue(panel.hasCompensationDirection())
+        self.assertIn("CompensationDirection", panel.properties())
+
+        Dummy.Type = "Projection"
+        self.assertTrue(panel.hasCompensationDirection())
+        self.assertIn("CompensationDirection", panel.properties())
+
     def test_standard_buttons_are_int(self):
         import TaskPanelBase
         buttons = TaskPanelBase.BaseTaskPanel.getStandardButtons(None)

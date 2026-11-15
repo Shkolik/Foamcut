@@ -19,8 +19,6 @@ class ProjectionSection(FoamCutBase.FoamCutMovementBaseObject):
         obj.Type = "Projection"
         obj.addProperty("App::PropertyLinkSub", "Source", "Data", "Source object to project").Source = source
 
-        obj.setEditorMode("CompensationDirection", 3)
-        
         obj.Proxy = self
         self.execute(obj)
 

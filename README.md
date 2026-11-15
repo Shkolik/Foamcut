@@ -133,7 +133,7 @@ Kerf compensation supports 3 modes:
 - Uniform - both plane paths have the same offset (Kerf compensation) from the original path. The resulting part will never be exact since the wire speed is different on different parts of the route. The only exception is when the left and right paths are identical.
 - Dynamic - the offset is scaled in relation to the wire speed over the given part of the route. That, in theory, lets the machine cut an exact part. Especially useful when cutting tapered parts. Compensation degree can be used to dial the proportion calculations - sometimes helpful on highly tapered and thin parts, since foam gets denser as it melts, which makes the proportion non-linear. In most cases 1.0 is what you want.
 
-Kerf direction can be specified for each object (except Rotation, Path and Projection) independently or for the whole route.
+Kerf direction can be specified for each movement object (Path, Projection, Move, Join, Enter and Exit) independently or for the whole route.
 
 ![Route example](Examples/Route.png)
 
@@ -217,6 +217,8 @@ Kerf compensation value is a 1/2 of the cut width. It's a base value that could 
 
 This base compensation value will be used in the Uniform kerf compensation mode and will be increased/decreased depending on the wire speed over a specific path segment in the Dynamic mode.
 Compensation degree is used in Dynamic mode to dial-in the exact compensation proportion. It's a fine-tune setting, keep the default value if not sure.
+
+Kerf direction is per object: *Normal* offsets the path to the usual cut side, *Reversed* flips the offset to the other side (needed when the wire approaches a shape from the opposite direction) and *None* disables compensation for that object. The route's own direction setting reverses all object directions. Path and Projection expose the setting in their task panels and in the property editor.
 
 ![Kerf compensation](Examples/KerfComp.png)
 

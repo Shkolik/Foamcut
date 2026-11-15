@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Several setups (Jobs) per document. The active setup, shown in bold in the tree, receives new objects; double-click a Job or use Activate in its context menu to switch to it, and Edit setup opens its settings. With several setups and none active the object commands stay disabled; a document with a single setup keeps working without activating it.
+- Kerf direction (Normal / None / Reversed) is now user selectable for Path and Projection objects; it was hidden and read-only before. The setting appears in the property editor and in the movement task panels, and existing documents are migrated on open.
 
 ### Changed
 

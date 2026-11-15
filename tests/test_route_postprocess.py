@@ -473,6 +473,35 @@ class RoutePointTests(unittest.TestCase):
             App.closeDocument(doc.Name)
 
 
+class KerfDirectionTests(unittest.TestCase):
+    '''Per-object kerf direction applies to Path and Projection geometry.'''
+
+    def setUp(self):
+        self.doc, self.job = new_document()
+        self.doc.recompute()
+
+    def tearDown(self):
+        App.closeDocument(self.doc.Name)
+
+    def offset_for(self, obj_type, direction):
+        obj = add_movement(self.doc, obj_type, obj_type, [(10.0, 2.0), (20.0, 2.0)])
+        route = build_route(self.doc, self.job, [obj], kerf = 1.0, strategy = "Uniform")
+        obj.CompensationDirection = direction
+        route.touch()
+        route.recompute()
+        return [(round(p.y, 3), round(p.z, 3)) for p in route.Offset_L]
+
+    def test_path_and_projection_kerf_direction(self):
+        for obj_type in ("Path", "Projection"):
+            with self.subTest(obj_type = obj_type):
+                self.assertEqual(self.offset_for(obj_type, "Normal"),
+                                 [(10.0, 3.0), (20.0, 3.0)])
+                self.assertEqual(self.offset_for(obj_type, "Reversed"),
+                                 [(10.0, 1.0), (20.0, 1.0)])
+                self.assertEqual(self.offset_for(obj_type, "None"),
+                                 [(10.0, 2.0), (20.0, 2.0)])
+
+
 # FreeCADCmd imports the passed script as a module (__name__ is the module
 # basename, never "__main__"), so also run when this file is the entry script.
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):

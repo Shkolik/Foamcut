@@ -39,7 +39,7 @@ class MovementTaskPanel(BaseTaskPanel):
         return []
 
     def hasCompensationDirection(self):
-        return self.obj.Type not in ("Path", "Projection") and hasattr(self.obj, "CompensationDirection")
+        return hasattr(self.obj, "CompensationDirection")
 
     def addSections(self, layout):
         self.addObjectSection(layout)
