@@ -25,7 +25,7 @@ class MachineConfig(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyLength",     "VerticalTravel",   "Machine Geometry",  "Vertical travel distance"  ).VerticalTravel = utilities.getParameterFloat("VerticalTravel", 330)
         obj.addProperty("App::PropertyLength",     "FieldWidth",       "Machine Geometry",  "Distance between wire ends").FieldWidth = utilities.getParameterFloat("FieldWidth", 740)
         obj.addProperty("App::PropertyDistance",   "OriginX",          "Machine Geometry",  "Origin along X axis").OriginX = utilities.getParameterFloat("OriginX", 0)
-        obj.addProperty("App::PropertyDistance",   "OriginRotationX",  "Machine Geometry",  "Position of rotation axis along X axis").OriginRotationX = obj.HorizontalTravel / 2
+        obj.addProperty("App::PropertyDistance",   "OriginRotationX",  "Machine Geometry",  "Position of rotation axis along X axis").OriginRotationX = utilities.getParameterFloat("OriginRotationX", obj.HorizontalTravel / 2)
         
         obj.addProperty("App::PropertyString",     "X1AxisName",        "Axis Mapping",     "Name of X1 axis in GCODE").X1AxisName = utilities.getParameterString("X1AxisName", "X")
         obj.addProperty("App::PropertyString",     "Z1AxisName",        "Axis Mapping",     "Name of Z1 axis in GCODE").Z1AxisName = utilities.getParameterString("Z1AxisName","Y")

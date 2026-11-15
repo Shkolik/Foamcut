@@ -151,6 +151,22 @@ Generates G-code and saves it to the specified file.
 
 Mirror the selected G-code file around the YZ plane. Useful for cutting symmetrical pieces like wing consoles. At the moment there is no validation or changing of metadata in the resulting files - be careful using this command. De-facto obsolete command - if you have the source file with a route, just use "Duplicate route" instead, it has visual confirmation and follows all the settings of the machine profile. The only scenario to use the Mirror command is when the source file isn't available and you only have a G-code file in hand.
 
+## Default parameters
+
+A new Job starts with the values stored in the FreeCAD parameter group
+
+`User parameter:BaseApp/Workbench/FoamcutWB/DefaultMachineConfig`
+
+Parameter names match the Job property names shown in the settings panel (`BlockWidth`, `FeedRateCut`, `OriginRotationX`, ...).
+
+Every machine and process setting is copied from this group when the Job is created with **Init machine**. If a parameter does not exist yet, the workbench writes the built-in default into the group first, so the group always holds the defaults actually used. Editing a value there changes what the next Job starts with; Jobs that already exist keep their own settings.
+
+To change the defaults open **Tools → Edit parameters...**, expand `BaseApp → Workbench → FoamcutWB → DefaultMachineConfig`, edit the Value and press **Save**. Lengths are stored in millimeters, speeds in mm/s and times in seconds, regardless of the units shown in the Job panel.
+
+"Origin rotation X" is part of this group as well. When the parameter is first created it is set to half of the Horizontal travel; set it explicitly if the rotation axis of the machine is not centered along the X travel.
+
+![Default parameters](Examples/Parameters.png)
+
 ## Machine configuration
 
 ### Machine geometry

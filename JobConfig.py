@@ -48,7 +48,7 @@ def applyConfigProperties(obj):
     add("App::PropertyLength", "VerticalTravel", "Machine Geometry", "Vertical travel distance", utilities.getParameterFloat("VerticalTravel", 330))
     add("App::PropertyLength", "FieldWidth", "Machine Geometry", "Distance between wire ends", utilities.getParameterFloat("FieldWidth", 740))
     add("App::PropertyDistance", "OriginX", "Machine Geometry", "Origin along X axis", utilities.getParameterFloat("OriginX", 0))
-    add("App::PropertyDistance", "OriginRotationX", "Machine Geometry", "Position of rotation axis along X axis", obj.HorizontalTravel / 2)
+    add("App::PropertyDistance", "OriginRotationX", "Machine Geometry", "Position of rotation axis along X axis", utilities.getParameterFloat("OriginRotationX", obj.HorizontalTravel / 2))
 
     add("App::PropertyString", "X1AxisName", "Axis Mapping", "Name of X1 axis in GCODE", utilities.getParameterString("X1AxisName", "X"))
     add("App::PropertyString", "Z1AxisName", "Axis Mapping", "Name of Z1 axis in GCODE", utilities.getParameterString("Z1AxisName", "Y"))

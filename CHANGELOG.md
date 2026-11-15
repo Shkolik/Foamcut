@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - Route visual: break indexes were computed from object point counts instead of the flattened route layout, so the 3D view dropped cut segments (the Enter plunge of a rotation-first route and the Exit lead-out of every sub-route) while the G-code stayed correct. Breaks are now taken from the points actually generated, and existing documents are drawn from their stored point layout without a recompute.
 - Route with a trailing Rotation (for example rotation at the start and at the end) failed to build when kerf compensation was Uniform or Dynamic with an IndexError on an empty trailing segment. The trailing rotation no longer produces an empty segment.
 - Route postprocessor: Enter ignored its Rapid move flag, so the plunge from safe height to the lead-in start was always G1. It is now G0 when Rapid move is enabled, including an Enter without lead-in that plunges straight to the entry point; the lead-in to the entry point stays a cut.
+- Origin rotation X always ignored the machine default parameters and was derived from the horizontal travel. It now comes from the same parameter group as the rest of the machine geometry (falling back to half of the horizontal travel when the parameter does not exist yet).
 
 ## [0.2.1] - 2026-11-13
 
