@@ -106,6 +106,30 @@ def openRoutePanel(obj):
     return showRoutePanel(obj, False)
 
 
+def splitRoutePoints(points, breaks):
+    '''
+    Split a flattened route polyline into the segments separated by breaks.
+    A break marks the last point of one segment; the next segment starts at
+    the following point, so no line is drawn across a rapid or a rotation.
+    @param points - route point list (Offset_L or Offset_R)
+    @param breaks - indexes of the last point of every segment but the last
+    @returns list of point lists
+    '''
+    if len(points) == 0:
+        return []
+    if len(breaks) == 0:
+        return [list(points)]
+
+    pointGroups = []
+    lastBreak = 0
+    for idx in breaks:
+        pointGroups.append(list(points[lastBreak:idx + 1]))
+        lastBreak = idx + 1
+    if lastBreak < len(points):
+        pointGroups.append(list(points[lastBreak:]))
+    return pointGroups
+
+
 class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 
     def doubleClicked(self, _):
@@ -126,8 +150,9 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
             while self.node.getNumChildren() > 0:
                 self.node.removeChild(0)
 
-            self.node.addChild(self.drawRouteLines(self.Object.Offset_L, self.Object.RouteBreaks))
-            self.node.addChild(self.drawRouteLines(self.Object.Offset_R, self.Object.RouteBreaks))
+            breaks = self.routeBreaks()
+            self.node.addChild(self.drawRouteLines(self.Object.Offset_L, breaks))
+            self.node.addChild(self.drawRouteLines(self.Object.Offset_R, breaks))
 
             if self.Object.Pauses is not None and len(self.Object.Pauses) > 0 and len(self.Object.Pauses) == len(self.Object.PausesDurations):
                 pauses = []
@@ -137,6 +162,17 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
                     pauses.append([self.Object.Offset_R[idx], float(dur)])
 
                 self.node.addChild(self.drawPauses(pauses))
+
+    def routeBreaks(self):
+        '''
+        Break indexes from the route point layout. Routes saved before the
+        layout-based accounting keep stale indexes in RouteBreaks, so use the
+        layout when it is consistent with the stored points.
+        '''
+        try:
+            return WireRoute.getRouteBreaks(self.Object)
+        except Exception:
+            return list(self.Object.RouteBreaks)
 
     def drawPauses(self, points):
         group = coin.SoGroup()
@@ -189,21 +225,8 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 
     def drawRouteLines(self, points, breaks):
         group = coin.SoGroup()
-        if len(points) > 0:
-            pointGroups = []
-
-            if len(breaks) > 0:
-                lastBreak = 0
-                for idx in breaks:
-                    pointGroups.append(points[lastBreak:idx + 1:1])
-                    lastBreak = idx + 1
-                if lastBreak < len(points) - 1:
-                    pointGroups.append(points[lastBreak:])
-            else:
-                pointGroups.append(points)
-
-            for pg in pointGroups:
-                group.addChild(self.drawRouteLine(pg))
+        for pointGroup in splitRoutePoints(points, breaks):
+            group.addChild(self.drawRouteLine(pointGroup))
         return group
 
     def drawRouteLine(self, points):

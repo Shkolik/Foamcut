@@ -11,6 +11,7 @@ import FreeCADGui
 Gui=FreeCADGui
 from PySide import QtGui
 import RouteGui
+import WireRoute
 import WireRouteClone
 import utilities
 
@@ -29,8 +30,9 @@ class WireRouteCloneVP(RouteGui.WireRouteVP):
         if len(points_L) == 0 or len(points_R) == 0:
             return
 
-        self.node.addChild(self.drawRouteLines(points_L, source.RouteBreaks))
-        self.node.addChild(self.drawRouteLines(points_R, source.RouteBreaks))
+        breaks = self.sourceBreaks(source)
+        self.node.addChild(self.drawRouteLines(points_L, breaks))
+        self.node.addChild(self.drawRouteLines(points_R, breaks))
 
         if source.Pauses is not None and len(source.Pauses) > 0 and len(source.Pauses) == len(source.PausesDurations):
             pauses = []
@@ -39,6 +41,13 @@ class WireRouteCloneVP(RouteGui.WireRouteVP):
                 pauses.append([points_L[idx], float(duration)])
                 pauses.append([points_R[idx], float(duration)])
             self.node.addChild(self.drawPauses(pauses))
+
+    def sourceBreaks(self, source):
+        '''Break indexes from the source layout; fall back to its stored values.'''
+        try:
+            return WireRoute.getRouteBreaks(source)
+        except Exception:
+            return list(source.RouteBreaks)
 
     def getIcon(self):
         return utilities.getIconPath("route-clone.svg")

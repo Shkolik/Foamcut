@@ -186,6 +186,24 @@ def getRoutePointLayout(route):
         raise Exception("ERROR: Route [{}] point layout does not match its points: {} mapped, {} stored. Recompute the route.".format(route.Label, index, total))
     return blocks
 
+
+def getRouteBreaks(route):
+    '''
+    Return the indexes of the last point of every route segment that is
+    followed by another segment. The route leaves the cut at an Exit, travels
+    (and possibly rotates) at safe height and enters the next cut, so the
+    polyline must not connect those points.
+    @param route - Route object
+    @returns list of point indexes
+    '''
+    blocks = getRoutePointLayout(route)
+    breaks = []
+    for block_index, (object, start, count) in enumerate(blocks):
+        if object.Type == "Exit" and block_index < len(blocks) - 1:
+            breaks.append(start + count - 1)
+    return breaks
+
+
 def mirrorRoutePointsXY(route, points, pivot):
     '''
     Reflect one side of a route about a horizontal plane.
@@ -233,7 +251,7 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyVectorList",  "Offset_L",         "", "", 5)
         obj.addProperty("App::PropertyVectorList",  "Offset_R",         "", "", 5)
 
-        obj.addProperty("App::PropertyIntegerList", "RouteBreaks",      "", "", 5) # indexes of a points where route breaks - Rotation
+        obj.addProperty("App::PropertyIntegerList", "RouteBreaks",      "", "", 5) # indexes of the last point of every route segment (rotation or travel break)
 
         obj.addProperty("App::PropertyIntegerList", "Pauses",           "", "", 5) # indexes of a points where should be pause
         obj.addProperty("App::PropertyFloatList",   "PausesDurations",  "", "", 5) 
@@ -364,21 +382,12 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         item_index  = 0
         pauses = []
         pausesDuration = []
-        breaks = []
-
-        # lastObjectPoint tracks global index in flattened Path_L / Path_R
-        lastObjectPoint = 0
 
         # - Check is single element
         if len(obj.Objects) == 1:
             # - Store element            
             route_data.append(item_index)
             route_data_dir.append(False)
-            object = obj.Objects[item_index]
-
-            # skip rotation object
-            if hasattr(object, "PointsCount"):
-                lastObjectPoint = object.PointsCount - 1
 
         # - Walk through other objects
         for second in obj.Objects[1:]:
@@ -390,7 +399,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 if first.Type == "Enter" and reversed is not None:
                     route_data.append(item_index)
                     route_data_dir.append(False)
-                    lastObjectPoint += first.PointsCount - 1
 
                 #print("SKIP: %s" % second.Type)               
                 continue
@@ -406,7 +414,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 # - Store first element
                 route_data.append(item_index - 1)
                 route_data_dir.append(False)
-                breaks.append(lastObjectPoint)
 
                 # - Check is rotation is first element
                 if item_index == 1:
@@ -422,7 +429,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 # - Store element
                 route_data.append(item_index)
                 route_data_dir.append(False)
-                breaks.append(lastObjectPoint)
 
                 # - Skip element
                 first = None
@@ -437,16 +443,9 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     route_data.append(item_index - 1)
                     route_data_dir.append(False)
 
-                    lastObjectPoint += first.PointsCount - 1
-
-
                 # - Store element
                 route_data.append(item_index)
                 route_data_dir.append(False)
-
-                breaks.append(lastObjectPoint)
-
-                lastObjectPoint += second.PointsCount - 1
 
                 first = second
                 reversed = False # enter always normal
@@ -488,9 +487,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 route_data.append(item_index - 1)
                 route_data_dir.append(first_reversed)
 
-                lastObjectPoint += first.PointsCount - 1
-
-
             else:                
                 # - Detect next pairs
                 if isCommonPoint(first_line[START if reversed else END], second_line[START]):
@@ -505,8 +501,6 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             # - Store second element
             route_data.append(item_index)
             route_data_dir.append(reversed)
-
-            lastObjectPoint += second.PointsCount - 1
 
             # - Go to next object
             first = second
@@ -580,9 +574,10 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
             currentSegment.Edges.append(currentEdge)
 
-        # - dead code: "Rotation" is never set (same reason as the segment-split check above).
-        #   trailing Rotation is always preceded by an Exit
-        if currentEdge.ObjectType != "Rotation":
+        # - A trailing Rotation starts (and leaves empty) a new segment: the
+        #   split at the preceding Exit already stored the cut segment.
+        #   Empty segments have no edges and must not reach the kerf pass.
+        if len(currentSegment.Edges) > 0:
             segments.append(currentSegment)
 
         applyKerf = obj.KerfCompensation > 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) > FC_KERF_STRATEGY_NONE
@@ -614,6 +609,9 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
 
             # intersect offsets and build final route points
             for i, segment in enumerate(segments):
+                if len(segment.Edges) == 0:
+                    continue
+
                 firstWire_L = secondWire_L = None
                 firstWire_R = secondWire_R = None
                 
@@ -702,8 +700,14 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                     edge.OffsetRight = right_off
 
         # build route from segments and edges
-        for i, segment in enumerate(segments):
+        breaks = []
+        for segment in segments:
             if len(segment.Edges) > 0:
+                if len(resultPoints_L) > 0:
+                    # - The previous segment ended at an Exit; the next one
+                    #   starts with a travel move, so the polyline breaks here.
+                    breaks.append(len(resultPoints_L) - 1)
+
                 for j, edge in enumerate(segment.Edges):
                     pointsCount = edge.PointsCount
                     # check for enter/exit case and add plunge-down or plunge-up lines

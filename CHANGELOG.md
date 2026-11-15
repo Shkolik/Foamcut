@@ -13,6 +13,11 @@ All notable changes to this project will be documented in this file.
 
 - `InitMachine` follows the scripting template: the module is now GUI-free domain code with the script-friendly `createMachine(doc)` factory, and the Init machine command lives in `MachineGui` next to the Job view provider.
 
+### Fixed
+
+- Route visual: break indexes were computed from object point counts instead of the flattened route layout, so the 3D view dropped cut segments (the Enter plunge of a rotation-first route and the Exit lead-out of every sub-route) while the G-code stayed correct. Breaks are now taken from the points actually generated, and existing documents are drawn from their stored point layout without a recompute.
+- Route with a trailing Rotation (for example rotation at the start and at the end) failed to build when kerf compensation was Uniform or Dynamic with an IndexError on an empty trailing segment. The trailing rotation no longer produces an empty segment.
+
 ## [0.2.1] - 2026-11-13
 
 ### Added
