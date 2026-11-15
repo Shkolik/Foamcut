@@ -263,6 +263,8 @@ class Postprocess():
         GCODE += self.makeCommentedLine(config, "Width: {}".format(config.FieldWidth)) + "\n"
         GCODE += self.makeCommentedLine(config, "Length: {}".format(config.HorizontalTravel)) + "\n"
         GCODE += self.makeCommentedLine(config, "Height: {}".format(config.VerticalTravel)) + "\n"
+        if config.FiveAxisMachine:
+            GCODE += self.makeCommentedLine(config, "Origin rotation X: {}".format(config.OriginRotationX)) + "\n"
         GCODE += "\n"
 
         GCODE += self.makeCommentedLine(config, "*** FOAM BLOCK ***") + "\n"
@@ -602,12 +604,27 @@ class Postprocess():
         if save_path == "":
             App.Console.PrintWarning("GCODE saving aborted (no output file path specified)\n")
         else:
+            saved = False
             try:
                 with open(save_path, "w") as f:
                     f.write(program)
+                saved = True
                 App.Console.PrintMessage("GCODE saved into [%s]\n" % save_path)
             except Exception:
                 App.Console.PrintError("Unable to save GCODE in [" + save_path + "]\n")
+
+            if saved and App.GuiUp:
+                self.showSavedMessage(run_time)
+
+    def showSavedMessage(self, run_time):
+        '''
+        Report a successful G-code export.
+        @param run_time - formatted expected run time (HH:MM:SS)
+        '''
+        QtGui.QMessageBox.information(
+            None,
+            "G-Code export",
+            "G-Code saved successfully.\nEstimated run time: {}".format(run_time))
 
     def GetResources(self):
         return {"Pixmap"  : utilities.getIconPath("gcode.svg"), # the name of a svg file available in the resources

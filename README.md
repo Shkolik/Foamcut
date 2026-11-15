@@ -247,6 +247,8 @@ This section lets you set postprocessor settings:
 - Start program code - optional preamble - run before any line of G-code produced by the postprocessor. Could be custom comments or a specific homing cycle (do not forget to turn off Homing!) or anything else.
 - End program code - ending code that runs after the postprocessor completes its output. Can be a wire cleaning cycle or a custom parking cycle or a comment or whatever.
 
+The generated file starts with a commented preamble describing the program, the machine and the foam block. The machine block includes the machine type, working area and - for a 5-axis machine - the rotation axis position (Origin rotation X). After a successful save a dialog confirms the export and shows the estimated run time.
+
 ![G-Code](Examples/Gcode.png)
 
 ## Scripting the workbench

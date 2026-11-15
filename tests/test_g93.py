@@ -37,6 +37,7 @@ def make_config(feed_rate_mode):
     cfg.WireOnCommand = "M03 S{WirePower}"; cfg.WireOffCommand = "M05"
     cfg.WireMinPower = 700; cfg.WireMaxPower = 1000; cfg.DynamicWirePower = False
     cfg.FieldWidth = 730; cfg.HorizontalTravel = 550; cfg.VerticalTravel = 300
+    cfg.OriginRotationX = 275
     cfg.BlockWidth = 400; cfg.BlockLength = 300; cfg.BlockHeight = 50
     cfg.BlockPosition = FreeCAD.Vector(-200, 275, 50)
     cfg.TimeUnits = utilities.FC_TIME_UNITS[0]
@@ -107,7 +108,7 @@ class TestMachineConfig(unittest.TestCase):
 
 G94_NO_PARK_EXPECTED = (
     "; *** PROGRAM ***\n; Expected run time: 00:00:22\n\n"
-    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n; Origin rotation X: 275\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
     "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
@@ -185,7 +186,7 @@ class TestFeedHelpers(unittest.TestCase):
 
 G93_NO_PARK_EXPECTED = (
     "; *** PROGRAM ***\n; Expected run time: 00:00:16\n\n"
-    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n; Origin rotation X: 275\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
     "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
@@ -202,7 +203,7 @@ G93_NO_PARK_EXPECTED = (
 
 G93_PARK_HOMING_EXPECTED = (
     "; *** PROGRAM ***\n; Expected run time: 00:00:36\n\n"
-    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n; Origin rotation X: 275\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
     "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
@@ -227,7 +228,7 @@ G93_PARK_HOMING_EXPECTED = (
 
 G94_PARK_HOMING_EXPECTED = (
     "; *** PROGRAM ***\n; Expected run time: 00:00:43\n\n"
-    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n\n"
+    "; *** MACHINE ***\n; Machine type: 5-Axis\n; Width: 730\n; Length: 550\n; Height: 300\n; Origin rotation X: 275\n\n"
     "; *** FOAM BLOCK ***\n; Width: 400\n; Length: 300\n; Height: 50\n"
     "; Position - Left-Bottom-Front corner in relation to the origin\n"
     "; Position.X: -200.0\n; Position.Y: 275.0\n; Position.Z: 50.0\n\n"
@@ -371,6 +372,64 @@ class TestG93Emission(unittest.TestCase):
         idx_g93 = content.index("G93\n")
         idx_task = content.index("; *** TASK BLOCK ***")
         self.assertLess(idx_g93, idx_task)
+
+
+class TestPreambleAndExport(unittest.TestCase):
+    def make_output(self, cfg):
+        import tempfile
+        outpath = os.path.join(tempfile.gettempdir(), "preamble_%s.gcode" % id(cfg))
+        return generate(cfg, [make_route()], outpath)
+
+    def test_preamble_discloses_origin_rotation_for_5_axis(self):
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        content = self.make_output(cfg)
+        self.assertIn("; Origin rotation X: 275\n", content)
+
+    def test_preamble_omits_origin_rotation_for_4_axis(self):
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        cfg.FiveAxisMachine = False
+        content = self.make_output(cfg)
+        self.assertNotIn("Origin rotation X", content)
+
+    def test_saved_message_reports_run_time(self):
+        calls = []
+
+        class FakeMessageBox:
+            @staticmethod
+            def information(parent, title, message):
+                calls.append((title, message))
+
+        original_gui = Postprocess.QtGui
+        Postprocess.QtGui = type("QtGui", (), {"QMessageBox": FakeMessageBox})
+        try:
+            Postprocess.Postprocess().showSavedMessage("00:01:23")
+        finally:
+            Postprocess.QtGui = original_gui
+
+        self.assertEqual(calls, [
+            ("G-Code export", "G-Code saved successfully.\nEstimated run time: 00:01:23")])
+
+    def test_export_reports_run_time_when_gui_is_up(self):
+        import tempfile
+        cfg = make_config(utilities.FC_FEED_RATE_MODES[0])
+        outpath = os.path.join(tempfile.gettempdir(), "preamble_dialog.gcode")
+        calls = []
+
+        class FakeApp:
+            GuiUp = True
+            Console = Postprocess.App.Console
+
+        original_app = Postprocess.App
+        original_show = Postprocess.Postprocess.showSavedMessage
+        Postprocess.App = FakeApp
+        Postprocess.Postprocess.showSavedMessage = lambda self, run_time: calls.append(run_time)
+        try:
+            generate(cfg, [make_route()], outpath)
+        finally:
+            Postprocess.Postprocess.showSavedMessage = original_show
+            Postprocess.App = original_app
+
+        self.assertEqual(calls, ["00:00:22"])
 
 
 # FreeCADCmd imports the passed script as a module (__name__ is the module
