@@ -219,6 +219,35 @@ def intersectLineAndPlane(v0, v1, plane):
     
     return App.Vector(point.X, point.Y, point.Z)
 
+def getSplineLength(points):
+    '''
+    Get the length of a C0 spline passing through the points.
+    @param points - list of App.Vector points
+    @returns spline length
+    '''
+    if len(points) < 2:
+        return 0.0
+
+    path = Part.BSplineCurve()
+    path.approximate(Points = points, Continuity="C0")
+    return float(path.length())
+
+def projectEdgeToPlane(leftPoints, rightPoints, plane):
+    '''
+    Project a paired wire path to a plane and return the projected points and
+    their length. Path_L[i] and Path_R[i] are the two ends of the same wire.
+    @param leftPoints - left path points
+    @param rightPoints - right path points, paired index-wise with leftPoints
+    @param plane - plane to project onto
+    @returns tuple (projected points, projected length)
+    '''
+    if len(leftPoints) != len(rightPoints):
+        raise Exception(
+            f"ERROR: Left and right path point count mismatch: {len(leftPoints)} != {len(rightPoints)}")
+
+    projected = [intersectLineAndPlane(l, r, plane) for l, r in zip(leftPoints, rightPoints)]
+    return projected, getSplineLength(projected)
+
 def getParallelEdgeLength(obj, planeX):
     '''
     Get the length of the wire path where it crosses an artificial plane at planeX.
@@ -239,15 +268,8 @@ def getParallelEdgeLength(obj, planeX):
     from MachinePlane import WorkingPlane
     plane = WorkingPlane.fromX(job, planeX)
 
-    projected = []
-    for l, r in zip(obj.Path_L, obj.Path_R):
-        projected.append(intersectLineAndPlane(l, r, plane))
-
-    # recalculate edges length
-    path = Part.BSplineCurve()
-    path.approximate(Points = projected, Continuity="C0")
-    
-    return float(path.length())
+    _, length = projectEdgeToPlane(obj.Path_L, obj.Path_R, plane)
+    return length
 
 
 def getLeadScales(leftLength, rightLength):

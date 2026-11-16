@@ -72,6 +72,29 @@ class TestParallelEdgeLength(unittest.TestCase):
                 self.assertAlmostEqual(
                     utilities.getParallelEdgeLength(self.obj, 0.0), 10.0, places = 4)
 
+    def test_project_edge_to_plane_returns_points_and_length(self):
+        from MachinePlane import WorkingPlane
+        plane = WorkingPlane.fromX(self.job, 0.0)
+        projected, length = utilities.projectEdgeToPlane(
+            self.obj.Path_L, self.obj.Path_R, plane)
+
+        self.assertAlmostEqual(length, 10.0, places = 4)
+        self.assertEqual(len(projected), 2)
+        for point in projected:
+            self.assertAlmostEqual(point.x, 0.0, places = 6)
+        self.assertAlmostEqual(projected[0].y, 0.0, places = 6)
+        self.assertAlmostEqual(projected[1].y, 10.0, places = 6)
+
+    def test_project_edge_to_plane_rejects_mismatched_point_counts(self):
+        from MachinePlane import WorkingPlane
+        plane = WorkingPlane.fromX(self.job, 0.0)
+        with self.assertRaises(Exception):
+            utilities.projectEdgeToPlane(self.obj.Path_L, self.obj.Path_R[:-1], plane)
+
+    def test_spline_length_handles_short_point_lists(self):
+        self.assertEqual(utilities.getSplineLength([]), 0.0)
+        self.assertEqual(utilities.getSplineLength([App.Vector(0.0, 0.0, 0.0)]), 0.0)
+
 
 class TestLeadScales(unittest.TestCase):
     def test_short_side_keeps_nominal_scale(self):

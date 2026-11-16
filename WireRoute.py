@@ -21,8 +21,8 @@ class FoamCut_RouteSegment():
     def __init__(self):
         self.Edges = []
         self.LastPoint = 0
-        self.LeftPlaneX = 0.0
-        self.RightPlaneX = 0.0
+        self.LeftPlaneX = None
+        self.RightPlaneX = None
         self.PathLeft = []
         self.PathRight = []
         self.SimpleProjection = False
@@ -51,25 +51,15 @@ class FoamCut_RouteEdge():
             # edge is too short or a single point - no need to make offset
             return
         
-        projectedLeft = []
-        projectedRight = []
+        leftPoints, leftLength = projectEdgeToPlane(self.PointsLeft, self.PointsRight, leftPlane)
+        rightPoints, rightLength = projectEdgeToPlane(self.PointsLeft, self.PointsRight, rightPlane)
 
-        for i in range(len(self.PointsLeft)):
-            projectedLeft.append(intersectLineAndPlane(self.PointsLeft[i], self.PointsRight[i], leftPlane))
-            projectedRight.append(intersectLineAndPlane(self.PointsLeft[i], self.PointsRight[i], rightPlane))
-
-        self.PointsLeft = projectedLeft
-        self.PointsRight = projectedRight
+        self.PointsLeft = leftPoints
+        self.PointsRight = rightPoints
 
         # recalculate edges length
-        path_L = Part.BSplineCurve()
-        path_L.approximate(Points = projectedLeft, Continuity="C0")
-
-        path_R = Part.BSplineCurve()
-        path_R.approximate(Points = projectedRight, Continuity="C0")
-        
-        self.LeftEdgeLength = float(path_L.length())
-        self.RightEdgeLength = float(path_R.length())
+        self.LeftEdgeLength = leftLength
+        self.RightEdgeLength = rightLength
 
     def makeOffset(self, dynamic = False, degree=1.0):
         if self.PointsCount <= 1 or self.LeftEdgeLength <= 1e-2 or self.RightEdgeLength <= 1e-2:
@@ -567,8 +557,15 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 else:
                     (left, right) = self.getEdges(object)
                     if left is not None and right is not None:
-                        currentSegment.LeftPlaneX = left.BoundBox.XMin if left.BoundBox.XMin < currentSegment.LeftPlaneX else currentSegment.LeftPlaneX
-                        currentSegment.RightPlaneX = right.BoundBox.XMax if right.BoundBox.XMax > currentSegment.RightPlaneX else currentSegment.RightPlaneX
+                        if currentSegment.LeftPlaneX is None:
+                            currentSegment.LeftPlaneX = left.BoundBox.XMin
+                        else:
+                            currentSegment.LeftPlaneX = min(currentSegment.LeftPlaneX, left.BoundBox.XMin)
+
+                        if currentSegment.RightPlaneX is None:
+                            currentSegment.RightPlaneX = right.BoundBox.XMax
+                        else:
+                            currentSegment.RightPlaneX = max(currentSegment.RightPlaneX, right.BoundBox.XMax)
                     else:
                         currentSegment.SimpleProjection = True
 
@@ -587,8 +584,10 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             # build temporary planes for projection
             # and make offsets from resulted projections
             for i, segment in enumerate(segments):                
-                leftPlane = WorkingPlane.fromX(job, segment.LeftPlaneX)
-                rightPlane = WorkingPlane.fromX(job, segment.RightPlaneX)
+                leftPlane = rightPlane = None
+                if not segment.SimpleProjection:
+                    leftPlane = WorkingPlane.fromX(job, segment.LeftPlaneX)
+                    rightPlane = WorkingPlane.fromX(job, segment.RightPlaneX)
 
                 for j, edge in enumerate(segment.Edges):
                     idx = FC_KERF_DIRECTIONS.index(edge.CompensationDirection) if edge.CompensationDirection in FC_KERF_DIRECTIONS else 0                    
