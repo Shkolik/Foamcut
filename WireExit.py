@@ -75,18 +75,18 @@ class WireExit(FoamCutBase.FoamCutMovementBaseObject):
 
                 # - if lead-out enabled, calculate lead-out point and add line to exit point
                 if obj.LeadOutEnabled:
-                    leftLen = getParallelEdgeLength(lastObj, exit.x)
-                    rightLen = getParallelEdgeLength(lastObj, exitOpposite.x)
+                    (left, right) = self.getEdges(lastObj)
 
-                    # Determine nominal (long) side
-                    leftIsNominal = leftLen >= rightLen
-
-                    # Avoid division by zero
-                    if leftLen > 0 and rightLen > 0:
-                        leftScale  = 1.0 if leftIsNominal else leftLen / rightLen
-                        rightScale = 1.0 if not leftIsNominal else rightLen / leftLen
-                    else:
+                    if left is None or right is None:
                         leftScale = rightScale = 1.0
+                    else:
+                        # - Artificial planes at the original edge depths.
+                        #   The shorter side keeps the nominal lead-out length.
+                        leftX = min(v.X for v in left.Vertexes) if hasattr(left, "Vertexes") else left.X
+                        rightX = max(v.X for v in right.Vertexes) if hasattr(right, "Vertexes") else right.X
+                        leftLen = getParallelEdgeLength(lastObj, leftX)
+                        rightLen = getParallelEdgeLength(lastObj, rightX)
+                        leftScale, rightScale = getLeadScales(leftLen, rightLen)
 
                     exitLead = exit + App.Vector(0.0, float(obj.LeadOutX) * leftScale, float(obj.LeadOutY) * leftScale)
                     oppLead   = exitOpposite + App.Vector(0.0, float(obj.LeadOutX) * rightScale, float(obj.LeadOutY) * rightScale)

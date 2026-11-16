@@ -221,28 +221,26 @@ def intersectLineAndPlane(v0, v1, plane):
 
 def getParallelEdgeLength(obj, planeX):
     '''
-    Get length of edge projected to the parallel to working plane on specified X.
-    
-    Args:
-        obj: Object containing the path and configuration
-        planeX: X coordinate of the plane to project onto
+    Get the length of the wire path where it crosses an artificial plane at planeX.
+    Path_L[i] and Path_R[i] are the two ends of the same wire, already paired by
+    the path builder, so they are always paired index-wise. EdgesInverted only
+    describes the direction of the right source edge and must not reverse them.
+    @param obj - object containing the path and the Job link
+    @param planeX - X coordinate of the artificial plane
+    @returns path length at that plane
     '''
-    if not hasattr(obj, "Path_L") or not hasattr(obj, "Path_R") or not hasattr(obj, "EdgesInverted"):
+    if not hasattr(obj, "Path_L") or not hasattr(obj, "Path_R"):
         raise Exception(f"Unsupported object type {obj.Label}")
 
     job = obj.Document.getObject(obj.JobName)
     if job is None or job.Type != "Job":
         raise Exception(f"Active Job not found for {obj.Label}")
 
-    left_points = obj.Path_L
-    right_points = list(reversed(obj.Path_R)) if obj.EdgesInverted else obj.Path_R
-
     from MachinePlane import WorkingPlane
     plane = WorkingPlane.fromX(job, planeX)
 
     projected = []
-
-    for l, r in zip(left_points, right_points):
+    for l, r in zip(obj.Path_L, obj.Path_R):
         projected.append(intersectLineAndPlane(l, r, plane))
 
     # recalculate edges length
@@ -250,6 +248,22 @@ def getParallelEdgeLength(obj, planeX):
     path.approximate(Points = projected, Continuity="C0")
     
     return float(path.length())
+
+
+def getLeadScales(leftLength, rightLength):
+    '''
+    Return the per-side multipliers for lead-in/lead-out lengths.
+    The shorter edge keeps the nominal length and the longer one is scaled
+    proportionally, so the wire enters/leaves the foam consistently.
+    @param leftLength - path length at the left artificial plane
+    @param rightLength - path length at the right artificial plane
+    @returns tuple (left scale, right scale)
+    '''
+    if leftLength <= 0.0 or rightLength <= 0.0:
+        return (1.0, 1.0)
+
+    shortLength = min(leftLength, rightLength)
+    return (float(leftLength) / shortLength, float(rightLength) / shortLength)
 
 def getJob(obj):
     '''

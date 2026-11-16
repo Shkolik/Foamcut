@@ -108,13 +108,13 @@ Creates a path between 2 selected vertices. Used to join 2 movements or to creat
 
 ### ![enterIcon](./Resources/icons/enter.svg) Enter
 
-Creates an enter path from the safe height to the selected vertex. Supports lead-in that is proportional to the path that owns the entry point. Lead-in is helpful for entering the foam at the exact speed and temperature where it matters the most. When *Rapid move* is enabled the plunge from safe height down to the lead-in start (or directly to the entry point when lead-in is disabled) is emitted as G0; the lead-in itself always stays a cut (G1).
+Creates an enter path from the safe height to the selected vertex. Supports lead-in that is proportional to the cut edges: the shorter edge gets the nominal lead-in length and the longer edge is scaled from it. Lead-in is helpful for entering the foam at the exact speed and temperature where it matters the most. When *Rapid move* is enabled the plunge from safe height down to the lead-in start (or directly to the entry point when lead-in is disabled) is emitted as G0; the lead-in itself always stays a cut (G1).
 
 ![Enter example](Examples/Enter.png)
 
 ### ![exitIcon](./Resources/icons/exit.svg) Exit
 
-Creates an exit path to the safe height from the selected vertex. Supports lead-out. The idea is the same as lead-in for enter.
+Creates an exit path to the safe height from the selected vertex. Supports lead-out. The idea is the same as lead-in for enter: the shorter edge gets the nominal lead-out length and the longer edge is scaled from it.
 
 ![Exit example](Examples/Exit.png)
 

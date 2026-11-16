@@ -118,18 +118,18 @@ class WireEnter(FoamCutBase.FoamCutMovementBaseObject):
 
                 # - if lead-in enabled, calculate lead-in point and add line to entry point
                 if obj.LeadInEnabled:
-                    leftLen = getParallelEdgeLength(nextObj, entry.x)
-                    rightLen = getParallelEdgeLength(nextObj, entryOpposite.x)
-    
-                    # Determine nominal (long) side
-                    leftIsNominal = leftLen >= rightLen
+                    (left, right) = self.getEdges(nextObj)
 
-                    # Avoid division by zero
-                    if leftLen > 0 and rightLen > 0:
-                        leftScale  = 1.0 if leftIsNominal else leftLen / rightLen
-                        rightScale = 1.0 if not leftIsNominal else rightLen / leftLen                        
-                    else:
+                    if left is None or right is None:
                         leftScale = rightScale = 1.0
+                    else:
+                        # - Artificial planes at the original edge depths.
+                        #   The shorter side keeps the nominal lead-in length.
+                        leftX = min(v.X for v in left.Vertexes) if hasattr(left, "Vertexes") else left.X
+                        rightX = max(v.X for v in right.Vertexes) if hasattr(right, "Vertexes") else right.X
+                        leftLen = getParallelEdgeLength(nextObj, leftX)
+                        rightLen = getParallelEdgeLength(nextObj, rightX)
+                        leftScale, rightScale = getLeadScales(leftLen, rightLen)
 
                     entryLead = entry + App.Vector(0.0, float(obj.LeadInX) * leftScale, float(obj.LeadInY) * leftScale)
                     oppLead   = entryOpposite + App.Vector(0.0, float(obj.LeadInX) * rightScale, float(obj.LeadInY) * rightScale)
