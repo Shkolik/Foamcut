@@ -9,7 +9,7 @@ __usage__ = """Select target body to rotate and activate tool."""
 import FreeCAD
 App=FreeCAD
 import FoamCutBase
-from utilities import getJob, jobExpression, bindJob
+from utilities import getJob, jobExpression, bindJob, getBlockCorners, getBlockOutsideMachine
  
 class Rotation(FoamCutBase.FoamCutBaseObject):
     def __init__(self, obj, source, jobName): 
@@ -21,13 +21,84 @@ class Rotation(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyLink",      "Source",     "Task",     "Source object").Source = source
         obj.addProperty("App::PropertyAngle",     "Angle",      "Task",     "Rotate object by angle").Angle = 90
         
-
         job = getJob(obj)
         bindJob(obj, job)
         obj.setExpression(".OriginRotationX", jobExpression(job, "OriginRotationX"))
         
         obj.Proxy = self
+        self._ready = False
         self.execute(obj)
+        # - The first pass runs before the expressions are evaluated, so the foam
+        #   block check waits for the next recompute.
+        self._ready = True
+
+    def getCumulativeAngle(self, obj):
+        '''
+        Get the total rotation angle applied to the source geometry.
+        Rotations are chained: a rotation of a rotation adds up, the same way the
+        postprocessor emits them.
+        @param obj - Rotation object
+        @returns accumulated angle in degrees
+        '''
+        angle = float(obj.Angle)
+        source = obj.Source
+        visited = {obj.Name}
+
+        while source is not None and getattr(source, "Type", "") == "Rotation":
+            if source.Name in visited:
+                break
+            visited.add(source.Name)
+            angle += float(source.Angle)
+            source = source.Source
+
+        return angle
+
+    def getRotatedBlockCorners(self, obj):
+        '''
+        Get the foam block corners rotated with the part on the rotating table.
+        The block belongs to the Job; it is rotated around the machine rotation
+        axis by the accumulated angle of the rotation chain.
+        @param obj - Rotation object
+        @returns list of corners or None when the block is not available
+        '''
+        job = getJob(obj)
+        if job is None or not hasattr(job, "BlockWidth"):
+            return None
+
+        angle = self.getCumulativeAngle(obj)
+        return getBlockCorners(job, float(obj.OriginRotationX), angle)
+
+    def getBlockIssues(self, obj):
+        '''
+        Check the rotated foam block against the machine travel.
+        A block that does not fit the machine can not be cut as placed, so this
+        warns before the cut. Visual only: routes are not validated against it.
+        @param obj - Rotation object
+        @returns list of issues, empty when the block fits
+        '''
+        corners = self.getRotatedBlockCorners(obj)
+        if corners is None:
+            return []
+
+        job = getJob(obj)
+        return getBlockOutsideMachine(job, corners)
+
+    def reportBlockIssues(self, obj):
+        '''
+        Print the foam block issues once per state, so a plain recompute does not
+        repeat the same warning.
+        @param obj - Rotation object
+        '''
+        if not getattr(self, "_ready", True):
+            return
+
+        issues = self.getBlockIssues(obj)
+        if issues == getattr(self, "_reportedBlockIssues", None):
+            return
+
+        self._reportedBlockIssues = issues
+        for issue in issues:
+            App.Console.PrintWarning("{}: {}\n".format(obj.Label, issue))
 
     def execute(self, obj):
         if obj.Source is None:
@@ -40,6 +111,8 @@ class Rotation(FoamCutBase.FoamCutBaseObject):
         # - Assign new shape
         obj.Shape     = shape
         obj.Placement = shape.Placement
+
+        self.reportBlockIssues(obj)
 
 
 def createRotation(job, source, label = None, recompute = True):

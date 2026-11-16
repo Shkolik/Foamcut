@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - G-code preamble now discloses the rotation axis position (Origin rotation X) in the MACHINE block for 5-axis machines.
 - G-code export shows a confirmation dialog with the estimated run time after the file is saved.
 - Route view option `Show wire near model` draws the wire position at the model profiles instead of the working planes, so the cut can be checked against the part before cutting. It uses the same planes as the kerf compensation, including segments built from a single edge (projection, enter, exit, move). Off by default.
+- Rotation shows the foam block rotated with the part on the rotating table, so the stock position can be checked before cutting. The block follows the Job block size and position and accumulates through chained rotations. Enable it with the `Show foam block` view option or with the `RotationShowFoamBlock` workbench parameter (on by default). A rotated block that leaves the machine travel is reported in the report view.
 
 ### Changed
 

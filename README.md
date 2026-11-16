@@ -122,6 +122,8 @@ Creates an exit path to the safe height from the selected vertex. Supports lead-
 
 Rotates the selected body around the 5th axis. It has its own shape that can be used in all operations. The shape is synchronized with its source.
 
+The rotation can also show the foam block rotated with the part, the way the stock sits on the rotating table. It follows the block size and position of the Job and adds up through chained rotations. Turn it on with *Show foam block* in the rotation view properties; if a rotated block does not fit the machine travel, a warning is written to the report view.
+
 ![Rotation example](Examples/Rotation.png)
 
 ### ![routeIcon](./Resources/icons/route.svg) Route

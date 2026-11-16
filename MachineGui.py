@@ -18,6 +18,7 @@ import FoamCutViewProviders
 import JobConfig
 from InitMachine import createMachine
 from TaskPanelBase import BaseTaskPanel
+from FoamCutViewProviders import drawLine as _line, drawFace as _face, drawBox as _box
 
 VIEW_PROPERTIES = (
     ("ShowCNCVolume", "Show CNC volume"),
@@ -33,87 +34,6 @@ DRAW_PROPERTIES = (
     "BlockPosition", "FiveAxisMachine",
 )
 
-
-def _line(points, color, width = 1, transparency = 0.0):
-    separator = coin.SoSeparator()
-    draw_style = coin.SoDrawStyle()
-    draw_style.style = coin.SoDrawStyle.LINES
-    draw_style.lineWidth = width
-    coords = coin.SoCoordinate3()
-    coords.point.setValues(0, len(points), points)
-    line = coin.SoLineSet()
-    line.numVertices.setValue(len(points))
-    separator.addChild(draw_style)
-    if transparency > 0.0:
-        material = coin.SoMaterial()
-        material.diffuseColor.setValue(*color)
-        material.transparency.setValue(transparency)
-        separator.addChild(material)
-    else:
-        base_color = coin.SoBaseColor()
-        base_color.rgb.setValue(*color)
-        separator.addChild(base_color)
-    separator.addChild(coords)
-    separator.addChild(line)
-    return separator
-
-
-def _face(points, color, transparency = 0.0):
-    separator = coin.SoSeparator()
-    draw_style = coin.SoDrawStyle()
-    draw_style.style = coin.SoDrawStyle.FILLED
-    material = coin.SoMaterial()
-    material.diffuseColor.setValue(*color)
-    material.transparency.setValue(transparency)
-    coords = coin.SoCoordinate3()
-    coords.point.setValues(0, len(points), points)
-    face = coin.SoFaceSet()
-    face.numVertices.setValue(len(points))
-    separator.addChild(draw_style)
-    separator.addChild(material)
-    separator.addChild(coords)
-    separator.addChild(face)
-    return separator
-
-
-def _box_corners(x, y, z, length, width, height):
-    x2 = x + length
-    y2 = y + width
-    z2 = z + height
-    return [
-        (x, y, z), (x2, y, z), (x2, y2, z), (x, y2, z),
-        (x, y, z2), (x2, y, z2), (x2, y2, z2), (x, y2, z2),
-    ]
-
-
-def _box_edges(corners):
-    edges = [
-        (0, 1), (1, 2), (2, 3), (3, 0),
-        (4, 5), (5, 6), (6, 7), (7, 4),
-        (0, 4), (1, 5), (2, 6), (3, 7),
-    ]
-    return [[corners[first], corners[second]] for first, second in edges]
-
-
-def _box_faces(corners):
-    return [
-        [corners[0], corners[1], corners[2], corners[3]],
-        [corners[4], corners[5], corners[6], corners[7]],
-        [corners[0], corners[1], corners[5], corners[4]],
-        [corners[1], corners[2], corners[6], corners[5]],
-        [corners[2], corners[3], corners[7], corners[6]],
-        [corners[3], corners[0], corners[4], corners[7]],
-    ]
-
-
-def _box(x, y, z, length, width, height, face_color, transparency, edge_color):
-    group = coin.SoSeparator()
-    corners = _box_corners(x, y, z, length, width, height)
-    for face in _box_faces(corners):
-        group.addChild(_face(face, face_color, transparency))
-    for edge in _box_edges(corners):
-        group.addChild(_line(edge, edge_color, 1))
-    return group
 
 
 def _origin_axis(label, length, rotate, mirror, color):
@@ -253,10 +173,31 @@ class MachineVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def updateData(self, obj, prop):
         if hasattr(self, "node") and prop not in ("Group", "Label", "Proxy"):
             self.draw()
+            self.refreshRotationBlocks()
 
     def onChanged(self, obj, prop):
         if hasattr(self, "node") and (prop in VIEW_PROPERTY_NAMES or prop == "Visibility"):
             self.draw()
+
+    def refreshRotationBlocks(self):
+        '''
+        Redraw the foam block visual of the rotations after a Job change.
+        The block belongs to the Job, but the Rotation draws it, and a Job change
+        does not recompute the rotations, so they are refreshed from here.
+        '''
+        for child in getattr(self.Object, "Group", []):
+            if getattr(child, "Type", "") != "Rotation":
+                continue
+
+            view_object = getattr(child, "ViewObject", None)
+            proxy = getattr(view_object, "Proxy", None) if view_object is not None else None
+            if proxy is None or not hasattr(proxy, "drawBlock"):
+                continue
+
+            try:
+                proxy.drawBlock()
+            except Exception as error:
+                App.Console.PrintWarning("Could not draw the rotated foam block: {}\n".format(error))
 
     def visible(self, name):
         if self.ViewObject is None:

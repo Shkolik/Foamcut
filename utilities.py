@@ -146,6 +146,83 @@ def getEdgesLinks(obj, source):
                 objects.append([obj, ['Edge{}'.format(i)]])
     return objects
 
+# - Corner order of a box: bottom face, then top face, both counter-clockwise.
+BOX_FACES = ((0, 1, 2, 3), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7))
+BOX_EDGES = ((0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4), (0, 4), (1, 5), (2, 6), (3, 7))
+
+def getBoxCorners(x, y, z, sizeX, sizeY, sizeZ):
+    '''
+    Get the corners of an axis aligned box.
+    @param x, y, z - base corner of the box
+    @param sizeX, sizeY, sizeZ - box size along each axis
+    @returns list of eight corners, see BOX_FACES and BOX_EDGES for the order
+    '''
+    x2 = x + sizeX
+    y2 = y + sizeY
+    z2 = z + sizeZ
+    return [
+        App.Vector(x, y, z), App.Vector(x2, y, z), App.Vector(x2, y2, z), App.Vector(x, y2, z),
+        App.Vector(x, y, z2), App.Vector(x2, y, z2), App.Vector(x2, y2, z2), App.Vector(x, y2, z2),
+    ]
+
+def rotatePointsAboutZ(points, originY, angle):
+    '''
+    Rotate points around the vertical machine axis.
+    @param points - list of points
+    @param originY - position of the rotation axis along machine Y
+    @param angle - rotation angle in degrees
+    @returns list of rotated points
+    '''
+    if isclose(float(angle), 0.0):
+        return list(points)
+
+    rotation = App.Rotation(App.Vector(0.0, 0.0, 1.0), float(angle))
+    pivot = App.Vector(0.0, float(originY), 0.0)
+    return [pivot + rotation.multVec(point - pivot) for point in points]
+
+def getBlockCorners(job, originY = 0.0, angle = 0.0):
+    '''
+    Get the corners of the Job foam block, optionally rotated around the machine
+    rotation axis, the same way the part on a rotating table is rotated.
+    @param job - Job object with the block settings
+    @param originY - position of the rotation axis along machine Y
+    @param angle - rotation angle in degrees
+    @returns list of eight corners
+    '''
+    position = job.BlockPosition
+    corners = getBoxCorners(float(position.x), float(position.y), float(position.z),
+                            float(job.BlockWidth), float(job.BlockLength), float(job.BlockHeight))
+    return rotatePointsAboutZ(corners, originY, angle)
+
+def getBlockOutsideMachine(job, corners, tolerance = 1e-6):
+    '''
+    Check foam block corners against the machine travel.
+    This is a visual warning helper; it does not validate or change a route.
+    @param job - Job object with the machine settings
+    @param corners - foam block corners
+    @param tolerance - allowed overshoot
+    @returns list of issues, empty when the block fits the machine
+    '''
+    issues = []
+
+    halfWidth = float(job.FieldWidth) / 2.0
+    yMin = -float(job.OriginX)
+    yMax = yMin + float(job.HorizontalTravel)
+    zMax = float(job.VerticalTravel)
+
+    xs = [point.x for point in corners]
+    ys = [point.y for point in corners]
+    zs = [point.z for point in corners]
+
+    if min(xs) < -halfWidth - tolerance or max(xs) > halfWidth + tolerance:
+        issues.append("foam block exceeds the machine width (X)")
+    if min(ys) < yMin - tolerance or max(ys) > yMax + tolerance:
+        issues.append("foam block exceeds the horizontal travel (Y)")
+    if min(zs) < -tolerance or max(zs) > zMax + tolerance:
+        issues.append("foam block exceeds the vertical travel (Z)")
+
+    return issues
+
 def splitRoutePoints(points, breaks):
     '''
     Split a flattened route polyline into the segments separated by breaks.

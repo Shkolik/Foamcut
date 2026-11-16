@@ -10,10 +10,16 @@ App = FreeCAD
 import FreeCADGui
 Gui = FreeCADGui
 from PySide import QtGui
+import pivy.coin as coin
 import utilities
 import FoamCutViewProviders
 from TaskPanelBase import BaseTaskPanel
 import Rotate
+
+# - Same look as the Job foam block
+FOAM_BLOCK_FACE_COLOR = (1.0, 0.45, 0.65)
+FOAM_BLOCK_EDGE_COLOR = (0.9, 0.2, 0.4)
+FOAM_BLOCK_TRANSPARENCY = 0.8
 
 
 class RotationTaskPanel(BaseTaskPanel):
@@ -68,7 +74,60 @@ def openRotationPanel(obj):
 class RotationVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def attach(self, obj):
         super().attach(obj)
+
+        if not hasattr(obj, "ShowFoamBlock"):
+            obj.addProperty("App::PropertyBool", "ShowFoamBlock", "Task",
+                            "Show the foam block rotated with the part").ShowFoamBlock = \
+                utilities.getParameterBool("RotationShowFoamBlock", True)
+
+        self.node = coin.SoSeparator()
+        obj.RootNode.addChild(self.node)
+
+        self.drawBlock()
         self.hideSource()
+
+    def drawBlock(self):
+        '''
+        Draw the Job foam block rotated around the machine rotation axis, so the
+        stock position on the rotating table can be checked before cutting.
+        '''
+        if not hasattr(self, "node"):
+            return
+
+        while self.node.getNumChildren() > 0:
+            self.node.removeChild(0)
+
+        if not getattr(self.ViewObject, "Visibility", True) or not getattr(self.ViewObject, "ShowFoamBlock", True):
+            return
+
+        try:
+            proxy = getattr(self.Object, "Proxy", None)
+            if proxy is None or not hasattr(proxy, "getRotatedBlockCorners"):
+                return
+
+            corners = proxy.getRotatedBlockCorners(self.Object)
+        except Exception as error:
+            App.Console.PrintWarning("{}: cannot draw the rotated foam block: {}\n".format(self.Object.Label, error))
+            return
+
+        if corners is None:
+            return
+
+        # - Nodes added to the view provider root are transformed by the object
+        #   placement, but the corners are already in machine coordinates, so
+        #   compensate it.
+        placement = getattr(self.Object, "Placement", None)
+        if placement is not None:
+            inverse = placement.inverse()
+            corners = [inverse.multVec(point) for point in corners]
+
+        # - Only the block is unpickable, the rotation shape stays selectable.
+        pick_style = coin.SoPickStyle()
+        pick_style.style.setValue(coin.SoPickStyle.UNPICKABLE)
+        self.node.addChild(pick_style)
+
+        self.node.addChild(FoamCutViewProviders.drawBoxCorners(
+            corners, FOAM_BLOCK_FACE_COLOR, FOAM_BLOCK_TRANSPARENCY, FOAM_BLOCK_EDGE_COLOR))
 
     def hideSource(self):
         try:
@@ -80,6 +139,13 @@ class RotationVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def updateData(self, obj, prop):
         if prop == "Source":
             self.hideSource()
+
+        if prop not in ("Group", "Label", "Proxy"):
+            self.drawBlock()
+
+    def onChanged(self, obj, prop):
+        if prop in ("ShowFoamBlock", "Visibility"):
+            self.drawBlock()
 
     def getIcon(self):
         return utilities.getIconPath("rotation.svg")

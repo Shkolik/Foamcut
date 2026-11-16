@@ -1,6 +1,71 @@
 import FreeCAD
-from utilities import isNewStateHandling
+from utilities import isNewStateHandling, getBoxCorners, BOX_FACES, BOX_EDGES
 import pivy.coin as coin
+
+
+def drawLine(points, color, width = 1, transparency = 0.0):
+    '''Draw an open polyline.'''
+    separator = coin.SoSeparator()
+    draw_style = coin.SoDrawStyle()
+    draw_style.style = coin.SoDrawStyle.LINES
+    draw_style.lineWidth = width
+    coords = coin.SoCoordinate3()
+    coords.point.setValues(0, len(points), points)
+    line = coin.SoLineSet()
+    line.numVertices.setValue(len(points))
+    separator.addChild(draw_style)
+    if transparency > 0.0:
+        material = coin.SoMaterial()
+        material.diffuseColor.setValue(*color)
+        material.transparency.setValue(transparency)
+        separator.addChild(material)
+    else:
+        base_color = coin.SoBaseColor()
+        base_color.rgb.setValue(*color)
+        separator.addChild(base_color)
+    separator.addChild(coords)
+    separator.addChild(line)
+    return separator
+
+
+def drawFace(points, color, transparency = 0.0):
+    '''Draw a filled polygon.'''
+    separator = coin.SoSeparator()
+    draw_style = coin.SoDrawStyle()
+    draw_style.style = coin.SoDrawStyle.FILLED
+    material = coin.SoMaterial()
+    material.diffuseColor.setValue(*color)
+    material.transparency.setValue(transparency)
+    coords = coin.SoCoordinate3()
+    coords.point.setValues(0, len(points), points)
+    face = coin.SoFaceSet()
+    face.numVertices.setValue(len(points))
+    separator.addChild(draw_style)
+    separator.addChild(material)
+    separator.addChild(coords)
+    separator.addChild(face)
+    return separator
+
+
+def drawBoxCorners(corners, face_color, transparency, edge_color):
+    '''
+    Draw a box from its corners.
+    Corners may be rotated, so this draws a box in any orientation.
+    @param corners - eight corners, see utilities.BOX_FACES for the order
+    '''
+    group = coin.SoSeparator()
+    for face in BOX_FACES:
+        group.addChild(drawFace([corners[index] for index in face], face_color, transparency))
+    for first, second in BOX_EDGES:
+        group.addChild(drawLine([corners[first], corners[second]], edge_color, 1))
+    return group
+
+
+def drawBox(x, y, z, sizeX, sizeY, sizeZ, face_color, transparency, edge_color):
+    '''Draw an axis aligned box.'''
+    corners = getBoxCorners(x, y, z, sizeX, sizeY, sizeZ)
+    return drawBoxCorners(corners, face_color, transparency, edge_color)
+
 
 class FoamCutBaseViewProvider:
     def __init__(self, obj):
