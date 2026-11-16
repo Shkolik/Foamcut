@@ -146,6 +146,29 @@ def getEdgesLinks(obj, source):
                 objects.append([obj, ['Edge{}'.format(i)]])
     return objects
 
+def splitRoutePoints(points, breaks):
+    '''
+    Split a flattened route polyline into the segments separated by breaks.
+    A break marks the last point of one segment; the next segment starts at the
+    following point, so no line is drawn across a rapid or a rotation.
+    @param points - route point list (Offset_L or Offset_R)
+    @param breaks - indexes of the last point of every segment but the last
+    @returns list of point lists
+    '''
+    if len(points) == 0:
+        return []
+    if len(breaks) == 0:
+        return [list(points)]
+
+    pointGroups = []
+    lastBreak = 0
+    for idx in breaks:
+        pointGroups.append(list(points[lastBreak:idx + 1]))
+        lastBreak = idx + 1
+    if lastBreak < len(points):
+        pointGroups.append(list(points[lastBreak:]))
+    return pointGroups
+
 def findEdgeIndex(shape, edge):
     '''
     Find the 1-based index of an edge in a shape, ignoring its direction.

@@ -194,6 +194,65 @@ def getRouteBreaks(route):
     return breaks
 
 
+def getWirePointsAtModel(route):
+    '''
+    Return the route wire points projected onto the artificial planes near the model.
+    Every route point is one wire position, so projecting the point pairs onto the
+    planes at the original edges shows where the wire crosses the part. That is
+    easier to read than the projection on the working planes, which is far away
+    from the model and heavily stretched.
+    @param route - Route object
+    @returns tuple (left groups, right groups) with one point list per route segment
+    '''
+    leftPoints = list(getattr(route, "Offset_L", []))
+    rightPoints = list(getattr(route, "Offset_R", []))
+    leftPlanes = list(getattr(route, "SegmentLeftPlaneX", []))
+    rightPlanes = list(getattr(route, "SegmentRightPlaneX", []))
+
+    if len(leftPoints) == 0 or len(leftPoints) != len(rightPoints):
+        return ([], [])
+    if len(leftPlanes) == 0 or len(leftPlanes) != len(rightPlanes):
+        return ([], [])
+
+    job = route.Document.getObject(route.JobName)
+    if job is None or getattr(job, "Type", None) != "Job":
+        return ([], [])
+
+    try:
+        breaks = getRouteBreaks(route)
+    except Exception:
+        breaks = list(getattr(route, "RouteBreaks", []))
+
+    leftGroups = []
+    rightGroups = []
+
+    leftSegments = splitRoutePoints(leftPoints, breaks)
+    rightSegments = splitRoutePoints(rightPoints, breaks)
+
+    for index, (segmentLeft, segmentRight) in enumerate(zip(leftSegments, rightSegments)):
+        if index >= len(leftPlanes) or index >= len(rightPlanes):
+            break
+        if len(segmentLeft) == 0 or len(segmentLeft) != len(segmentRight):
+            continue
+
+        leftX = float(leftPlanes[index])
+        rightX = float(rightPlanes[index])
+        if isclose(leftX, rightX):
+            continue
+
+        try:
+            projectedLeft, _ = projectEdgeToPlane(segmentLeft, segmentRight, WorkingPlane.fromX(job, leftX))
+            projectedRight, _ = projectEdgeToPlane(segmentLeft, segmentRight, WorkingPlane.fromX(job, rightX))
+        except Exception:
+            # - A wire parallel to the plane has no intersection; skip the segment.
+            continue
+
+        leftGroups.append(projectedLeft)
+        rightGroups.append(projectedRight)
+
+    return (leftGroups, rightGroups)
+
+
 def mirrorRoutePointsXY(route, points, pivot):
     '''
     Reflect one side of a route about a horizontal plane.
@@ -247,6 +306,11 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         obj.addProperty("App::PropertyFloatList",   "PausesDurations",  "", "", 5) 
 
         obj.addProperty("App::PropertyFloatList",   "FeedOverrides",  "", "", 5) 
+
+        # - Planes near the model edges of every route segment. Used to show the
+        #   wire position relative to the part, one entry per segment.
+        obj.addProperty("App::PropertyFloatList",   "SegmentLeftPlaneX",  "", "", 5) 
+        obj.addProperty("App::PropertyFloatList",   "SegmentRightPlaneX", "", "", 5) 
 
         obj.addProperty("App::PropertyInteger",     "Redraw",           "", "", 5).Redraw = 0 # property to tgger view provider to update 
 
@@ -344,6 +408,14 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         if not hasattr(obj, "FeedOverrides"):
             obj.addProperty("App::PropertyFloatList",   "FeedOverrides",  "", "", 5) 
             App.Console.PrintMessage("{} - Migrating from 0.1.10 to 0.1.11 - adding FeedOverrides property.\n".format(obj.Label))
+            touched = True
+
+        if not hasattr(obj, "SegmentLeftPlaneX") or not hasattr(obj, "SegmentRightPlaneX"):
+            if not hasattr(obj, "SegmentLeftPlaneX"):
+                obj.addProperty("App::PropertyFloatList",   "SegmentLeftPlaneX",  "", "", 5) 
+            if not hasattr(obj, "SegmentRightPlaneX"):
+                obj.addProperty("App::PropertyFloatList",   "SegmentRightPlaneX", "", "", 5) 
+            App.Console.PrintMessage("{} - Migrating from 0.2.1 to 0.2.2 - adding SegmentLeftPlaneX and SegmentRightPlaneX properties.\n".format(obj.Label))
             touched = True
             
         if touched:
@@ -576,6 +648,22 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
         #   Empty segments have no edges and must not reach the kerf pass.
         if len(currentSegment.Edges) > 0:
             segments.append(currentSegment)
+
+        # - Store the planes near the model edges so the 3D view can show where
+        #   the wire passes relative to the part. Projection segments have no
+        #   source edges, so they stay on the working planes.
+        segmentLeftPlanes = []
+        segmentRightPlanes = []
+        for segment in segments:
+            if segment.SimpleProjection or segment.LeftPlaneX is None or segment.RightPlaneX is None:
+                segmentLeftPlanes.append(float(wpl.Position.x))
+                segmentRightPlanes.append(float(wpr.Position.x))
+            else:
+                segmentLeftPlanes.append(float(segment.LeftPlaneX))
+                segmentRightPlanes.append(float(segment.RightPlaneX))
+
+        obj.SegmentLeftPlaneX = segmentLeftPlanes
+        obj.SegmentRightPlaneX = segmentRightPlanes
 
         applyKerf = obj.KerfCompensation > 0 and FC_KERF_STRATEGY.index(obj.CompensationStrategy) > FC_KERF_STRATEGY_NONE
 

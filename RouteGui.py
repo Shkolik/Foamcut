@@ -16,7 +16,11 @@ import utilities
 import FoamCutViewProviders
 from TaskPanelBase import BaseTaskPanel
 import WireRoute
-from utilities import getIconPath, setPickStyle, UNPICKABLE, FC_TYPES_TO_ROUTE
+from utilities import getIconPath, setPickStyle, UNPICKABLE, FC_TYPES_TO_ROUTE, splitRoutePoints
+
+# - Colors of the route visualizations
+ROUTE_COLOR = (1, 0, 0)
+WIRE_MODEL_COLOR = (0, 0, 1)
 
 
 class RouteTaskPanel(BaseTaskPanel):
@@ -106,30 +110,6 @@ def openRoutePanel(obj):
     return showRoutePanel(obj, False)
 
 
-def splitRoutePoints(points, breaks):
-    '''
-    Split a flattened route polyline into the segments separated by breaks.
-    A break marks the last point of one segment; the next segment starts at
-    the following point, so no line is drawn across a rapid or a rotation.
-    @param points - route point list (Offset_L or Offset_R)
-    @param breaks - indexes of the last point of every segment but the last
-    @returns list of point lists
-    '''
-    if len(points) == 0:
-        return []
-    if len(breaks) == 0:
-        return [list(points)]
-
-    pointGroups = []
-    lastBreak = 0
-    for idx in breaks:
-        pointGroups.append(list(points[lastBreak:idx + 1]))
-        lastBreak = idx + 1
-    if lastBreak < len(points):
-        pointGroups.append(list(points[lastBreak:]))
-    return pointGroups
-
-
 class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
 
     def doubleClicked(self, _):
@@ -138,6 +118,10 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
     def attach(self, obj):
         self.ViewObject = obj
         self.Object = obj.Object
+
+        if getattr(self.Object, "Type", "") == "Route" and not hasattr(self.ViewObject, "ShowWirePath"):
+            self.ViewObject.addProperty("App::PropertyBool", "ShowWirePath", "Task",
+                                        "Show wire position near the model profiles").ShowWirePath = False
 
         self.node = coin.SoGroup()
 
@@ -154,6 +138,9 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
             self.node.addChild(self.drawRouteLines(self.Object.Offset_L, breaks))
             self.node.addChild(self.drawRouteLines(self.Object.Offset_R, breaks))
 
+            if getattr(self.ViewObject, "ShowWirePath", False):
+                self.node.addChild(self.drawModelWire())
+
             if self.Object.Pauses is not None and len(self.Object.Pauses) > 0 and len(self.Object.Pauses) == len(self.Object.PausesDurations):
                 pauses = []
                 for dur_idx, idx in enumerate(self.Object.Pauses):
@@ -162,6 +149,25 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
                     pauses.append([self.Object.Offset_R[idx], float(dur)])
 
                 self.node.addChild(self.drawPauses(pauses))
+
+    def drawModelWire(self):
+        '''
+        Draw the wire position near the model profiles. The route itself is only
+        drawn on the working planes, which makes it hard to see where the wire
+        actually passes relative to the part.
+        '''
+        group = coin.SoGroup()
+
+        try:
+            (leftGroups, rightGroups) = WireRoute.getWirePointsAtModel(self.Object)
+        except Exception as error:
+            App.Console.PrintWarning("{}: cannot draw the wire near the model: {}\n".format(self.Object.Label, error))
+            return group
+
+        for points in leftGroups + rightGroups:
+            group.addChild(self.drawRouteLine(points, WIRE_MODEL_COLOR))
+
+        return group
 
     def routeBreaks(self):
         '''
@@ -229,20 +235,24 @@ class WireRouteVP(FoamCutViewProviders.FoamCutBaseViewProvider):
             group.addChild(self.drawRouteLine(pointGroup))
         return group
 
-    def drawRouteLine(self, points):
+    def onChanged(self, obj, prop):
+        if prop in ("ShowWirePath", "Visibility") and hasattr(self, "node"):
+            self.drawRoute()
+
+    def drawRouteLine(self, points, color = None):
         sep = coin.SoSeparator()
         if len(points) > 0:
             line = coin.SoLineSet()
             line.numVertices.setValue(len(points))
             coords = coin.SoCoordinate3()
             coords.point.setValues(0, [[p.x, p.y, p.z] for p in points])
-            color = coin.SoBaseColor()
-            color.rgb.setValue(1, 0, 0)
+            baseColor = coin.SoBaseColor()
+            baseColor.rgb.setValue(*(color if color is not None else ROUTE_COLOR))
             draw_style = coin.SoDrawStyle()
             draw_style.style = coin.SoDrawStyle.FILLED
             draw_style.lineWidth = 2
             sep.addChild(draw_style)
-            sep.addChild(color)
+            sep.addChild(baseColor)
             sep.addChild(coords)
             sep.addChild(line)
         return sep

@@ -137,6 +137,10 @@ Kerf direction can be specified for each movement object (Path, Projection, Move
 
 ![Route example](Examples/Route.png)
 
+The route itself is drawn on the working planes as a red line. Enable *Show Wire Path* in the Route view properties to also draw the wire position next to the model as a blue line, so you can check whether the wire passes inside or outside the part before cutting a test piece. It is a display option only and does not change the G-code.
+
+![Route visual example](Examples/RouteVisual.png)
+
 ### ![routeCloneIcon](./Resources/icons/route-clone.svg) Duplicate route
 
 Creates a parametric clone of the selected route and opens a task panel to place and/or mirror it. The clone follows all changes of the source route (paths, kerf compensation, pauses, feed overrides). The panel sets a Y (block length) and Z (block height) offset relative to the source, mirrors the cut horizontally (YZ) by swapping the wire planes like Mirror GCODE does, and can mirror it vertically (XY) about the middle of the foam block. In XY mode the plunge moves always stay at safe height and lead-in/lead-out are rebuilt from the mirrored entry/exit point, so their approach angle stays correct. Rotation angles are reversed for any mirror. Double-click a clone to edit it again. Only original routes can be duplicated - a clone cannot be cloned.
