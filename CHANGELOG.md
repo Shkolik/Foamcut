@@ -23,6 +23,8 @@ All notable changes to this project will be documented in this file.
 - Route postprocessor: Enter ignored its Rapid move flag, so the plunge from safe height to the lead-in start was always G1. It is now G0 when Rapid move is enabled, including an Enter without lead-in that plunges straight to the entry point; the lead-in to the entry point stays a cut.
 - Origin rotation X always ignored the machine default parameters and was derived from the horizontal travel. It now comes from the same parameter group as the rest of the machine geometry (falling back to half of the horizontal travel when the parameter does not exist yet).
 - Lead-in/lead-out: the nominal length now goes to the shorter cut edge and the longer edge is scaled proportionally; the artificial-plane length is no longer reversed for inverted edges, so a lead can no longer point the wrong way. Existing Enter/Exit objects pick the fix up on recompute.
+- Enter/Exit: selecting a vertex of a Path that had an inverted edge attached the opposite end to the wrong end of the other edge, which twisted the plunge. The opposite end is now resolved through the actual wire that the selected path point belongs to, so every path end and every source edge end resolves to the correct pair.
+- Creating several paths at once from two faces could pair the opposite edges wrongly, so the paths did not join and the route failed with "not connected". Edges are now paired by the face that connects them instead of by the nearest distance, which is ambiguous as soon as the profiles are offset, rotated or placed asymmetrically inside the foam.
 
 ## [0.2.1] - 2026-11-13
 

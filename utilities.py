@@ -145,7 +145,164 @@ def getEdgesLinks(obj, source):
             if fe.isEqual(edge):
                 objects.append([obj, ['Edge{}'.format(i)]])
     return objects
-    
+
+def findEdgeIndex(shape, edge):
+    '''
+    Find the 1-based index of an edge in a shape, ignoring its direction.
+    @param shape - shape to search the edge in
+    @param edge - edge to find
+    @returns 1-based index of the edge or None if it is not a part of shape
+    '''
+    for i, shapeEdge in enumerate(shape.Edges, start=1):
+        if edge.isEqual(shapeEdge):
+            return i
+
+        reversedEdge = Part.Edge(shapeEdge)
+        reversedEdge.reverse()
+        if edge.isEqual(reversedEdge):
+            return i
+
+    return None
+
+def findOppositeEdgeIndex(edge, edges_r, skipIndex = None):
+    '''
+    Try to find edge in collection of edges that most close to edge provided
+    @param edge - edge on a left side
+    @param edges_r - edges on a right side
+    @param skipIndex - index of edge to skip in edges_r
+    @returns index of closest edge on a right side
+    '''
+    v1_l = edge.firstVertex().Point
+    v2_l = edge.lastVertex().Point
+
+    firstRightEdgeIndex = skipIndex + 1 if skipIndex is not None and skipIndex + 1 < len(edges_r) else 0
+
+    minDistance = min(v1_l.distanceToPoint(edges_r[firstRightEdgeIndex].firstVertex().Point), v1_l.distanceToPoint(edges_r[firstRightEdgeIndex].lastVertex().Point)) + \
+    min(v2_l.distanceToPoint(edges_r[firstRightEdgeIndex].firstVertex().Point), v2_l.distanceToPoint(edges_r[firstRightEdgeIndex].lastVertex().Point))
+
+    for i, edge_r in enumerate(edges_r):
+        if i == skipIndex:
+            continue
+        v1_r = edge_r.firstVertex().Point
+        v2_r = edge_r.lastVertex().Point
+        dist = min(v1_l.distanceToPoint(v1_r), v1_l.distanceToPoint(v2_r)) + min(v2_l.distanceToPoint(v1_r), v2_l.distanceToPoint(v2_r))
+        if dist < minDistance:
+            minDistance = dist
+            firstRightEdgeIndex = i
+
+    return firstRightEdgeIndex
+
+def sortEdgesByFaces(parent, edges_l, edges_r):
+    '''
+    Sort right edges to match left edges using the faces that connect them.
+
+    Between two profile faces every left edge belongs to the left face and to
+    exactly one connecting face, and that connecting face holds the opposite
+    right edge. This is a topological pairing, so it does not depend on the
+    shape position, orientation or on how close the edges look on a projection.
+
+    @param parent - feature containing both sets of edges
+    @param edges_l - list of edges on a left side
+    @param edges_r - list of edges on a right side
+    @returns list of right edges ordered like edges_l, or None when the pairing
+             can not be resolved from the topology
+    '''
+    shape = parent.Shape
+
+    leftIndices = [findEdgeIndex(shape, edge) for edge in edges_l]
+    rightIndices = [findEdgeIndex(shape, edge) for edge in edges_r]
+    if None in leftIndices or None in rightIndices:
+        return None
+
+    rightSet = set(rightIndices)
+    partners = {}
+
+    for face in shape.Faces:
+        faceIndices = [findEdgeIndex(shape, edge) for edge in face.Edges]
+        leftOnFace = [index for index in faceIndices if index in leftIndices]
+        rightOnFace = [index for index in faceIndices if index in rightSet]
+
+        # - A connecting face holds exactly one edge of each side. The profile
+        #   faces themselves hold all their edges and are skipped here.
+        if len(leftOnFace) != 1 or len(rightOnFace) != 1:
+            continue
+
+        leftIndex = leftOnFace[0]
+        rightIndex = rightOnFace[0]
+        if leftIndex in partners and partners[leftIndex] != rightIndex:
+            return None
+
+        partners[leftIndex] = rightIndex
+
+    if len(partners) != len(leftIndices):
+        return None
+
+    sortedIndices = [partners[index] for index in leftIndices]
+    if len(set(sortedIndices)) != len(sortedIndices):
+        return None
+
+    return [edges_r[rightIndices.index(index)] for index in sortedIndices]
+
+def sortEdges(parent_l, parent_r, edges_l, edges_r):
+    '''
+    Sort right edges to form opposite edge pairs.
+
+    The topological pairing is used when both sides come from the same shape.
+    Otherwise, and whenever the topology does not resolve the pairs (for example
+    two disjoint faces with no connecting faces), the distance based pairing is
+    used instead.
+
+    @param parent_l - feature containing edges_l
+    @param parent_r - feature containing edges_r
+    @param edges_l - list of edges on a left side
+    @param edges_r - list of edges on a right side
+    @returns list of edge pairs, each pair is a tuple of sub object links
+    '''
+    objects = []
+
+    if len(edges_l) == 1 and len(edges_r) == 1:
+        edges_l_links = getEdgesLinks(parent_l, edges_l)
+        edges_r_links = getEdgesLinks(parent_r, edges_r)
+        if len(edges_l_links) == 0 or len(edges_r_links) == 0:
+            FreeCAD.Console.PrintError("ERROR: Cannot create paths. Selected edges have no matching links in the parent shape.\n")
+            return objects
+        objects.append([edges_l_links[0], edges_r_links[0]])
+        return objects
+
+    # - Prefer the topological pairing. The distance based fallback below can not
+    #   tell the sides apart when profiles are offset, and a single wrong first
+    #   match flips the whole direction.
+    edges_r_sorted = sortEdgesByFaces(parent_l, edges_l, edges_r) if parent_l is parent_r else None
+
+    if edges_r_sorted is None:
+        firstRightEdgeIndex = findOppositeEdgeIndex(edges_l[0], edges_r)
+        secondRightEdgeIndex = findOppositeEdgeIndex(edges_l[1], edges_r, firstRightEdgeIndex)
+
+        edges_r_sorted = []
+
+        if (firstRightEdgeIndex + 1 == len(edges_r) and secondRightEdgeIndex == 0) or firstRightEdgeIndex < secondRightEdgeIndex:
+            for i in range(firstRightEdgeIndex, len(edges_r)):
+                edges_r_sorted.append(edges_r[i])
+            for i in range(firstRightEdgeIndex):
+                edges_r_sorted.append(edges_r[i])
+        else:
+            for i in range(firstRightEdgeIndex, -1, -1):
+                edges_r_sorted.append(edges_r[i])
+            for i in range(len(edges_r) - 1, firstRightEdgeIndex, - 1):
+                edges_r_sorted.append(edges_r[i])
+
+    edges_l_links = getEdgesLinks(parent_l, edges_l)
+    edges_r_links = getEdgesLinks(parent_r, edges_r_sorted)
+
+    if len(edges_l_links) < len(edges_l) or len(edges_r_links) < len(edges_r_sorted):
+        FreeCAD.Console.PrintError("ERROR: Cannot create paths. Selected edges have no matching links in the parent shape.\n")
+        return objects
+
+    for i in range(len(edges_l)):
+        objects.append([edges_l_links[i], edges_r_links[i]])
+
+    return objects
+
 def getAllSelectedEdges():
     '''
     Get all selected Edges in format of sub object links
