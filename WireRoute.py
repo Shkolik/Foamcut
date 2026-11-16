@@ -237,10 +237,14 @@ def getWirePointsAtModel(route):
 
         leftX = float(leftPlanes[index])
         rightX = float(rightPlanes[index])
-        if isclose(leftX, rightX):
-            continue
 
         try:
+            if isclose(leftX, rightX):
+                # - Single source edge: both sides project to the same line.
+                projectedLeft, _ = projectEdgeToPlane(segmentLeft, segmentRight, WorkingPlane.fromX(job, leftX))
+                leftGroups.append(projectedLeft)
+                continue
+
             projectedLeft, _ = projectEdgeToPlane(segmentLeft, segmentRight, WorkingPlane.fromX(job, leftX))
             projectedRight, _ = projectEdgeToPlane(segmentLeft, segmentRight, WorkingPlane.fromX(job, rightX))
         except Exception:
@@ -623,23 +627,24 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
                 pauses.append(currentSegment.LastPoint)
                 pausesDuration.append(float(object.PauseDuration)) 
 
-            if not currentSegment.SimpleProjection:
+            if not currentSegment.SimpleProjection or currentSegment.LeftPlaneX is None:
                 if object.Type == "Projection":
                     currentSegment.SimpleProjection = True
-                else:
-                    (left, right) = self.getEdges(object)
-                    if left is not None and right is not None:
-                        if currentSegment.LeftPlaneX is None:
-                            currentSegment.LeftPlaneX = left.BoundBox.XMin
-                        else:
-                            currentSegment.LeftPlaneX = min(currentSegment.LeftPlaneX, left.BoundBox.XMin)
 
-                        if currentSegment.RightPlaneX is None:
-                            currentSegment.RightPlaneX = right.BoundBox.XMax
-                        else:
-                            currentSegment.RightPlaneX = max(currentSegment.RightPlaneX, right.BoundBox.XMax)
+                (leftX, rightX) = self.getSourceBounds(object)
+
+                if leftX is None:
+                    currentSegment.SimpleProjection = True
+                else:
+                    if currentSegment.LeftPlaneX is None:
+                        currentSegment.LeftPlaneX = leftX
                     else:
-                        currentSegment.SimpleProjection = True
+                        currentSegment.LeftPlaneX = min(currentSegment.LeftPlaneX, leftX)
+
+                    if currentSegment.RightPlaneX is None:
+                        currentSegment.RightPlaneX = rightX
+                    else:
+                        currentSegment.RightPlaneX = max(currentSegment.RightPlaneX, rightX)
 
             currentSegment.Edges.append(currentEdge)
 
@@ -650,12 +655,12 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             segments.append(currentSegment)
 
         # - Store the planes near the model edges so the 3D view can show where
-        #   the wire passes relative to the part. Projection segments have no
-        #   source edges, so they stay on the working planes.
+        #   the wire passes relative to the part. A segment without any source
+        #   geometry stays on the working planes.
         segmentLeftPlanes = []
         segmentRightPlanes = []
         for segment in segments:
-            if segment.SimpleProjection or segment.LeftPlaneX is None or segment.RightPlaneX is None:
+            if segment.LeftPlaneX is None or segment.RightPlaneX is None:
                 segmentLeftPlanes.append(float(wpl.Position.x))
                 segmentRightPlanes.append(float(wpr.Position.x))
             else:
@@ -867,7 +872,35 @@ class WireRoute(FoamCutBase.FoamCutBaseObject):
             return (left, right)
         else:
             return (None, None)
-        
+
+    def getSourceBounds(self, obj):
+        '''
+        Get the X extents of the source geometry of a movement object.
+        Path and Projection keep a pair of edges, while Enter, Exit and Move keep
+        a single source edge, so the missing side falls back to the other one.
+        @param obj - movement object
+        @returns tuple (left X, right X) or (None, None) when there is no source
+        '''
+        (left, right) = self.getEdges(obj)
+
+        if left is None:
+            name = getattr(obj, "LeftEdgeName", "")
+            if name:
+                left = obj.getSubObject(name)
+
+        if right is None:
+            name = getattr(obj, "RightEdgeName", "")
+            if name:
+                right = obj.getSubObject(name)
+
+        if left is None and right is None:
+            return (None, None)
+
+        leftX = left.BoundBox.XMin if left is not None else right.BoundBox.XMin
+        rightX = right.BoundBox.XMax if right is not None else left.BoundBox.XMax
+
+        return (leftX, rightX)
+
     def getWirepoints(self, wire, num_points):
         '''
         Make a Bspline from wire, discretize it with specified number of points

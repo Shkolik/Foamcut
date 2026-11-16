@@ -24,6 +24,7 @@ FreeCADGui.addCommand = lambda *a, **k: None
 
 import Part
 import WirePath
+import WireProjection
 import WireRoute
 from test_route_postprocess import new_document
 
@@ -83,6 +84,31 @@ class TestWirePointsAtModel(unittest.TestCase):
         self.assertAlmostEqual(rightGroups[0][0].z, RIGHT_EDGE[0].z, places = 6)
         self.assertAlmostEqual(rightGroups[0][-1].y, RIGHT_EDGE[1].y, places = 6)
         self.assertAlmostEqual(rightGroups[0][-1].z, RIGHT_EDGE[1].z, places = 6)
+
+    def test_projection_segment_is_drawn_at_its_source(self):
+        # - A projection keeps a single source edge at the model, so its segment
+        #   has to be drawn there instead of on the working planes.
+        source = Part.makeLine(App.Vector(50.0, 200.0, 100.0), App.Vector(50.0, 210.0, 130.0))
+        edge = self.doc.addObject("Part::Feature", "ProjectionSource")
+        edge.Shape = source
+        self.doc.recompute()
+
+        projection = WireProjection.createProjection(self.job, (edge, "Edge1"), recompute = False)
+        self.doc.recompute()
+
+        self.job.KerfCompensation = 0.0
+        route = WireRoute.createRoute(self.job, [projection], recompute = True)
+
+        self.assertEqual(list(route.SegmentLeftPlaneX), [50.0])
+        self.assertEqual(list(route.SegmentRightPlaneX), [50.0])
+
+        (leftGroups, rightGroups) = WireRoute.getWirePointsAtModel(route)
+        self.assertEqual(len(leftGroups), 1)
+        self.assertEqual(len(rightGroups), 0)
+        self.assertEqual(len(leftGroups[0]), len(route.Offset_L))
+
+        for point in leftGroups[0]:
+            self.assertAlmostEqual(point.x, 50.0, places = 6)
 
 
 if __name__ == "__main__" or (len(sys.argv) > 1 and os.path.abspath(sys.argv[1]) == os.path.abspath(__file__)):
