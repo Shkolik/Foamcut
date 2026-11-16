@@ -11,6 +11,11 @@ Gui=FreeCADGui
 import Part
 from utilities import *
 
+# - Distance from a selected path point to the wire line that owns it. The path
+#   point is the exact intersection of that line with the working plane, so this
+#   only absorbs discretization noise.
+WIRE_LINE_TOLERANCE = 0.1
+
 def getRoutesForObject(obj):
     '''
     Return the routes that use a movement object.
@@ -154,6 +159,145 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
             else:
                 obj.setEditorMode("PauseDuration", 3)
 
+    def getEdgeEnds(self, edge):
+        '''
+        Get start and end vertexes of an edge or a single vertex.
+        @param edge - edge, wire or vertex
+        @returns tuple (start vertex, end vertex)
+        '''
+        if edge is None:
+            return (None, None)
+
+        if isinstance(edge, Part.Vertex):
+            return (edge, edge)
+
+        return (edge.firstVertex(), edge.lastVertex())
+
+    def getPairedVertex(self, vertex, leftStart, leftEnd, rightStart, rightEnd, inverted):
+        '''
+        Get the wire end paired with the given source edge end.
+        Path_L[i] and Path_R[i] are the two ends of the same wire, so when the
+        right edge is inverted its ends are paired in the opposite order.
+        @returns paired vertex or None if vertex is not an edge end
+        '''
+        if vertex is leftStart:
+            return rightStart if not inverted else rightEnd
+        if vertex is leftEnd:
+            return rightEnd if not inverted else rightStart
+        if vertex is rightStart:
+            return leftStart if not inverted else leftEnd
+        if vertex is rightEnd:
+            return leftEnd if not inverted else leftStart
+
+        return None
+
+    def getPointLineDistance(self, point, first, second):
+        '''
+        Get the distance from a point to the infinite line through two vertexes.
+        @param point - point to check
+        @param first - first vertex of the line
+        @param second - second vertex of the line
+        @returns distance to the line
+        '''
+        direction = second.Point.sub(first.Point)
+        if direction.Length <= 1e-9:
+            return point.distanceToPoint(first.Point)
+
+        return point.sub(first.Point).cross(direction).Length / direction.Length
+
+    def resolveOppositeVertex(self, point, parent, left, right, inverted):
+        '''
+        Resolve the source edge end that owns a point projected to a working plane.
+        Every path end is the intersection of the working plane with the line
+        between two source edge ends, so the end is resolved by the path index.
+        Because the path tie can be resolved on either end of an edge, the
+        alternate pairing is checked against the same line and used when the
+        index pairing does not lie on it.
+        @param point - point on a working plane
+        @param parent - movement object that owns the point
+        @param left - left source edge
+        @param right - right source edge
+        @param inverted - True if the right edge is inverted
+        @returns tuple (isLeft, vertex, oppositeVertex)
+        '''
+        leftStart, leftEnd = self.getEdgeEnds(left)
+        rightStart, rightEnd = self.getEdgeEnds(right)
+
+        isStart = None
+        if isCommonPoint(parent.Path_L[START], point) or isCommonPoint(parent.Path_R[START], point):
+            isStart = True
+        elif isCommonPoint(parent.Path_L[END], point) or isCommonPoint(parent.Path_R[END], point):
+            isStart = False
+
+        if isStart is None:
+            # - Not a path end: fall back to the nearest source edge end.
+            return self.matchNearestVertex(point, left, right, inverted)
+
+        if isStart:
+            nominal   = (leftStart, rightEnd if inverted else rightStart)
+            alternate = (leftEnd,   rightStart if inverted else rightEnd)
+        else:
+            nominal   = (leftEnd,   rightStart if inverted else rightEnd)
+            alternate = (leftStart, rightEnd if inverted else rightStart)
+
+        pair = nominal
+        if self.getPointLineDistance(point, nominal[0], nominal[1]) > WIRE_LINE_TOLERANCE:
+            if self.getPointLineDistance(point, alternate[0], alternate[1]) <= WIRE_LINE_TOLERANCE:
+                pair = alternate
+
+        # - Working planes are outside the foam, so the nearer end of the wire is
+        #   the one that owns the selected point.
+        if point.distanceToPoint(pair[0].Point) <= point.distanceToPoint(pair[1].Point):
+            (vertex, oppositeVertex) = pair
+        else:
+            (oppositeVertex, vertex) = pair
+
+        isLeft = vertex is leftStart or vertex is leftEnd
+        return (isLeft, vertex, oppositeVertex)
+
+    def matchNearestVertex(self, point, left, right, inverted):
+        '''
+        Match a point with the nearest source edge end and return its pair.
+        @returns tuple (isLeft, vertex, oppositeVertex)
+        '''
+        leftStart, leftEnd = self.getEdgeEnds(left)
+        rightStart, rightEnd = self.getEdgeEnds(right)
+
+        nearestVertex = None
+        nearestIsLeft = False
+        nearestDistance = None
+
+        for end, isLeft in ((leftStart, True), (leftEnd, True), (rightStart, False), (rightEnd, False)):
+            if end is None:
+                continue
+
+            distance = point.distanceToPoint(end.Point)
+            if nearestDistance is None or distance < nearestDistance:
+                nearestVertex = end
+                nearestIsLeft = isLeft
+                nearestDistance = distance
+
+        oppositeVertex = self.getPairedVertex(
+            nearestVertex, leftStart, leftEnd, rightStart, rightEnd, inverted)
+
+        return (nearestIsLeft, nearestVertex, oppositeVertex)
+
+    def matchOppositeVertex(self, vertex, left, right, inverted):
+        '''
+        Match a selected source vertex with an edge end and return its pair.
+        @returns tuple (isLeft, vertex, oppositeVertex) or None if not matched
+        '''
+        leftStart, leftEnd = self.getEdgeEnds(left)
+        rightStart, rightEnd = self.getEdgeEnds(right)
+
+        for end, isLeft in ((leftStart, True), (leftEnd, True), (rightStart, False), (rightEnd, False)):
+            if end is not None and isCommonPoint(end, vertex):
+                oppositeVertex = self.getPairedVertex(
+                    end, leftStart, leftEnd, rightStart, rightEnd, inverted)
+                return (isLeft, end, oppositeVertex)
+
+        return None
+
     def findOppositeVertexes(self, obj, parent, vertex):
         oppositeVertex = None
 
@@ -176,77 +320,38 @@ class FoamCutMovementBaseObject(FoamCutBaseObject):
 
         # get edges or vertices on object we cut from parent action (move, join, path...)
         (left, right) = self.getEdges(parent)
+        if left is None or right is None:
+            raise Exception(f"ERROR: {parent.Label} has no edges to resolve the opposite vertex.\n")
 
         if onPlane:
             if isMovement(parent):
-                
-                point = vertex.Point
-                (distToLeft, _, _) = vertex.distToShape(left)
-                (distToRight, _, _) = vertex.distToShape(right)
-                
-                # - Connect
-                if isCommonPoint(parent.Path_L[START], point):
-                    isLeft = True
-                    if distToLeft < distToRight:
-                        vertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
-                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())            
-                    else:
-                        vertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
-                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.firstVertex() if not parent.EdgesInverted else left.lastVertex())
-                elif isCommonPoint(parent.Path_L[END], point):
-                    isLeft = True
-                    if distToLeft < distToRight:
-                        vertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
-                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
-                    else:
-                        vertex = right if isinstance(right, Part.Vertex) else right.lastVertex()
-                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.lastVertex() if not parent.EdgesInverted else left.firstVertex())
-                elif isCommonPoint(parent.Path_R[START], point):
-                    if distToRight < distToLeft:
-                        vertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
-                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.firstVertex() if not parent.EdgesInverted else left.lastVertex())                
-                    else:
-                        vertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
-                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.firstVertex() if not parent.EdgesInverted else right.lastVertex())
-                elif isCommonPoint(parent.Path_R[END], point):
-                    if distToRight < distToLeft:
-                        vertex = right if isinstance(right, Part.Vertex) else right.lastVertex() 
-                        oppositeVertex = left if isinstance(left, Part.Vertex) else (left.lastVertex() if not parent.EdgesInverted else left.firstVertex())
-                    else:
-                        vertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
-                        oppositeVertex = right if isinstance(right, Part.Vertex) else (right.lastVertex() if not parent.EdgesInverted else right.firstVertex())
+                # - Working planes are outside the foam, so the selected point is
+                #   a projection of a wire end. Find the source end that owns it
+                #   by distance and take the paired end on the other side.
+                (isLeft, vertex, oppositeVertex) = self.resolveOppositeVertex(
+                    vertex.Point, parent, left, right, bool(parent.EdgesInverted))
             else:
                 raise Exception(f"ERROR: Not supported parent object type. Only Path, Move and Projection supported.\n")
         else:
+            # - Selected vertex is a source edge end or a model vertex.
             if isMovement(parent):
-                (distToLeft, _, _) = vertex.distToShape(wp[0].Shape)
-                (distToRight, _, _) = vertex.distToShape(wp[1].Shape)
-
-                isLeft = distToLeft < distToRight
-
-                if isCommonPoint(left if isinstance(left, Part.Vertex) else left.firstVertex(), vertex):                    
-                    oppositeVertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
-                elif isCommonPoint(left if isinstance(left, Part.Vertex) else left.lastVertex(), vertex):
-                    oppositeVertex = right if isinstance(right, Part.Vertex) else right.lastVertex()
-                elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.firstVertex(), vertex):
-                    oppositeVertex =left if isinstance(left, Part.Vertex) else left.firstVertex()
-                elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.lastVertex(), vertex):
-                    oppositeVertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
+                result = self.matchOppositeVertex(vertex, left, right, bool(parent.EdgesInverted))
+                if result is not None:
+                    (isLeft, vertex, oppositeVertex) = result
             else:
                 for object in job.Group:
-                    if isMovement(object):
-                        (left, right) = self.getEdges(object)
+                    if not isMovement(object):
+                        continue
 
-                        if isCommonPoint(left if isinstance(left, Part.Vertex) else left.firstVertex(), vertex):
-                            isLeft = True
-                            oppositeVertex = right if isinstance(right, Part.Vertex) else right.firstVertex()
-                        elif isCommonPoint(left if isinstance(left, Part.Vertex) else left.lastVertex(), vertex):
-                            isLeft = True
-                            oppositeVertex = right if isinstance(right, Part.Vertex) else right.lastVertex()
-                        elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.firstVertex(), vertex):
-                            oppositeVertex = left if isinstance(left, Part.Vertex) else left.firstVertex()
-                        elif isCommonPoint(right if isinstance(right, Part.Vertex) else right.lastVertex(), vertex):
-                            oppositeVertex = left if isinstance(left, Part.Vertex) else left.lastVertex()
+                    (objectLeft, objectRight) = self.getEdges(object)
+                    if objectLeft is None or objectRight is None:
+                        continue
+
+                    result = self.matchOppositeVertex(
+                        vertex, objectLeft, objectRight, bool(object.EdgesInverted))
+                    if result is not None:
+                        (isLeft, vertex, oppositeVertex) = result
+                        break
 
         return (isLeft, vertex, oppositeVertex, wp)
 
